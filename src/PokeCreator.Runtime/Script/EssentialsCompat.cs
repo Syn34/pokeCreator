@@ -326,7 +326,7 @@ namespace PokeCreator.Runtime.Script
             var sb = new StringBuilder();
             for (int i = 1; i < s.Length - 1; i++)
             {
-                if (s[i] == '\\' && i + 1 < s.Length - 1 && (s[i + 1] == '"' || s[i + 1] == '\'')) { sb.Append(s[i + 1]); i++; }
+                if (s[i] == '\\' && i + 1 < s.Length - 1 && (s[i + 1] == '"' || s[i + 1] == '\'' || s[i + 1] == '\\')) { sb.Append(s[i + 1]); i++; }
                 else sb.Append(s[i]);
             }
             return sb.ToString();

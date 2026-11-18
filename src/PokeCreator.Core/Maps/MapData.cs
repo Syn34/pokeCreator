@@ -171,6 +171,8 @@ namespace PokeCreator.Maps
             return m;
         }
 
+        public bool Valid(int x, int y) { return x >= 0 && y >= 0 && x < Width && y < Height; }
+
         public int GetTile(int x, int y, int z)
         {
             if (x < 0 || y < 0 || x >= Width || y >= Height || z < 0 || z >= Layers.Count) return 0;

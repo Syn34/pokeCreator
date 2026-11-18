@@ -83,6 +83,7 @@ namespace PokeCreator.Runtime
             Compat = new EssentialsCompat(this);
             Encounters = new EncounterSystem(this) { Enabled = !_opt.NoEncounters };
             _renderer = new MapRenderer(Gfx, Project);
+            ScriptLoader.Load(this, Project.ScriptsDir);
 
             NewGame();
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;

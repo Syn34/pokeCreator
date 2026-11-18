@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 OUT=bin
 mkdir -p "$OUT"
-MCS="mcs -langversion:7 -nowarn:1591,0168,0219 -debug-"
+MCS="mcs -langversion:5 -nowarn:1591,0168,0219 -debug-"
 echo "== Core";    $MCS -target:library -out:$OUT/PokeCreator.Core.dll   -recurse:'src/PokeCreator.Core/*.cs' -r:System.Core.dll
 echo "== Import";  $MCS -target:library -out:$OUT/PokeCreator.Import.dll -recurse:'src/PokeCreator.Import/*.cs' -r:$OUT/PokeCreator.Core.dll -r:System.Core.dll
 echo "== CLI";     $MCS -target:exe     -out:$OUT/PokeCreatorImport.exe  src/PokeCreator.Tools/ImportCli.cs -r:$OUT/PokeCreator.Core.dll -r:$OUT/PokeCreator.Import.dll

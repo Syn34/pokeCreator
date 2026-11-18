@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>PokeCreatorStudio</AssemblyName>
+    <RootNamespace>PokeCreator</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <OutputPath>..\..\bin\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>1591;0168;0219;0649</NoWarn>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PokeCreator.Core\PokeCreator.Core.csproj" />
+    <ProjectReference Include="..\PokeCreator.Import\PokeCreator.Import.csproj" />
+    <ProjectReference Include="..\PokeCreator.Runtime\PokeCreator.Runtime.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

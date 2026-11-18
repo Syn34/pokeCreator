@@ -1,0 +1,43 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PokeCreator.Core", "src\PokeCreator.Core\PokeCreator.Core.csproj", "{7FB0DF82-AAED-5EF9-B0BB-5B40F1D4D041}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PokeCreator.Import", "src\PokeCreator.Import\PokeCreator.Import.csproj", "{A34D2759-0AAB-52C3-A86B-85A85165F625}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PokeCreator.Tools", "src\PokeCreator.Tools\PokeCreator.Tools.csproj", "{775929E7-0A4D-5990-8F24-9D4106EAFA9B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PokeCreator.Runtime", "src\PokeCreator.Runtime\PokeCreator.Runtime.csproj", "{C9CCB8D6-B9F1-5626-9BA7-D0F455EC5CD7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PokeCreator.Studio", "src\PokeCreator.Studio\PokeCreator.Studio.csproj", "{AA1820BE-7412-5255-95B6-45D26E3889DD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7FB0DF82-AAED-5EF9-B0BB-5B40F1D4D041}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FB0DF82-AAED-5EF9-B0BB-5B40F1D4D041}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FB0DF82-AAED-5EF9-B0BB-5B40F1D4D041}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FB0DF82-AAED-5EF9-B0BB-5B40F1D4D041}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A34D2759-0AAB-52C3-A86B-85A85165F625}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A34D2759-0AAB-52C3-A86B-85A85165F625}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A34D2759-0AAB-52C3-A86B-85A85165F625}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A34D2759-0AAB-52C3-A86B-85A85165F625}.Release|Any CPU.Build.0 = Release|Any CPU
+		{775929E7-0A4D-5990-8F24-9D4106EAFA9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{775929E7-0A4D-5990-8F24-9D4106EAFA9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{775929E7-0A4D-5990-8F24-9D4106EAFA9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{775929E7-0A4D-5990-8F24-9D4106EAFA9B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C9CCB8D6-B9F1-5626-9BA7-D0F455EC5CD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9CCB8D6-B9F1-5626-9BA7-D0F455EC5CD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9CCB8D6-B9F1-5626-9BA7-D0F455EC5CD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9CCB8D6-B9F1-5626-9BA7-D0F455EC5CD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA1820BE-7412-5255-95B6-45D26E3889DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA1820BE-7412-5255-95B6-45D26E3889DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA1820BE-7412-5255-95B6-45D26E3889DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA1820BE-7412-5255-95B6-45D26E3889DD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
