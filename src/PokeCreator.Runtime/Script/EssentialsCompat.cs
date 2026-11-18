@@ -246,6 +246,19 @@ namespace PokeCreator.Runtime.Script
             Register("pbWildBattle", wildBattle);
             Register("WildBattle.start", wildBattle);
 
+            // Variables, bag and screen helpers
+            Register("pbSet", (c, a) => { _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1))); _game.Map.RefreshEvents(); return Arg(a, 1); });
+            Register("pbGet", (c, a) => _game.State.GetVar(ToInt(Arg(a, 0))));
+            Register("$bag.remove", (c, a) => { bool had = _game.State.Bag.ContainsKey(Str(a, 0)); _game.State.AddItem(Str(a, 0), -(a.Count > 1 ? ToInt(a[1]) : 1)); return had; });
+            Register("$bag.can_add?", (c, a) => true);
+            Register("$bag.quantity", (c, a) => { int n; return _game.State.Bag.TryGetValue(Str(a, 0), out n) ? n : 0; });
+            Register("$player.has_species?", (c, a) => _game.Party.Any(p => p.Species.Equals(Str(a, 0), StringComparison.OrdinalIgnoreCase)));
+            Register("Tone.new", (c, a) => a.Select(x => (object)ToInt(x)).ToList());
+            Register("pbToneChangeAll", (c, a) => { _game.SetScreenTone(Arg(a, 0) as List<object>, ToInt(Arg(a, 1)) * 3 / 2); return true; });
+            foreach (var n in new[] { "hide_choice", "setBattleRule", "$game_screen.weather", "Phone.add", "pbPickBerry", "setPrice", "setVariable", "$speeches.push", "pbToneChangeAll" })
+                if (!_commands.ContainsKey(n)) Register(n, noop);
+            Register("Phone.can_add?", (c, a) => false);
+
             Register("pbGetPokemon", (c, a) => null);
             Register("pbPartyCount", (c, a) => _game.Party.Count);
             Register("pbChooseNonEggPokemon", (c, a) => true);
