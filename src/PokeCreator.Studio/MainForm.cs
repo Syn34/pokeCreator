@@ -96,6 +96,9 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add(new ToolStripMenuItem("&Playtest", null, (s, e) => Playtest(null)) { ShortcutKeys = Keys.F5 });
             game.DropDownItems.Add(new ToolStripMenuItem("Playtest from Current Map", null, (s, e) => PlaytestHere()) { ShortcutKeys = Keys.Shift | Keys.F5 });
             game.DropDownItems.Add(new ToolStripSeparator());
+            game.DropDownItems.Add(new ToolStripMenuItem("&World Map", null, (s, e) => OpenWorld()) { ShortcutKeys = Keys.Control | Keys.M });
+            game.DropDownItems.Add("Tilesets", null, (s, e) => { if (Project != null) OpenDocument("sys:tilesets", () => new TilesetEditor(Project)); });
+            game.DropDownItems.Add(new ToolStripSeparator());
             game.DropDownItems.Add("Game Settings", null, (s, e) => OpenSettings());
             game.DropDownItems.Add("Player Characters", null, (s, e) => OpenPlayers());
             game.DropDownItems.Add("Switches && Variables", null, (s, e) => OpenDocument("sys:switches", () => new SwitchesDocument(Project)));
@@ -259,7 +262,7 @@ namespace PokeCreator.Studio
             Node(settings.Nodes, "Player Characters", "players", "sys:players");
             Node(settings.Nodes, "Switches & Variables", "switches", "sys:switches");
             Node(settings.Nodes, "Tilesets", "tilesets", "sys:tilesets");
-            Node(settings.Nodes, "Map Connections", "connections", "sys:connections");
+            Node(settings.Nodes, "Map Connections (list)", "connections", "sys:connections");
             Node(settings.Nodes, "Appearance (Studio)", "appearance", "sys:appearance");
 
             var db = Node(_tree.Nodes, "Database", "database", null);
@@ -267,6 +270,7 @@ namespace PokeCreator.Studio
             db.Expand();
 
             var maps = Node(_tree.Nodes, "Maps (" + p.MapInfos.Count + ")", "maps", "maps");
+            Node(maps.Nodes, "World Map (connections)", "world", "sys:world");
             AddMapNodes(maps.Nodes, 0, new HashSet<int>());
             maps.Expand();
 
@@ -430,7 +434,8 @@ namespace PokeCreator.Studio
             else if (s == "sys:players") OpenPlayers();
             else if (s == "sys:switches") OpenDocument(s, () => new SwitchesDocument(Project));
             else if (s == "sys:tilesets") OpenDocument(s, () => new TilesetEditor(Project));
-            else if (s == "sys:connections") OpenDocument(s, () => new ObjectDocument("Map Connections", Project.Connections, () => Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections), "Maps that join seamlessly at their edges. Edge is North/South/East/West; offsets line the maps up."));
+            else if (s == "sys:world") OpenWorld();
+            else if (s == "sys:connections") { var w = FindTab("sys:world"); if (w != null) CloseTab(w); if (FindTab("sys:world") == null) OpenDocument(s, () => new ObjectDocument("Map Connections", Project.Connections, () => Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections), "Maps that join seamlessly at their edges. Edge is North/South/East/West; offsets line the maps up.")); }
             else if (s.StartsWith("assets:")) { string dir = s.Substring(7); OpenDocument(s, () => new AssetBrowser(Project, dir)); }
             else if (s.StartsWith("file:")) OpenFile(s.Substring(5));
         }
@@ -496,6 +501,15 @@ namespace PokeCreator.Studio
             for (int i = 0; i < _tabs.TabCount; i++) if (_tabs.GetTabRect(i).Contains(p)) { CloseTab(_tabs.TabPages[i]); return; }
         }
 
+        void OpenWorld()
+        {
+            if (Project == null) return;
+            // The connection list document edits the same data; close it so the two can't disagree
+            var list = FindTab("sys:connections");
+            if (list != null) CloseTab(list);
+            OpenDocument("sys:world", () => new WorldEditor(this, Project));
+        }
+
         void OpenTable(DatabaseTable t) { OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)); }
 
         void OpenSettings()
@@ -533,6 +547,9 @@ namespace PokeCreator.Studio
             RebuildTree();
             OpenMap(m.Id);
         }
+
+        /// <summary>Rebuilds the project tree after another document added or renamed things.</summary>
+        public void RefreshTree() { RebuildTree(); }
 
         void RenameMap(MapInfo mi)
         {

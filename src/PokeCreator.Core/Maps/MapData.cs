@@ -225,7 +225,7 @@ namespace PokeCreator.Maps
         [JsonCompact] public List<int> Passages { get; set; }
         /// <summary>Per tile ID: 0 = below characters, 1-5 = drawn above.</summary>
         [JsonCompact] public List<int> Priorities { get; set; }
-        /// <summary>Per tile ID: Essentials terrain tag (2 grass, 5 ledge, 6 water...).</summary>
+        /// <summary>Per tile ID: Essentials terrain tag (1 ledge, 2 grass, 5-7 water, 10 tall grass... see TerrainTags.Names).</summary>
         [JsonCompact] public List<int> TerrainTags { get; set; }
 
         public TilesetData()

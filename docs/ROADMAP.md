@@ -14,6 +14,9 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Pause menu: Party, Summary, Bag, Trainer Card, Save, Quit to Title
 - [x] Save/load (JSON save files) and a title screen with Continue / New Game
 - [x] Studio: closable document tabs, dark mode, Appearance tab, tree icons
+- [x] Complete built-in database: all 1025 Pokémon with forms, moves, abilities and items; Add Missing Data for existing projects
+- [x] World Map: drag-to-connect map connections, new connected maps, unplaced-map list
+- [x] Tileset and autotile image import with 16×16 and wide-sheet conversion
 - [ ] Using items from the Bag (Potions, Repels...), giving held items
 - [ ] Evolution on level up (needs battles for EXP)
 - [ ] Pokédex (seen/caught), Options menu
@@ -34,8 +37,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [ ] Weather and fog/panorama effects, flash/darkness maps, Essentials text codes (colours, speed, windowskins)
 
 ## v0.5: Studio power features
-- [ ] Visual map connections editor (drag maps next to each other)
-- [ ] World map overview of all maps
+- [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves
 - [ ] Move-route editor and full command palette in the event editor
 - [ ] Validation panel: missing graphics, broken references (e.g. a move that doesn't exist)
 - [ ] Common events, troops/battle setup screens

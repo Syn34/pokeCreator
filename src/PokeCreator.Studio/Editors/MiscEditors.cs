@@ -38,9 +38,19 @@ namespace PokeCreator.Studio.Editors
             _canvas = new TilesetCanvas(this);
             _scroll.Controls.Add(_canvas);
             var left = new Panel { Dock = DockStyle.Left, Width = 220 };
-            var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 32 };
+            var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 68 };
             var add = new Button { Text = "New Tileset" }; add.Click += (s, e) => { int id = _p.Tilesets.Count == 0 ? 1 : _p.Tilesets.Max(t => t.Id) + 1; _p.Tilesets.Add(new TilesetData { Id = id, Name = "New tileset" }); Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark(); };
+            var fromImage = new Button { Text = "New From Image…", AutoSize = true };
+            fromImage.Click += (s, e) =>
+            {
+                string name = TilesetImport.PickTileset(FindForm(), _p);
+                if (name == null) return;
+                int id = _p.Tilesets.Count == 0 ? 1 : _p.Tilesets.Max(t => t.Id) + 1;
+                _p.Tilesets.Add(new TilesetData { Id = id, Name = name, TilesetName = name });
+                Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark();
+            };
             bar.Controls.Add(add);
+            bar.Controls.Add(fromImage);
             left.Controls.Add(_list); left.Controls.Add(bar);
 
             var modes = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
@@ -52,10 +62,34 @@ namespace PokeCreator.Studio.Editors
                 rb.CheckedChanged += (s, e) => { if (rb.Checked) { _mode = mm; _canvas.Invalidate(); } };
                 modes.Controls.Add(rb);
             }
+            var imageBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
+            var changeImage = new Button { Text = "Replace Tileset Image…", AutoSize = true };
+            changeImage.Click += (s, e) =>
+            {
+                var ts = Current; if (ts == null) return;
+                string name = TilesetImport.PickTileset(FindForm(), _p);
+                if (name == null) return;
+                ts.TilesetName = name; Mark(); ShowSelected();
+            };
+            var autotile = new Button { Text = "Import Autotile…", AutoSize = true };
+            autotile.Click += (s, e) =>
+            {
+                var ts = Current; if (ts == null) return;
+                while (ts.AutotileNames.Count < 7) ts.AutotileNames.Add("");
+                var slots = Enumerable.Range(0, 7).Select(i => "Slot " + (i + 1) + ": " + (ts.AutotileNames[i] == "" ? "(empty)" : ts.AutotileNames[i])).ToArray();
+                int slot = ChoiceDialog.Ask(FindForm(), "Which autotile slot?", slots);
+                if (slot < 0) return;
+                string name = TilesetImport.PickAutotile(FindForm(), _p);
+                if (name == null) return;
+                ts.AutotileNames[slot] = name; Mark(); ShowSelected();
+            };
+            imageBar.Controls.Add(changeImage);
+            imageBar.Controls.Add(autotile);
+            imageBar.Controls.Add(new Label { Text = "16×16 sheets are doubled and wide sheets re-arranged to 8 tiles across automatically.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(8, 8, 0, 0) });
             var help = new Label { Dock = DockStyle.Top, Height = 20, ForeColor = Color.DimGray, Text = "Left-click to raise/toggle, right-click to lower. Terrain: 1 ledge, 2 grass, 5-9 water, 10 tall grass, 12 ice, 15 bridge." };
 
             var right = new Panel { Dock = DockStyle.Fill };
-            right.Controls.Add(_scroll); right.Controls.Add(help); right.Controls.Add(modes); right.Controls.Add(_formHost);
+            right.Controls.Add(_scroll); right.Controls.Add(help); right.Controls.Add(modes); right.Controls.Add(imageBar); right.Controls.Add(_formHost);
             Controls.Add(right); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(left);
             _list.SelectedIndexChanged += (s, e) => ShowSelected();
             Fill();

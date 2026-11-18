@@ -21,7 +21,8 @@ MyGame/
     regional_dexes.json
     tilesets.json           tileset images + per-tile passability / priority / terrain tag
     mapinfos.json           map tree (names, parents, order)
-    map_connections.json    maps that join at their edges
+    map_connections.json    maps that join at their edges (edited in the World Map)
+    world.json              Studio only: where each map sits on the World Map ({"5": [x, y]} in tiles)
     Maps/
       Map001.json …         one file per map: size, tileset, music, Pokémon settings,
                             tile layers, events
@@ -83,3 +84,17 @@ public static class Rewards
     }
 }
 ```
+
+## Map connections
+
+`map_connections.json` uses Essentials' meaning. Each entry joins one edge of `Map1` to one edge of `Map2`:
+
+```json
+{ "Map1": 47, "Edge1": "East", "Offset1": 8, "Map2": 52, "Edge2": "West" }
+```
+
+Take the point `Offset1` tiles along Map1's edge and the point `Offset2` tiles along Map2's edge (offsets run left-to-right on North/South edges, top-to-bottom on East/West edges); the maps are placed so those two points meet. Above, Map 52's top-left corner sits 8 tiles below Map 47's top-right corner. Missing offsets are 0. The World Map writes these for you.
+
+## Built-in database
+
+`BaseData/*.json` next to the Studio (from `data/base` in the repo) holds every Pokémon, move, ability, item, type and trainer type. New projects are created from it, and **Database → Add Missing Pokémon & Data** merges in records whose ID the project doesn't have yet. Existing records are never changed. See `tools/basedata/README.md` for how it's generated.

@@ -250,6 +250,10 @@ namespace PokeCreator.Studio.Controls
                 case "tilesets":
                     Box(g, C(90, 180, 90), 1.5f, 1.5f, 7, 7); Box(g, C(200, 170, 120), 9.5f, 1.5f, 7, 7);
                     Box(g, C(100, 160, 230), 1.5f, 9.5f, 7, 7); Box(g, C(150, 150, 160), 9.5f, 9.5f, 7, 7); break;
+                case "world":
+                    Round(g, C(60, 130, 200), 1.5f, 1.5f, 15, 15, 2);
+                    Box(g, C(110, 190, 90), 3, 3, 5, 5); Box(g, C(110, 190, 90), 8, 3, 6, 5); Box(g, C(230, 200, 110), 3, 8, 11, 6);
+                    break;
                 case "connections":
                     using (var p = new Pen(C(120, 130, 150), 2.4f)) { g.DrawArc(p, 1.5f, 5.5f, 9, 7, 90, 180); g.DrawArc(p, 7.5f, 5.5f, 9, 7, 270, 180); g.DrawLine(p, 6, 5.5f, 9, 5.5f); g.DrawLine(p, 9, 12.5f, 12, 12.5f); g.DrawLine(p, 6, 9, 12, 9); }
                     break;

@@ -14,7 +14,7 @@ PokeCreator does what Pokémon Essentials does, built to be easier to use:
 
 Already have an Essentials game? **File → Import Pokémon Essentials Project** converts it: PBS data, maps, events, tilesets, switch/variable names, graphics and audio. Your Essentials folder isn't changed.
 
-## What works today (v0.1)
+## What works today (v0.2)
 
 **Studio (editor)**
 - Project explorer for every data table, map, script, asset folder and file, with an icon for everything (houses for towns, signposts for routes, caves, Pokémon Centers, gyms, Poké Balls...) and colour-coded indent guides like a code editor. Right-click a map → **Change Icon…** to choose your own
@@ -22,9 +22,11 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Database editors generated from the data model: dropdowns for types/moves/abilities/items, grids for level-up moves, evolutions, EVs, trainer parties and encounter slots, sprite previews
 - Map editor: tileset palette, 3 tile layers + events layer, pencil / rectangle / flood fill / eraser, right-click eyedropper, automatic autotile shapes, dim-other-layers, grid, passability overlay, undo/redo, zoom, map properties (size, tileset, music, Pokémon settings)
 - Event editor: pages, conditions, sprite picker with preview, triggers and movement, readable command list, one-click Text / Choices / If / Switch / Self Switch / Variable / Warp / Sound / Music / Wait / Give Item / Script, plus quick templates for NPCs, doors and item balls
-- Tileset editor: passability, priority, terrain tags, bush and counter flags
+- **World Map** (Ctrl+M): every outdoor map laid out by its connections as live thumbnails. Drag maps so their edges touch to connect them, pull them apart to disconnect, nudge with the arrow keys, drop unplaced maps in from the side list, and right-click empty space to create a new connected map. Writes the same `map_connections.json` the game uses
+- Tileset editor: passability, priority, terrain tags, bush and counter flags. **New From Image / Replace Tileset Image / Import Autotile**: 16×16 sheets are doubled and wide sheets re-arranged to 8 tiles across automatically
+- **Complete built-in database**: all 1025 Pokémon (#1–1025, with regional and alternate forms), 921 moves, 316 abilities and 715 items. New projects start with it, imports top up what Essentials lacks, and **Database → Add Missing Pokémon & Data** adds anything missing to an existing project without touching your edits
 - Asset browser with thumbnails and drag-and-drop import; text/script editor with highlighting and find
-- Game settings, player characters, switches & variables, map connections
+- Game settings, player characters, switches & variables
 
 **Game runtime (`Game.exe`, SDL2)**
 - Tile maps with RMXP autotiles, animated tiles and correct above/below layering
@@ -39,6 +41,8 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Title screen** (uses your `Graphics/Titles/title.png`) with Continue / New Game / Quit
 - **Pause menu** (Esc/X): Pokémon party (switch order), 3-page summary (info, stats with nature colours, moves), Bag with 8 pockets, trainer card, Save, Quit to Title
 - **Saving and loading** to `%AppData%\PokeCreator\Saves\<game title>\Game.json` (previous save kept as a backup)
+
+**Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
 
 **Not yet:** battles (wild/trainer battles currently show a placeholder message), using items, Pokédex, PC boxes, Surf/Fly/field moves and shops. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
