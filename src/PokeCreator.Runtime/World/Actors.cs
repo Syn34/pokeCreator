@@ -1,0 +1,293 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using PokeCreator.Data;
+using PokeCreator.Maps;
+using PokeCreator.Runtime.Platform;
+using PokeCreator.Runtime.Script;
+
+namespace PokeCreator.Runtime.World
+{
+    /// <summary>A map event: picks the active page from its conditions and runs its commands.</summary>
+    public class GameEvent : Character
+    {
+        public readonly MapEvent Data;
+        public readonly GameMap Owner;
+        public EventPage Page;
+        public bool Erased;
+        public int Trigger = -1;
+        public List<EventCommand> List;
+        public bool Starting;
+        public Interpreter ParallelInterpreter;
+        int _lockedDirection;
+        bool _locked;
+
+        public int Id { get { return Data.Id; } }
+        public string Name { get { return Data.Name; } }
+        public override GameMap Map { get { return Owner; } }
+
+        public GameEvent(Game game, GameMap owner, MapEvent data) : base(game)
+        {
+            Data = data; Owner = owner;
+            MoveTo(data.X, data.Y);
+            Refresh();
+        }
+
+        bool ConditionsMet(EventPage p)
+        {
+            var c = p.Condition; var s = Game.State;
+            if (c.Switch1Valid && !s.GetSwitch(c.Switch1Id)) return false;
+            if (c.Switch2Valid && !s.GetSwitch(c.Switch2Id)) return false;
+            if (c.VariableValid && s.GetVar(c.VariableId) < c.VariableValue) return false;
+            if (c.SelfSwitchValid && !s.GetSelf(Owner.Id, Id, c.SelfSwitchCh)) return false;
+            return true;
+        }
+
+        public void Refresh()
+        {
+            EventPage newPage = null;
+            if (!Erased)
+                for (int i = Data.Pages.Count - 1; i >= 0; i--)
+                    if (ConditionsMet(Data.Pages[i])) { newPage = Data.Pages[i]; break; }
+            if (newPage == Page) return;
+            Page = newPage;
+            Starting = false;
+            if (Page == null)
+            {
+                TileId = 0; CharacterName = ""; Through = true; Trigger = -1; List = null; ParallelInterpreter = null;
+                return;
+            }
+            var g = Page.Graphic;
+            TileId = g.TileId; CharacterName = g.CharacterName ?? "";
+            if (Direction != g.Direction || !_locked) { Direction = g.Direction == 0 ? 2 : g.Direction; }
+            OriginalPattern = Pattern = g.Pattern;
+            Opacity = g.Opacity;
+            MoveSpeed = Page.MoveSpeed; MoveFrequency = Page.MoveFrequency;
+            WalkAnime = Page.WalkAnime; StepAnime = Page.StepAnime; DirectionFix = Page.DirectionFix;
+            Through = Page.Through; AlwaysOnTop = Page.AlwaysOnTop;
+            Trigger = Page.Trigger; List = Page.List;
+            SetCustomRoute(Page.MoveType == 3 ? Page.MoveRoute : null);
+            ParallelInterpreter = Trigger == Triggers.Parallel ? new Interpreter(Game, Owner.Id, Id, List) : null;
+            if (Trigger == Triggers.Autorun) Start();
+        }
+
+        public bool HasCommands { get { return List != null && List.Any(c => c.Code != 0); } }
+
+        public void Start() { if (HasCommands) Starting = true; }
+
+        public void Erase() { Erased = true; Refresh(); }
+
+        /// <summary>Events with no sprite (or Through) are stepped on rather than bumped into.</summary>
+        public bool OverTrigger { get { return CharacterName.Length == 0 || Through; } }
+
+        public void Lock()
+        {
+            if (_locked) return;
+            _lockedDirection = Direction;
+            TurnToward(Game.Player);
+            _locked = true;
+        }
+
+        public void Unlock()
+        {
+            if (!_locked) return;
+            _locked = false;
+            if (!DirectionFix && Page != null && Page.MoveType == 0) Direction = _lockedDirection;
+        }
+
+        protected override bool CanMoveAutonomously()
+        {
+            return Page != null && !_locked && !Starting && !Moving && !Jumping && !Game.MessageBusy;
+        }
+
+        protected override void UpdateSelfMovement()
+        {
+            int threshold = (int)((40 - MoveFrequency * 2) * (6 - MoveFrequency) * 1.5);
+            if (StopCount <= threshold) return;
+            switch (Page.MoveType)
+            {
+                case 1: MoveRandom(); break;
+                case 2:
+                    {
+                        int dx = Math.Abs(X - Game.Player.X), dy = Math.Abs(Y - Game.Player.Y);
+                        if (dx + dy >= 20) MoveRandom();
+                        else if (Game.Rng.Next(6) < 4) MoveToward(Game.Player); else MoveRandom();
+                        break;
+                    }
+                case 3: UpdateRoute(); break;
+            }
+        }
+
+        protected override void OnBump(int x, int y)
+        {
+            // Event touch: this event walked into the player
+            if (Trigger == Triggers.EventTouch && Game.Player.X == x && Game.Player.Y == y && !Game.InterpreterRunning) Start();
+        }
+
+        public override void Update()
+        {
+            base.Update();
+            if (ParallelInterpreter != null && !Erased) ParallelInterpreter.Update();
+        }
+    }
+
+    /// <summary>The player character, controlled with the keyboard.</summary>
+    public class Player : Character
+    {
+        public PlayerCharacter Look;
+        bool _wasMoving;
+        GameMap _pendingNeighbor;
+        int _pendingOffX, _pendingOffY;
+
+        public Player(Game game) : base(game) { MoveSpeed = 4; }
+
+        public string WalkCharset { get { return Look != null && !string.IsNullOrEmpty(Look.WalkCharset) ? Look.WalkCharset : "trainer_POKEMONTRAINER_Red"; } }
+        public string RunCharset { get { return Look != null && !string.IsNullOrEmpty(Look.RunCharset) ? Look.RunCharset : WalkCharset; } }
+
+        public override void Update()
+        {
+            bool canControl = !Game.InterpreterRunning && !Game.MessageBusy && !Game.Transferring && !RouteForced;
+            if (canControl && !Moving && !Jumping)
+            {
+                int d = Input.Dir4;
+                bool run = Input.Press(Button.Run);
+                MoveSpeed = run ? 5 : 4;
+                if (d != 0) Move(d);
+            }
+            bool running = MoveSpeed >= 5 && (Moving || Input.Dir4 != 0);
+            CharacterName = running && Game.Project.FindAsset("Graphics/Characters", RunCharset) != null ? RunCharset : WalkCharset;
+
+            base.Update();
+
+            if (_wasMoving && !Moving && !Jumping) OnStepFinished();
+            _wasMoving = Moving || Jumping;
+
+            if (canControl && !Moving && !Jumping && Input.Trigger(Button.Action)) CheckActionTrigger();
+        }
+
+        GameMap TargetMap(int nx, int ny, out int lx, out int ly)
+        {
+            GameMap m;
+            if (Game.Map.Resolve(nx, ny, out m, out lx, out ly)) return m;
+            return null;
+        }
+
+        public override bool Move(int d, bool turn = true)
+        {
+            if (turn) Turn(d);
+            int nx = X + Dx(d), ny = Y + Dy(d);
+            var map = Game.Map;
+
+            if (Through) { X = nx; Y = ny; return true; }
+
+            int lx, ly;
+            var target = TargetMap(nx, ny, out lx, out ly);
+            if (target == null) return false;
+
+            // Ledges: jump over in the direction of travel
+            if (target.TerrainTag(lx, ly) == GameMap.TagLedge && map.Valid(nx + Dx(d), ny + Dy(d)))
+            {
+                int jx = nx + Dx(d), jy = ny + Dy(d);
+                if (map.TilePassable(jx, jy, 10 - d, null) && !map.EventsAt(jx, jy).Any(e => !e.OverTrigger))
+                {
+                    Game.Audio.PlaySe("Player jump");
+                    Jump(Dx(d) * 2, Dy(d) * 2);
+                    return true;
+                }
+            }
+
+            bool ok = map.TilePassable(X, Y, d, null) && target.TilePassable(lx, ly, 10 - d, null);
+            if (ok && Array.IndexOf(GameMap.WaterTags, target.TerrainTag(lx, ly)) >= 0) ok = false; // needs Surf
+            if (ok && target == map)
+            {
+                foreach (var e in map.EventsAt(nx, ny))
+                    if (!e.Through && e.CharacterName.Length > 0) { ok = false; break; }
+            }
+            if (!ok)
+            {
+                if (target == map) CheckTouchTrigger(nx, ny);
+                Game.Audio.PlaySe("Player bump");
+                return false;
+            }
+            X = nx; Y = ny;
+            if (target != map)
+            {
+                var n = map.Neighbors.First(nb => nb.Map == target);
+                _pendingNeighbor = target; _pendingOffX = n.OffsetX; _pendingOffY = n.OffsetY;
+            }
+            return true;
+        }
+
+        void OnStepFinished()
+        {
+            if (_pendingNeighbor != null)
+            {
+                Game.EnterNeighbor(_pendingNeighbor, _pendingOffX, _pendingOffY);
+                _pendingNeighbor = null;
+            }
+            Game.State.Steps++;
+            // Player touch / event touch on the tile we stepped onto
+            foreach (var e in Game.Map.EventsAt(X, Y).ToList())
+                if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
+            Game.Encounters.OnStep(X, Y);
+        }
+
+        void CheckTouchTrigger(int x, int y)
+        {
+            if (Game.InterpreterRunning) return;
+            foreach (var e in Game.Map.EventsAt(x, y))
+                if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && !e.OverTrigger) { e.Start(); return; }
+        }
+
+        void CheckActionTrigger()
+        {
+            var map = Game.Map;
+            foreach (var e in map.EventsAt(X, Y))
+                if (e.Trigger == Triggers.Action && e.OverTrigger) { e.Start(); return; }
+            int fx = X + Dx(Direction), fy = Y + Dy(Direction);
+            foreach (var e in map.EventsAt(fx, fy))
+                if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
+            if (map.IsCounter(fx, fy))
+            {
+                fx += Dx(Direction); fy += Dy(Direction);
+                foreach (var e in map.EventsAt(fx, fy))
+                    if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
+            }
+        }
+    }
+
+    /// <summary>Wild encounters from the project's encounter tables (battles are a placeholder for now).</summary>
+    public class EncounterSystem
+    {
+        readonly Game _game;
+        public bool Enabled = true;
+        int _cooldown;
+        public EncounterSystem(Game g) { _game = g; }
+
+        public void OnStep(int x, int y)
+        {
+            if (!Enabled) return;
+            if (_cooldown > 0) { _cooldown--; return; }
+            var map = _game.Map;
+            int tag = map.TerrainTag(x, y);
+            string method;
+            if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) method = "Land";
+            else if (map.Tileset != null && _game.Project.Encounters.Any(en => en.Map == map.Id && en.Methods.Any(mt => mt.Type.StartsWith("Cave")))) method = "Cave";
+            else return;
+            var table = _game.Project.Encounters.FirstOrDefault(en => en.Map == map.Id && en.Version == 0);
+            if (table == null) return;
+            bool night = DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20;
+            var m = table.Methods.FirstOrDefault(mm => mm.Type == method + (night ? "Night" : "Day")) ?? table.Methods.FirstOrDefault(mm => mm.Type == method);
+            if (m == null || m.Slots.Count == 0) return;
+            int density = m.Density > 0 ? m.Density : 25;
+            if (_game.Rng.Next(180) >= density) return;
+            int total = m.Slots.Sum(s => s.Chance), roll = _game.Rng.Next(Math.Max(1, total));
+            EncounterSlot slot = m.Slots[0];
+            foreach (var s in m.Slots) { if (roll < s.Chance) { slot = s; break; } roll -= s.Chance; }
+            int level = _game.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1);
+            var sp = _game.Project.Species.FirstOrDefault(s => s.Id == slot.Species);
+            _cooldown = 4;
+            _game.StartWildEncounter(sp != null ? sp.Name : slot.Species, level);
+        }
+    }
+}

@@ -14,5 +14,6 @@ fi
 if [ -d src/PokeCreator.Studio ]; then
   echo "== Studio";  $MCS -target:winexe -out:$OUT/PokeCreatorStudio.exe -recurse:'src/PokeCreator.Studio/*.cs' -r:$OUT/PokeCreator.Core.dll -r:$OUT/PokeCreator.Import.dll -r:System.Core.dll -r:System.Drawing.dll -r:System.Windows.Forms.dll -r:System.Data.dll
 fi
+cp src/PokeCreator.Runtime/Game.exe.config "$OUT"/ 2>/dev/null || true
 if [ -d lib/win-x64 ]; then cp lib/win-x64/*.dll "$OUT"/ 2>/dev/null || true; fi
 echo "Build OK -> $OUT/"

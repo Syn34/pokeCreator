@@ -1,0 +1,418 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using PokeCreator.Maps;
+using PokeCreator.Projects;
+using PokeCreator.Runtime.Platform;
+using PokeCreator.Runtime.Render;
+using PokeCreator.Runtime.Script;
+using PokeCreator.Runtime.UI;
+using PokeCreator.Runtime.World;
+
+namespace PokeCreator.Runtime
+{
+    public class GameOptions
+    {
+        public string ProjectDir;
+        public int StartMap = -1, StartX, StartY, StartDir = 2;
+        public string AutotestScript;
+        public bool NoEncounters;
+        public int Scale = 0;
+    }
+
+    /// <summary>Top-level game: owns the window, the current map and the main loop.</summary>
+    public class Game : IDisposable
+    {
+        public class PartyMember { public string Species; public int Level; }
+
+        public Project Project;
+        public Gfx Gfx;
+        public Audio Audio;
+        public GameState State = new GameState();
+        public Player Player;
+        public GameMap Map;
+        public MessageWindow Message;
+        public Interpreter Interpreter;
+        public EssentialsCompat Compat;
+        public EncounterSystem Encounters;
+        public readonly Random Rng = new Random();
+        public readonly List<PartyMember> Party = new List<PartyMember>();
+        MapRenderer _renderer;
+
+        public int DisplayX, DisplayY;
+        public int FrameCount;
+        bool _quit;
+
+        public bool MessageBusy { get { return Message.Busy; } }
+        public bool InterpreterRunning { get { return Interpreter.Running; } }
+        public bool Transferring { get { return _transfer != null; } }
+
+        class TransferRequest { public int Map, X, Y, Dir; public bool Fade; public int Phase; }
+        TransferRequest _transfer;
+        int _fadeAlpha;          // 0..255 black overlay
+        double[] _tone = new double[4], _toneTarget = new double[4];
+        int _toneFrames;
+        int _flash;
+        string _signText; int _signTimer;
+        readonly GameOptions _opt;
+
+        public Game(GameOptions opt) { _opt = opt; }
+
+        // ------------------------------------------------------------------ startup
+        public void Run()
+        {
+            Project = Project.Load(_opt.ProjectDir);
+            if (SDL.SDL_Init(SDL.INIT_VIDEO | SDL.INIT_EVENTS) != 0) throw new Exception("SDL_Init failed: " + SDL.GetError());
+            SDL.SDL_InitSubSystem(SDL.INIT_AUDIO);
+            SDL.IMG_Init(0x2 | 0x1); // PNG | JPG
+            SDL.TTF_Init();
+
+            var s = Project.Settings;
+            int scale = _opt.Scale > 0 ? _opt.Scale : Math.Max(1, s.WindowScale);
+            Gfx = new Gfx(s.Title ?? Project.Info.Name, s.ScreenWidth > 0 ? s.ScreenWidth : 512, s.ScreenHeight > 0 ? s.ScreenHeight : 384, scale);
+            if (!Gfx.LoadFont(Project.FindAsset("Fonts", s.Font), s.FontSize > 0 ? s.FontSize : 26))
+            {
+                var any = Directory.Exists(Project.FontsDir) ? Directory.GetFiles(Project.FontsDir, "*.ttf").FirstOrDefault() : null;
+                if (any != null) Gfx.LoadFont(any, s.FontSize > 0 ? s.FontSize : 26);
+            }
+            Audio = new Audio(Project);
+            Message = new MessageWindow(this);
+            Interpreter = new Interpreter(this);
+            Compat = new EssentialsCompat(this);
+            Encounters = new EncounterSystem(this) { Enabled = !_opt.NoEncounters };
+            _renderer = new MapRenderer(Gfx, Project);
+
+            NewGame();
+            Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
+
+            ulong freq = SDL.SDL_GetPerformanceFrequency();
+            double frameTime = 1.0 / 60.0;
+            ulong last = SDL.SDL_GetPerformanceCounter();
+            while (!_quit)
+            {
+                SDL_Event e;
+                while (SDL.SDL_PollEvent(out e) != 0) if (e.type == SDL.QUIT) _quit = true;
+                if (test != null) { if (!test.Step()) _quit = true; }
+                Input.Update();
+                Update();
+                Draw();
+                if (test != null) test.AfterDraw();
+                Gfx.Present();
+                FrameCount++;
+                // Frame limiter (vsync usually handles this)
+                double elapsed = (SDL.SDL_GetPerformanceCounter() - last) / (double)freq;
+                if (elapsed < frameTime) SDL.SDL_Delay((uint)Math.Max(0, (frameTime - elapsed) * 1000));
+                last = SDL.SDL_GetPerformanceCounter();
+            }
+        }
+
+        void NewGame()
+        {
+            var s = Project.Settings;
+            State.Money = s.StartMoney;
+            State.PlayerName = string.IsNullOrEmpty(s.DefaultPlayerName) ? "Red" : s.DefaultPlayerName;
+            foreach (var it in s.StartItemStorage) { }
+            Player = new Player(this);
+            Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, s.DefaultPlayer), Project.Players.Count - 1)] : null;
+            Player.CharacterName = Player.WalkCharset;
+            int map = _opt.StartMap > 0 ? _opt.StartMap : s.StartMap;
+            int x = _opt.StartMap > 0 ? _opt.StartX : s.StartX;
+            int y = _opt.StartMap > 0 ? _opt.StartY : s.StartY;
+            int dir = _opt.StartMap > 0 ? _opt.StartDir : (s.StartDirection == 0 ? 2 : s.StartDirection);
+            SetupMap(map, x, y, dir);
+        }
+
+        public void Quit() { _quit = true; }
+
+        // ------------------------------------------------------------------ maps
+        public void SetupMap(int id, int x, int y, int dir)
+        {
+            var data = Project.LoadMap(id);
+            if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
+            Map = new GameMap(Project, data, this, true);
+            Map.LoadNeighbors(Project, this);
+            Player.MoveTo(x, y);
+            if (dir != 0) Player.Turn(dir);
+            Interpreter.Setup(null, 0);
+            CenterCamera();
+            if (data.AutoplayBgm && data.Bgm != null) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            var props = data.Properties;
+            if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
+            Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
+        }
+
+        /// <summary>Called when the player walks across a map connection.</summary>
+        public void EnterNeighbor(GameMap neighbor, int offX, int offY)
+        {
+            int px = Player.X - offX, py = Player.Y - offY;
+            int dx = DisplayX - offX * 32, dy = DisplayY - offY * 32;
+            var data = neighbor.Data;
+            Map = new GameMap(Project, data, this, true);
+            Map.LoadNeighbors(Project, this);
+            Player.MoveTo(px, py);
+            DisplayX = dx; DisplayY = dy;
+            if (data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            var props = data.Properties;
+            if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
+            Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
+        }
+
+        public void RequestTransfer(int map, int x, int y, int dir, bool fade)
+        {
+            _transfer = new TransferRequest { Map = map, X = x, Y = y, Dir = dir, Fade = fade };
+        }
+
+        void UpdateTransfer()
+        {
+            var t = _transfer;
+            if (t.Phase == 0)
+            {
+                if (!t.Fade) { t.Phase = 1; }
+                else { _fadeAlpha = Math.Min(255, _fadeAlpha + 32); if (_fadeAlpha >= 255) t.Phase = 1; return; }
+            }
+            if (t.Phase == 1)
+            {
+                SetupMap(t.Map, t.X, t.Y, t.Dir);
+                t.Phase = 2;
+                if (!t.Fade) { _transfer = null; return; }
+            }
+            if (t.Phase == 2)
+            {
+                _fadeAlpha = Math.Max(0, _fadeAlpha - 32);
+                if (_fadeAlpha <= 0) _transfer = null;
+            }
+        }
+
+        // ------------------------------------------------------------------ battles (placeholders until the battle system lands)
+        public void StartWildEncounter(string species, int level)
+        {
+            Audio.PlaySe("Exclaim");
+            Message.Show("A wild " + species + " (Lv. " + level + ") appeared!\\nPokeCreator's battle system is coming soon, so it ran away.");
+        }
+
+        public void StartPlaceholderBattle(string who)
+        {
+            Message.Show("[Battle with " + who + "]\\nBattles aren't implemented yet, so this counts as a win.");
+        }
+
+        // ------------------------------------------------------------------ screen effects
+        public void SetScreenTone(List<object> values, int frames)
+        {
+            if (values == null) return;
+            for (int i = 0; i < 4 && i < values.Count; i++) _toneTarget[i] = Convert.ToDouble(values[i], CultureInfo.InvariantCulture);
+            _toneFrames = Math.Max(0, frames);
+            if (_toneFrames == 0) Array.Copy(_toneTarget, _tone, 4);
+        }
+
+        public void Flash(int frames) { _flash = Math.Max(1, frames); }
+
+        // ------------------------------------------------------------------ update
+        void Update()
+        {
+            if (_transfer != null) { UpdateTransfer(); if (_transfer != null && _transfer.Phase < 2) return; }
+
+            if (_toneFrames > 0)
+            {
+                for (int i = 0; i < 4; i++) _tone[i] += (_toneTarget[i] - _tone[i]) / _toneFrames;
+                _toneFrames--;
+            }
+            if (_flash > 0) _flash--;
+            if (_signTimer > 0) _signTimer--;
+
+            foreach (var e in Map.Events) e.Update();
+            Player.Update();
+
+            if (!Interpreter.Running && !Transferring)
+            {
+                var starter = Map.Events.FirstOrDefault(e => e.Starting && !e.Erased);
+                if (starter != null)
+                {
+                    starter.Starting = false;
+                    if (starter.Trigger <= Triggers.EventTouch) starter.Lock();
+                    Interpreter.Setup(starter.List, starter.Id);
+                }
+            }
+            Interpreter.Update();
+            // Autorun events restart after finishing while their page stays active
+            if (!Interpreter.Running) foreach (var e in Map.Events) if (e.Trigger == Triggers.Autorun && !e.Erased && !e.Starting) e.Start();
+            Message.Update();
+            UpdateCamera();
+        }
+
+        void CenterCamera()
+        {
+            DisplayX = (int)(Player.RealX / 4) - (Gfx.Width / 2 - 16);
+            DisplayY = (int)(Player.RealY / 4) - (Gfx.Height / 2 - 16);
+            ClampCamera();
+        }
+
+        void UpdateCamera()
+        {
+            DisplayX = (int)(Player.RealX / 4) - (Gfx.Width / 2 - 16);
+            DisplayY = (int)(Player.RealY / 4) - (Gfx.Height / 2 - 16);
+            ClampCamera();
+        }
+
+        void ClampCamera()
+        {
+            int mw = Map.Width * 32, mh = Map.Height * 32;
+            bool snap = Map.Data.Properties != null && Map.Data.Properties.SnapEdges;
+            if (Map.HasConnections && !snap) return;
+            if (mw <= Gfx.Width) DisplayX = -(Gfx.Width - mw) / 2;
+            else DisplayX = Math.Max(0, Math.Min(DisplayX, mw - Gfx.Width));
+            if (mh <= Gfx.Height) DisplayY = -(Gfx.Height - mh) / 2;
+            else DisplayY = Math.Max(0, Math.Min(DisplayY, mh - Gfx.Height));
+        }
+
+        // ------------------------------------------------------------------ draw
+        void Draw()
+        {
+            Gfx.Clear(Color.Black);
+            var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
+            _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
+            DrawTone();
+            DrawLocationSign();
+            Message.Draw(Gfx);
+            if (_flash > 0) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color(255, 255, 255, (byte)Math.Min(255, _flash * 12)));
+            if (_fadeAlpha > 0) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color(0, 0, 0, (byte)_fadeAlpha));
+        }
+
+        void DrawTone()
+        {
+            double r = _tone[0], g = _tone[1], b = _tone[2];
+            // Outdoor day/night tint (Essentials-style), applied on top of event tones
+            if (Map.Data.Properties != null && Map.Data.Properties.Outdoor)
+            {
+                int h = DateTime.Now.Hour;
+                if (h >= 20 || h < 5) { r -= 60; g -= 60; b -= 10; }
+                else if (h >= 18 || h < 7) { r += 10; g -= 20; b -= 40; }
+            }
+            double dark = -(Math.Min(0, r) + Math.Min(0, g) + Math.Min(0, b)) / 3.0;
+            if (dark > 1)
+            {
+                byte cr = (byte)Math.Max(0, Math.Min(255, 20 + (b < r ? 0 : 30)));
+                Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color(0, 0, cr, (byte)Math.Min(220, dark * 1.2)));
+            }
+            double light = (Math.Max(0, r) + Math.Max(0, g) + Math.Max(0, b)) / 3.0;
+            if (light > 1) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color((byte)Math.Min(255, 128 + Math.Max(0, r)), (byte)Math.Min(255, 96 + Math.Max(0, g)), (byte)Math.Min(255, 64 + Math.Max(0, b)), (byte)Math.Min(120, light)));
+        }
+
+        void DrawLocationSign()
+        {
+            if (_signTimer <= 0 || string.IsNullOrEmpty(_signText)) return;
+            int w = Math.Max(160, Gfx.TextWidth(_signText) + 40), h = 44;
+            int slide = _signTimer > 135 ? (_signTimer - 135) * 4 : (_signTimer < 15 ? (15 - _signTimer) * 4 : 0);
+            int y = 4 - slide;
+            MessageWindow.DrawBox(Gfx, 4, y, w, h);
+            Gfx.DrawText(24, y + 8, _signText, Color.TextBase, Color.TextShadow);
+        }
+
+        public void Dispose()
+        {
+            if (Audio != null) Audio.Dispose();
+            if (Gfx != null) Gfx.Dispose();
+            SDL.SDL_Quit();
+        }
+    }
+
+    /// <summary>
+    /// Scripted input for automated testing: one command per line —
+    /// "wait N", "hold up|down|left|right|action|cancel|run N", "tap action", "shot file.png", "quit".
+    /// </summary>
+    public class Autotest
+    {
+        readonly Game _g;
+        readonly Queue<string> _cmds;
+        int _wait; Button? _held; string _shot;
+        public Autotest(Game g, string path) { _g = g; _cmds = new Queue<string>(File.ReadAllLines(path).Where(l => l.Trim().Length > 0 && !l.StartsWith("#"))); }
+
+        static Button Parse(string s)
+        {
+            switch (s.ToLowerInvariant()) { case "up": return Button.Up; case "down": return Button.Down; case "left": return Button.Left; case "right": return Button.Right; case "action": return Button.Action; case "cancel": return Button.Cancel; case "run": return Button.Run; }
+            return Button.Action;
+        }
+
+        public bool Step()
+        {
+            if (_wait > 0)
+            {
+                _wait--;
+                if (_wait == 0 && _held.HasValue) { Input.Simulate(_held.Value, false); _held = null; _wait = 1; }
+                return true;
+            }
+            if (_cmds.Count == 0) return false;
+            var p = _cmds.Dequeue().Trim().Split(' ');
+            switch (p[0])
+            {
+                case "wait": _wait = int.Parse(p[1]); break;
+                case "hold": _held = Parse(p[1]); Input.Simulate(_held.Value, true); _wait = p.Length > 2 ? int.Parse(p[2]) : 1; break;
+                case "tap": _held = Parse(p[1]); Input.Simulate(_held.Value, true); _wait = 2; break;
+                case "shot": _shot = p.Length > 1 ? string.Join(" ", p.Skip(1)) : "shot.png"; break;
+                case "log": Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
+                case "quit": return false;
+            }
+            return true;
+        }
+
+        public void AfterDraw()
+        {
+            if (_shot != null) { _g.Gfx.SaveScreenshot(_shot); Console.WriteLine("[autotest] saved " + _shot); _shot = null; }
+        }
+    }
+
+    public static class Program
+    {
+        [STAThread]
+        public static int Main(string[] args)
+        {
+            var opt = new GameOptions();
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (a == "--map" && i + 1 < args.Length) opt.StartMap = int.Parse(args[++i]);
+                else if (a == "--x" && i + 1 < args.Length) opt.StartX = int.Parse(args[++i]);
+                else if (a == "--y" && i + 1 < args.Length) opt.StartY = int.Parse(args[++i]);
+                else if (a == "--dir" && i + 1 < args.Length) opt.StartDir = int.Parse(args[++i]);
+                else if (a == "--autotest" && i + 1 < args.Length) opt.AutotestScript = args[++i];
+                else if (a == "--scale" && i + 1 < args.Length) opt.Scale = int.Parse(args[++i]);
+                else if (a == "--no-encounters") opt.NoEncounters = true;
+                else if (!a.StartsWith("--")) opt.ProjectDir = a;
+            }
+            if (opt.ProjectDir == null)
+            {
+                // Default: a project.json next to Game.exe, or in its parent folder
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                foreach (var d in new[] { exeDir, Path.Combine(exeDir, ".."), Directory.GetCurrentDirectory() })
+                    if (Project.IsProjectFolder(d)) { opt.ProjectDir = d; break; }
+            }
+            if (opt.ProjectDir == null || !Project.IsProjectFolder(opt.ProjectDir))
+            {
+                ShowError("No PokeCreator project found.\n\nRun Game.exe from a project folder, or pass the project folder as the first argument.");
+                return 1;
+            }
+            try
+            {
+                using (var g = new Game(opt)) g.Run();
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                ShowError("The game stopped because of an error:\n\n" + ex.Message + "\n\n" + ex.StackTrace);
+                return 2;
+            }
+        }
+
+        static void ShowError(string msg)
+        {
+            Console.Error.WriteLine(msg);
+            try
+            {
+                File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "errorlog.txt"), DateTime.Now + "\n" + msg);
+                SDL.SDL_ShowSimpleMessageBox(0x10, SDL.U8("PokeCreator"), SDL.U8(msg), IntPtr.Zero);
+            }
+            catch { }
+        }
+    }
+}
