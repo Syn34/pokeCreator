@@ -204,13 +204,12 @@ namespace PokeCreator.Studio
 
         void NewProject()
         {
-            using (var d = new FolderBrowserDialog { Description = "Choose an empty folder for the new project" })
+            using (var d = new NewProjectDialog(_settings.LastProjectLocation))
             {
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                string name = Path.GetFileName(d.SelectedPath.TrimEnd(Path.DirectorySeparatorChar));
-                if (Directory.GetFileSystemEntries(d.SelectedPath).Length > 0 && MessageBox.Show(this, "That folder isn't empty. Create the project inside it anyway?", "New project", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
-                Project.Create(d.SelectedPath, name);
-                OpenProject(d.SelectedPath);
+                if (d.ShowDialog(this) != DialogResult.OK || d.ProjectFolder == null) return;
+                _settings.LastProjectLocation = d.ProjectLocation;
+                _settings.Save();
+                OpenProject(d.ProjectFolder);
             }
         }
 
@@ -647,6 +646,8 @@ namespace PokeCreator.Studio
         public string Guides { get; set; }
         public bool ShowIcons { get; set; }
         public int FontSize { get; set; }
+        /// <summary>Where the last new project was stored; the New Project dialog starts there.</summary>
+        public string LastProjectLocation { get; set; }
         public Settings() { Recent = new List<string>(); Accent = "200,48,48"; Guides = "Rainbow"; ShowIcons = true; FontSize = 9; }
         static string FilePath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PokeCreator", "studio.json"); } }
         public static Settings Load() { try { return File.Exists(FilePath) ? Json.Json.FromFile<Settings>(FilePath) : new Settings(); } catch { return new Settings(); } }

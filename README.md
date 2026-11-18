@@ -17,6 +17,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 ## What works today (v0.2)
 
 **Studio (editor)**
+- **New Project** asks for a project name and a location (paste a path or click Browse). The project is created in a new folder with the project's name inside that location, e.g. `Documents\PokeCreator Projects\My Game`
 - Project explorer for every data table, map, script, asset folder and file, with an icon for everything (houses for towns, signposts for routes, caves, Pokémon Centers, gyms, Poké Balls...) and colour-coded indent guides like a code editor. Right-click a map → **Change Icon…** to choose your own
 - **View → Appearance**: light/dark mode (Ctrl+Shift+D), accent colours, rainbow / per-section / plain tree guides, icons on/off, text size
 - Database editors generated from the data model: dropdowns for types/moves/abilities/items, grids for level-up moves, evolutions, EVs, trainer parties and encounter slots, sprite previews
