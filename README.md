@@ -21,6 +21,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Project explorer for every data table, map, script, asset folder and file, with an icon for everything (houses for towns, signposts for routes, caves, Pokémon Centers, gyms, Poké Balls...) and colour-coded indent guides like a code editor. Right-click a map → **Change Icon…** to choose your own
 - **View → Appearance**: light/dark mode (Ctrl+Shift+D), accent colours, rainbow / per-section / plain tree guides, icons on/off, text size
 - Database editors generated from the data model: dropdowns for types/moves/abilities/items, grids for level-up moves, evolutions, EVs, trainer parties and encounter slots, sprite previews
+- **Pokémon and trainer type images**: entries without an image are highlighted in the list (with a filter to show only those), and the details pane shows the trainer picture, or the Pokémon's front, back, shiny and icon sprites. **Import** (next to New / Duplicate / Delete) takes images named after IDs (`YOUNGSTER.png`, `CHARIZARD_1.png`): a matching entry gets the image, any other name becomes a new entry (a new form is copied from its species)
 - Map editor: tileset palette, 3 tile layers + events layer, pencil / rectangle / flood fill / eraser, right-click eyedropper, automatic autotile shapes, dim-other-layers, grid, passability overlay, undo/redo, zoom, map properties (size, tileset, music, Pokémon settings)
 - Event editor: pages, conditions, sprite picker with preview, triggers and movement, readable command list, one-click Text / Choices / If / Switch / Self Switch / Variable / Warp / Sound / Music / Wait / Give Item / Script, plus quick templates for NPCs, doors and item balls
 - **World Map** (Ctrl+M): every outdoor map laid out by its connections as live thumbnails. Drag maps so their edges touch to connect them, pull them apart to disconnect, nudge with the arrow keys, drop unplaced maps in from the side list, and right-click empty space to create a new connected map. Writes the same `map_connections.json` the game uses
@@ -54,7 +55,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 1. Build it (see below) or download a release zip, and unzip anywhere.
 2. Run **`PokeCreatorStudio.exe`**.
 3. Click **Import a Pokémon Essentials project**, pick your Essentials folder (the one with `Game.exe` and `PBS`), choose where the new project should go, then click **Import**.
-4. Double-click maps and database entries to edit. **Ctrl+S** saves everything.
+4. Click maps and database entries in the project pane to edit them. **Ctrl+S** saves everything.
 5. Press **F5** to play. Controls: arrows/WASD move, Shift runs, Z/Enter/Space interacts, X/Esc cancels.
 
 Requires Windows 10/11 64-bit (uses the built-in .NET Framework 4.8; nothing to install).
