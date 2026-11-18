@@ -8,11 +8,15 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - Essentials script-call compatibility layer; C# project scripts
 - Studio: project tree, generated database editors, map editor, event editor, tileset editor, asset browser, script/text editor, import wizard, playtest
 
-## v0.2: Core gameplay loop
-- [ ] Pokémon instances (stats, IVs/EVs, natures, abilities, moves, EXP, evolution)
-- [ ] Party and bag data; give/take Pokémon and items from events
-- [ ] Pause menu: Party, Bag, Pokédex, Trainer Card, Save, Options
-- [ ] Save/load (JSON save files) and a title screen with Continue / New Game
+## v0.2: Core gameplay loop (in progress)
+- [x] Pokémon instances (stats, IVs/EVs, natures, abilities, moves, EXP curves)
+- [x] Party and bag data; give Pokémon and items from events; healing
+- [x] Pause menu: Party, Summary, Bag, Trainer Card, Save, Quit to Title
+- [x] Save/load (JSON save files) and a title screen with Continue / New Game
+- [x] Studio: closable document tabs, dark mode, Appearance tab, tree icons
+- [ ] Using items from the Bag (Potions, Repels...), giving held items
+- [ ] Evolution on level up (needs battles for EXP)
+- [ ] Pokédex (seen/caught), Options menu
 - [ ] Intro sequence support (choose character, name entry)
 
 ## v0.3: Battles

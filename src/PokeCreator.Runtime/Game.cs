@@ -19,13 +19,13 @@ namespace PokeCreator.Runtime
         public int StartMap = -1, StartX, StartY, StartDir = 2;
         public string AutotestScript;
         public bool NoEncounters;
+        public bool SkipTitle;
         public int Scale = 0;
     }
 
     /// <summary>Top-level game: owns the window, the current map and the main loop.</summary>
     public class Game : IDisposable
     {
-        public class PartyMember { public string Species; public int Level; }
 
         public Project Project;
         public Gfx Gfx;
@@ -38,7 +38,7 @@ namespace PokeCreator.Runtime
         public EssentialsCompat Compat;
         public EncounterSystem Encounters;
         public readonly Random Rng = new Random();
-        public readonly List<PartyMember> Party = new List<PartyMember>();
+        public List<PokeCreator.Pkmn.Pokemon> Party { get { return State.Party; } }
         MapRenderer _renderer;
 
         public int DisplayX, DisplayY;
@@ -85,7 +85,9 @@ namespace PokeCreator.Runtime
             _renderer = new MapRenderer(Gfx, Project);
             ScriptLoader.Load(this, Project.ScriptsDir);
 
-            NewGame();
+            Player = new Player(this);
+            if (_opt.StartMap > 0 || _opt.SkipTitle) NewGame();
+            else PushScene(new TitleScene(this));
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
 
             ulong freq = SDL.SDL_GetPerformanceFrequency();
@@ -112,9 +114,11 @@ namespace PokeCreator.Runtime
         void NewGame()
         {
             var s = Project.Settings;
+            State = new GameState();
             State.Money = s.StartMoney;
             State.PlayerName = string.IsNullOrEmpty(s.DefaultPlayerName) ? "Red" : s.DefaultPlayerName;
-            foreach (var it in s.StartItemStorage) { }
+            State.TrainerId = Rng.Next(65536);
+            State.PlayerCharacter = Math.Max(0, s.DefaultPlayer);
             Player = new Player(this);
             Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, s.DefaultPlayer), Project.Players.Count - 1)] : null;
             Player.CharacterName = Player.WalkCharset;
@@ -126,6 +130,44 @@ namespace PokeCreator.Runtime
         }
 
         public void Quit() { _quit = true; }
+
+        void LoadGame()
+        {
+            State = new GameState();
+            var d = SaveSystem.Load(Project, State);
+            Player = new Player(this);
+            Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, State.PlayerCharacter), Project.Players.Count - 1)] : null;
+            Player.CharacterName = Player.WalkCharset;
+            SetupMap(d.MapId, d.X, d.Y, d.Direction);
+            if (!string.IsNullOrEmpty(d.Bgm) && string.IsNullOrEmpty(Audio.CurrentBgm)) Audio.PlayBgm(d.Bgm);
+        }
+
+        /// <summary>Called by the title screen once the player picks Continue or New Game.</summary>
+        public void FinishTitle(bool continueGame)
+        {
+            try { if (continueGame) LoadGame(); else NewGame(); }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Could not load save: " + ex.Message);
+                NewGame();
+                Message.Show("The save file couldn't be loaded, so a new game was started.\\n(" + ex.Message + ")");
+            }
+            _fadeAlpha = 255;
+        }
+
+        public void ReturnToTitle()
+        {
+            _scenes.Clear();
+            Interpreter.Setup(null, 0);
+            Audio.StopBgm();
+            Map = null;
+            PushScene(new TitleScene(this));
+        }
+
+        // ------------------------------------------------------------------ scenes (menus, title)
+        readonly List<Scene> _scenes = new List<Scene>();
+        public void PushScene(Scene s) { _scenes.Add(s); }
+        public bool SceneOpen { get { return _scenes.Count > 0; } }
 
         // ------------------------------------------------------------------ maps
         public void SetupMap(int id, int x, int y, int dir)
@@ -212,6 +254,17 @@ namespace PokeCreator.Runtime
         // ------------------------------------------------------------------ update
         void Update()
         {
+            if (_scenes.Count > 0)
+            {
+                if (Message.Busy) Message.Update();
+                else _scenes[_scenes.Count - 1].Tick();
+                _scenes.RemoveAll(sc => sc.Closed);
+                if (Map != null) State.PlayFrames++;
+                return;
+            }
+            if (Map == null) return;
+            State.PlayFrames++;
+            if (_transfer == null && _fadeAlpha > 0) _fadeAlpha = Math.Max(0, _fadeAlpha - 16);
             if (_transfer != null) { UpdateTransfer(); if (_transfer != null && _transfer.Phase < 2) return; }
 
             if (_toneFrames > 0)
@@ -271,10 +324,15 @@ namespace PokeCreator.Runtime
         void Draw()
         {
             Gfx.Clear(Color.Black);
-            var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
-            _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
-            DrawTone();
-            DrawLocationSign();
+            int firstOpaque = _scenes.FindLastIndex(sc => sc.Opaque);
+            if (Map != null && firstOpaque < 0)
+            {
+                var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
+                _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
+                DrawTone();
+                DrawLocationSign();
+            }
+            for (int i = Math.Max(0, firstOpaque); i < _scenes.Count; i++) _scenes[i].Draw(Gfx);
             Message.Draw(Gfx);
             if (_flash > 0) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color(255, 255, 255, (byte)Math.Min(255, _flash * 12)));
             if (_fadeAlpha > 0) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color(0, 0, 0, (byte)_fadeAlpha));
@@ -331,7 +389,7 @@ namespace PokeCreator.Runtime
 
         static Button Parse(string s)
         {
-            switch (s.ToLowerInvariant()) { case "up": return Button.Up; case "down": return Button.Down; case "left": return Button.Left; case "right": return Button.Right; case "action": return Button.Action; case "cancel": return Button.Cancel; case "run": return Button.Run; }
+            switch (s.ToLowerInvariant()) { case "up": return Button.Up; case "down": return Button.Down; case "left": return Button.Left; case "right": return Button.Right; case "action": return Button.Action; case "cancel": return Button.Cancel; case "run": return Button.Run; case "menu": return Button.Menu; }
             return Button.Action;
         }
 
@@ -351,7 +409,10 @@ namespace PokeCreator.Runtime
                 case "hold": _held = Parse(p[1]); Input.Simulate(_held.Value, true); _wait = p.Length > 2 ? int.Parse(p[2]) : 1; break;
                 case "tap": _held = Parse(p[1]); Input.Simulate(_held.Value, true); _wait = 2; break;
                 case "shot": _shot = p.Length > 1 ? string.Join(" ", p.Skip(1)) : "shot.png"; break;
-                case "log": Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
+                case "give": _g.Compat.RunScript("pbAddPokemonSilent(:" + p[1] + "," + p[2] + ")", null); break;
+                case "item": _g.State.AddItem(p[1], p.Length > 2 ? int.Parse(p[2]) : 1); break;
+                case "switch": _g.State.SetSwitch(int.Parse(p[1]), p.Length < 3 || p[2] == "on"); if (_g.Map != null) _g.Map.RefreshEvents(); break;
+                case "log": if (_g.Map == null) { Console.WriteLine("[autotest] (title screen) scenes=" + _g.SceneOpen); break; } Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
                 case "quit": return false;
             }
             return true;
@@ -379,6 +440,7 @@ namespace PokeCreator.Runtime
                 else if (a == "--autotest" && i + 1 < args.Length) opt.AutotestScript = args[++i];
                 else if (a == "--scale" && i + 1 < args.Length) opt.Scale = int.Parse(args[++i]);
                 else if (a == "--no-encounters") opt.NoEncounters = true;
+                else if (a == "--skip-title") opt.SkipTitle = true;
                 else if (!a.StartsWith("--")) opt.ProjectDir = a;
             }
             if (opt.ProjectDir == null)

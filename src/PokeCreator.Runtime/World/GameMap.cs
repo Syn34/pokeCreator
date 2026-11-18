@@ -18,6 +18,12 @@ namespace PokeCreator.Runtime.World
         public string PlayerName = "Red";
         public int Steps;
         public int PlayerCharacter;
+        public int TrainerId;
+        public long PlayFrames;
+        public List<PokeCreator.Pkmn.Pokemon> Party = new List<PokeCreator.Pkmn.Pokemon>();
+        public const int MaxParty = 6;
+        /// <summary>Pokémon sent to the PC when the party is full (boxes UI comes later).</summary>
+        public List<PokeCreator.Pkmn.Pokemon> Storage = new List<PokeCreator.Pkmn.Pokemon>();
 
         public bool GetSwitch(int id) { bool v; return Switches.TryGetValue(id, out v) && v; }
         public void SetSwitch(int id, bool v) { Switches[id] = v; }

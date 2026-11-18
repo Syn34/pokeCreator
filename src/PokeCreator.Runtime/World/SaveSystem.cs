@@ -1,0 +1,115 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using PokeCreator.Json;
+using PokeCreator.Pkmn;
+using PokeCreator.Projects;
+
+namespace PokeCreator.Runtime.World
+{
+    /// <summary>Everything needed to resume a game. Stored as readable JSON.</summary>
+    public class SaveData
+    {
+        public int Version { get; set; }
+        public string GameTitle { get; set; }
+        public string SavedAt { get; set; }
+        public string PlayerName { get; set; }
+        public int PlayerCharacter { get; set; }
+        public int TrainerId { get; set; }
+        public long PlayFrames { get; set; }
+        public int Money { get; set; }
+        public int Steps { get; set; }
+        public int MapId { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Direction { get; set; }
+        public string Location { get; set; }
+        public string Bgm { get; set; }
+        public List<int> SwitchesOn { get; set; }
+        public Dictionary<string, int> Variables { get; set; }
+        public List<string> SelfSwitches { get; set; }
+        public Dictionary<string, int> Bag { get; set; }
+        public List<Pokemon> Party { get; set; }
+        public List<Pokemon> Storage { get; set; }
+        public SaveData()
+        {
+            Version = 1; SwitchesOn = new List<int>(); Variables = new Dictionary<string, int>(); SelfSwitches = new List<string>();
+            Bag = new Dictionary<string, int>(); Party = new List<Pokemon>(); Storage = new List<Pokemon>();
+        }
+    }
+
+    /// <summary>What the title screen shows about the save file.</summary>
+    public class SaveSummary
+    {
+        public string PlayerName, Location;
+        public long PlayFrames;
+        public int PartyCount;
+    }
+
+    /// <summary>
+    /// Saves to %AppData%\PokeCreator\Saves\&lt;game title&gt;\Game.json (writable even when the
+    /// game is installed in Program Files). The previous save is kept as Game.bak.json.
+    /// </summary>
+    public static class SaveSystem
+    {
+        public static string Folder(Project p)
+        {
+            string title = string.IsNullOrEmpty(p.Settings.Title) ? p.Info.Name : p.Settings.Title;
+            foreach (var c in Path.GetInvalidFileNameChars()) title = title.Replace(c, '_');
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PokeCreator", "Saves", title.Trim());
+        }
+
+        public static string FilePath(Project p) { return Path.Combine(Folder(p), "Game.json"); }
+
+        public static bool Exists(Project p) { return File.Exists(FilePath(p)); }
+
+        public static SaveSummary Peek(Project p)
+        {
+            try
+            {
+                if (!Exists(p)) return null;
+                var d = Json.Json.FromFile<SaveData>(FilePath(p));
+                return new SaveSummary { PlayerName = d.PlayerName, Location = d.Location, PlayFrames = d.PlayFrames, PartyCount = d.Party.Count };
+            }
+            catch { return null; }
+        }
+
+        public static void Save(Game g)
+        {
+            var s = g.State;
+            var d = new SaveData
+            {
+                GameTitle = g.Project.Settings.Title, SavedAt = DateTime.Now.ToString("s"),
+                PlayerName = s.PlayerName, PlayerCharacter = s.PlayerCharacter, TrainerId = s.TrainerId, PlayFrames = s.PlayFrames,
+                Money = s.Money, Steps = s.Steps,
+                MapId = g.Map.Id, X = g.Player.X, Y = g.Player.Y, Direction = g.Player.Direction,
+                Location = g.Message.Expand(g.Map.DisplayName), Bgm = g.Audio.CurrentBgm,
+                SwitchesOn = s.Switches.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList(),
+                Variables = s.Variables.Where(kv => kv.Value != 0).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+                SelfSwitches = s.SelfSwitches.OrderBy(x => x).ToList(),
+                Bag = new Dictionary<string, int>(s.Bag),
+                Party = s.Party, Storage = s.Storage
+            };
+            Directory.CreateDirectory(Folder(g.Project));
+            string path = FilePath(g.Project), bak = Path.Combine(Folder(g.Project), "Game.bak.json");
+            if (File.Exists(path)) File.Copy(path, bak, true);
+            Json.Json.ToFile(path, d);
+        }
+
+        /// <summary>Loads the save into a fresh GameState and returns the saved position.</summary>
+        public static SaveData Load(Project p, GameState s)
+        {
+            var d = Json.Json.FromFile<SaveData>(FilePath(p));
+            s.PlayerName = d.PlayerName; s.PlayerCharacter = d.PlayerCharacter; s.TrainerId = d.TrainerId; s.PlayFrames = d.PlayFrames;
+            s.Money = d.Money; s.Steps = d.Steps;
+            s.Switches.Clear(); foreach (var id in d.SwitchesOn) s.Switches[id] = true;
+            s.Variables.Clear(); foreach (var kv in d.Variables) { int id; if (int.TryParse(kv.Key, out id)) s.Variables[id] = kv.Value; }
+            s.SelfSwitches.Clear(); foreach (var k in d.SelfSwitches) s.SelfSwitches.Add(k);
+            s.Bag.Clear(); foreach (var kv in d.Bag) s.Bag[kv.Key] = kv.Value;
+            s.Party = d.Party ?? new List<Pokemon>();
+            s.Storage = d.Storage ?? new List<Pokemon>();
+            return d;
+        }
+    }
+}

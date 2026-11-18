@@ -163,6 +163,7 @@ namespace PokeCreator.Runtime.World
             _wasMoving = Moving || Jumping;
 
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Action)) CheckActionTrigger();
+            if (canControl && !Moving && !Jumping && Input.Trigger(Button.Menu)) Game.PushScene(new PokeCreator.Runtime.UI.PauseMenu(Game));
         }
 
         GameMap TargetMap(int nx, int ny, out int lx, out int ly)

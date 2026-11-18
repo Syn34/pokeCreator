@@ -1,0 +1,513 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using PokeCreator.Data;
+using PokeCreator.Pkmn;
+using PokeCreator.Runtime.Platform;
+using PokeCreator.Runtime.World;
+
+namespace PokeCreator.Runtime.UI
+{
+    // =====================================================================================
+    /// <summary>Title screen: title image, "press a button", then Continue / New Game / Quit.</summary>
+    public class TitleScene : Scene
+    {
+        CommandList _menu;
+        SaveSummary _save;
+        bool _fading; int _fade; int _choice;
+
+        public TitleScene(Game g) : base(g)
+        {
+            Opaque = true;
+            _save = SaveSystem.Peek(g.Project);
+            if (!string.IsNullOrEmpty(g.Project.Settings.TitleBGM)) g.Audio.PlayBgm(g.Project.Settings.TitleBGM);
+        }
+
+        protected override void Update()
+        {
+            if (_fading)
+            {
+                _fade += 16;
+                if (_fade >= 255) { Close(); Game.FinishTitle(_choice == 0 && _save != null); }
+                return;
+            }
+            if (_menu == null)
+            {
+                if (Frame > 10 && (Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel)))
+                {
+                    Decide();
+                    var items = new List<string>();
+                    if (_save != null) items.Add("Continue");
+                    items.Add("New Game");
+                    items.Add("Quit");
+                    _menu = new CommandList(items);
+                }
+                return;
+            }
+            int r = _menu.Update(this, Cursor);
+            if (r == -2) { Cancel(); _menu = null; return; }
+            if (r < 0) return;
+            string cmd = _menu.Items[r];
+            Decide();
+            if (cmd == "Quit") { Game.Quit(); return; }
+            _choice = cmd == "Continue" ? 0 : 1;
+            _fading = true;
+            Game.Audio.FadeOutBgm(1);
+        }
+
+        public override void Draw(Gfx g)
+        {
+            var title = g.Load(Game.Project.FindAsset("Graphics/Titles", "title"));
+            if (title != null) g.Draw(title, 0, 0, title.Width, title.Height, 0, 0, g.Width, g.Height);
+            else
+            {
+                Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(32, 64, 160), new Color(8, 16, 48));
+                string t = Game.Project.Settings.Title ?? "PokeCreator";
+                g.DrawText(g.Width / 2 - g.TextWidth(t) / 2, g.Height / 3, t, Ui.Light, Ui.LightShadow);
+            }
+            if (_menu == null)
+            {
+                if ((Frame / 30) % 2 == 0)
+                {
+                    var start = g.Load(Game.Project.FindAsset("Graphics/Titles", "start"));
+                    if (start != null) g.Draw(start, 0, 0, start.Width, start.Height, g.Width / 2 - start.Width / 2, g.Height - 80);
+                    else { string p = "Press Enter"; g.DrawText(g.Width / 2 - g.TextWidth(p) / 2, g.Height - 80, p, Ui.Light, Ui.LightShadow); }
+                }
+            }
+            else
+            {
+                int w = Math.Max(_menu.Width(g), 200), h = _menu.Height(g);
+                _menu.Draw(g, g.Width / 2 - w / 2, g.Height - h - 24);
+                if (_save != null && _menu.Items[_menu.Index] == "Continue")
+                {
+                    int bx = 16, by = 16, bw = g.Width - 32, bh = 104;
+                    Ui.Box(g, bx, by, bw, bh);
+                    Ui.Text(g, bx + 20, by + 14, _save.PlayerName);
+                    Ui.TextRight(g, bx + bw - 20, by + 14, "Time  " + Ui.PlayTime(_save.PlayFrames));
+                    Ui.Text(g, bx + 20, by + 50, _save.Location);
+                    Ui.TextRight(g, bx + bw - 20, by + 50, "Pokémon  " + _save.PartyCount);
+                }
+            }
+            if (_fade > 0) g.FillRect(0, 0, g.Width, g.Height, new Color(0, 0, 0, (byte)Math.Min(255, _fade)));
+        }
+    }
+
+    // =====================================================================================
+    /// <summary>Pause menu (Esc / X): Pokémon, Bag, trainer card, Save, Quit.</summary>
+    public class PauseMenu : Scene
+    {
+        CommandList _list;
+        readonly List<string> _ids = new List<string>();
+
+        public PauseMenu(Game g) : base(g)
+        {
+            var labels = new List<string>();
+            if (g.State.Party.Count > 0) { _ids.Add("party"); labels.Add("Pokémon"); }
+            _ids.Add("bag"); labels.Add("Bag");
+            _ids.Add("card"); labels.Add(g.State.PlayerName);
+            _ids.Add("save"); labels.Add("Save");
+            _ids.Add("title"); labels.Add("Quit to Title");
+            _ids.Add("exit"); labels.Add("Exit");
+            _list = new CommandList(labels);
+            g.Audio.PlaySe("GUI menu open");
+        }
+
+        protected override void Update()
+        {
+            int r = _list.Update(this, Cursor);
+            if (r == -2) { Game.Audio.PlaySe("GUI menu close"); Close(); return; }
+            if (r < 0) return;
+            Decide();
+            switch (_ids[r])
+            {
+                case "party": Game.PushScene(new PartyScene(Game)); break;
+                case "bag": Game.PushScene(new BagScene(Game)); break;
+                case "card": Game.PushScene(new TrainerCardScene(Game)); break;
+                case "save":
+                    Game.Message.Show("Would you like to save the game?", new List<string> { "Yes", "No" }, 1, c =>
+                    {
+                        if (c != 0) return;
+                        try
+                        {
+                            SaveSystem.Save(Game);
+                            Game.Audio.PlayMe("GUI save game");
+                            Game.Message.Show("\\PN saved the game.");
+                        }
+                        catch (Exception ex) { Game.Message.Show("Saving failed: " + ex.Message); }
+                    });
+                    break;
+                case "title":
+                    Game.Message.Show("Return to the title screen? Unsaved progress will be lost.", new List<string> { "Yes", "No" }, 1, c =>
+                    {
+                        if (c == 0) { Close(); Game.ReturnToTitle(); }
+                    });
+                    break;
+                case "exit": Close(); break;
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            int w = _list.Width(g) + 20;
+            _list.Draw(g, g.Width - w - 6, 6);
+        }
+    }
+
+    // =====================================================================================
+    /// <summary>Party screen: six panels, Summary / Switch.</summary>
+    public class PartyScene : Scene
+    {
+        int _index, _switchFrom = -1;
+        CommandList _popup;
+        string _help = "Choose a Pokémon.";
+        List<Pokemon> Party { get { return Game.State.Party; } }
+
+        public PartyScene(Game g) : base(g) { Opaque = true; }
+
+        protected override void Update()
+        {
+            if (_popup != null)
+            {
+                int r = _popup.Update(this, Cursor);
+                if (r == -2 || (r >= 0 && _popup.Items[r] == "Cancel")) { Cancel(); _popup = null; return; }
+                if (r < 0) return;
+                Decide();
+                string cmd = _popup.Items[r];
+                _popup = null;
+                if (cmd == "Summary") Game.PushScene(new SummaryScene(Game, _index));
+                else if (cmd == "Switch") { _switchFrom = _index; _help = "Move to where?"; }
+                return;
+            }
+            int last = Party.Count; // index of the Cancel button
+            if (Input.Repeat(Button.Down)) { _index = _index == last ? 0 : (_index + 2 <= last - 1 ? _index + 2 : last); Cursor(); }
+            if (Input.Repeat(Button.Up)) { _index = _index == last ? Math.Max(0, last - 1) : (_index - 2 >= 0 ? _index - 2 : last); Cursor(); }
+            if (Input.Repeat(Button.Right) && _index < Party.Count - 1 && _index % 2 == 0) { _index++; Cursor(); }
+            if (Input.Repeat(Button.Left) && _index < Party.Count && _index % 2 == 1) { _index--; Cursor(); }
+            if (Input.Trigger(Button.Cancel))
+            {
+                Cancel();
+                if (_switchFrom >= 0) { _switchFrom = -1; _help = "Choose a Pokémon."; } else Close();
+                return;
+            }
+            if (Input.Trigger(Button.Action))
+            {
+                if (_index == Party.Count) { Cancel(); Close(); return; }
+                Decide();
+                if (_switchFrom >= 0)
+                {
+                    var t = Party[_switchFrom]; Party[_switchFrom] = Party[_index]; Party[_index] = t;
+                    _switchFrom = -1; _help = "Choose a Pokémon.";
+                    return;
+                }
+                _popup = new CommandList(new[] { "Summary", "Switch", "Cancel" });
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(56, 120, 104), new Color(24, 72, 64));
+            for (int i = 0; i < 6; i++)
+            {
+                int x = i % 2 == 0 ? 6 : g.Width / 2 + 2, y = 14 + (i / 2) * 96 + (i % 2) * 16;
+                int w = g.Width / 2 - 8, h = 84;
+                if (i >= Party.Count) { Ui.Panel(g, x, y, w, h, new Color(40, 88, 80), new Color(32, 64, 56)); continue; }
+                var pk = Party[i];
+                bool sel = i == _index, swap = i == _switchFrom;
+                var fill = pk.Fainted ? new Color(200, 120, 112) : sel ? new Color(248, 224, 120) : new Color(120, 200, 248);
+                if (swap) fill = new Color(248, 160, 200);
+                Ui.Panel(g, x, y, w, h, fill, sel ? new Color(248, 64, 48) : new Color(40, 56, 80));
+                Ui.PokemonIcon(g, Game, pk, x - 4, y - 8, sel ? Frame * 2 : Frame);
+                Ui.Text(g, x + 64, y + 6, pk.Name(Game.Project));
+                Ui.GenderSymbol(g, x + w - 30, y + 6, pk.Gender);
+                if (!string.IsNullOrEmpty(pk.Item)) Ui.ItemIcon(g, Game, pk.Item, x + 40, y + 40);
+                if (pk.IsEgg) continue;
+                int max = pk.TotalHP(Game.Project);
+                Ui.Text(g, x + 20, y + 46, "Lv." + pk.Level);
+                string st = Ui.StatusAbbrev(pk.Status);
+                if (pk.Fainted) st = "FNT";
+                if (st != "") g.DrawText(x + 20, y + 46, st, new Color(248, 64, 48), Ui.DarkShadow);
+                Ui.HpBar(g, x + 104, y + 44, w - 124, pk.HP, max);
+                Ui.TextRight(g, x + w - 16, y + 52, pk.HP + "/" + max);
+            }
+            // Cancel button and help box
+            int cw = 120, cx = g.Width - cw - 8, cy = g.Height - 52;
+            Ui.Panel(g, cx, cy, cw, 44, _index == Party.Count ? new Color(248, 224, 120) : new Color(220, 220, 228), new Color(40, 56, 80));
+            Ui.TextCenter(g, cx + cw / 2, cy + 6, "Cancel");
+            Ui.Box(g, 6, g.Height - 56, g.Width - cw - 24, 52);
+            Ui.Text(g, 24, g.Height - 46, _help);
+            if (_popup != null) { int w = _popup.Width(g); _popup.Draw(g, g.Width - w - 8, g.Height - _popup.Height(g) - 60); }
+        }
+    }
+
+    // =====================================================================================
+    /// <summary>Summary: sprite + Info / Stats / Moves pages. Left/Right change page, Up/Down change Pokémon.</summary>
+    public class SummaryScene : Scene
+    {
+        int _index, _page;
+        static readonly string[] Pages = { "INFO", "STATS", "MOVES" };
+        public SummaryScene(Game g, int index) : base(g) { Opaque = true; _index = index; }
+
+        protected override void Update()
+        {
+            var party = Game.State.Party;
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
+            if (Input.Repeat(Button.Right)) { _page = (_page + 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
+            if (Input.Repeat(Button.Left)) { _page = (_page + Pages.Length - 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
+            if (Input.Repeat(Button.Down) && party.Count > 1) { _index = (_index + 1) % party.Count; Cursor(); }
+            if (Input.Repeat(Button.Up) && party.Count > 1) { _index = (_index + party.Count - 1) % party.Count; Cursor(); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            var p = Game.Project;
+            var pk = Game.State.Party[Math.Min(_index, Game.State.Party.Count - 1)];
+            var d = pk.Data(p);
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 248, 240), new Color(216, 224, 232));
+            // Header with page tabs
+            g.FillRect(0, 0, g.Width, 40, new Color(232, 88, 64));
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                int tx = 200 + i * 104;
+                if (i == _page) Ui.Panel(g, tx, 6, 96, 30, new Color(248, 248, 248), new Color(160, 48, 32));
+                g.DrawText(tx + 48 - g.TextWidth(Pages[i]) / 2, 5, Pages[i], i == _page ? Ui.Dark : Ui.Light, i == _page ? Ui.DarkShadow : new Color(160, 48, 32));
+            }
+            Ui.LightText(g, 12, 5, "SUMMARY");
+
+            // Left column: sprite and name
+            Ui.Panel(g, 8, 48, 184, 328, new Color(248, 248, 248), new Color(152, 160, 176));
+            Ui.Text(g, 20, 54, pk.Name(p));
+            Ui.GenderSymbol(g, 160, 54, pk.Gender);
+            Ui.Text(g, 20, 86, "Lv. " + pk.Level);
+            if (pk.Shiny) g.DrawText(120, 86, "Shiny", new Color(248, 64, 48), Ui.DarkShadow);
+            Ui.PokemonFront(g, Game, pk, 100, 290, 168);
+            int ty = 300;
+            for (int i = 0; i < pk.Types(p).Count; i++) Ui.TypeBadge(g, Game, 14 + i * (Ui.BadgeWidth + 4), ty, pk.Types(p)[i]);
+            if (!string.IsNullOrEmpty(pk.Item))
+            {
+                var it = p.Items.FirstOrDefault(x => x.Id == pk.Item);
+                Ui.Text(g, 20, 336, it != null ? it.Name : pk.Item);
+            }
+            else Ui.Text(g, 20, 336, "No item");
+
+            int rx = 204, rw = g.Width - rx - 8;
+            Ui.Panel(g, rx, 48, rw, 328, new Color(248, 248, 248), new Color(152, 160, 176));
+            switch (_page)
+            {
+                case 0: DrawInfo(g, pk, d, rx, rw); break;
+                case 1: DrawStats(g, pk, rx, rw); break;
+                case 2: DrawMoves(g, pk, rx, rw); break;
+            }
+        }
+
+        void Row(Gfx g, int rx, int rw, int y, string label, string value)
+        {
+            g.DrawText(rx + 14, y, label, new Color(232, 88, 64), new Color(248, 192, 176));
+            Ui.Text(g, rx + 130, y, value);
+        }
+
+        void DrawInfo(Gfx g, Pokemon pk, SpeciesData d, int rx, int rw)
+        {
+            var p = Game.Project;
+            int dex = p.Species.Where(s => s.Form == 0).ToList().FindIndex(s => s.Species == pk.Species) + 1;
+            Row(g, rx, rw, 58, "Dex No.", dex > 0 ? dex.ToString("000") : "???");
+            Row(g, rx, rw, 92, "Species", d != null ? d.Name : pk.Species);
+            Row(g, rx, rw, 126, "OT", string.IsNullOrEmpty(pk.OTName) ? "-" : pk.OTName);
+            Row(g, rx, rw, 160, "ID No.", pk.OTId.ToString("00000"));
+            Row(g, rx, rw, 194, "Nature", Natures.Display(pk.Nature));
+            var ab = p.Abilities.FirstOrDefault(a => a.Id == pk.AbilityId(p));
+            Row(g, rx, rw, 228, "Ability", ab != null ? ab.Name : (pk.AbilityId(p) ?? "-"));
+            if (ab != null && !string.IsNullOrEmpty(ab.Description))
+            {
+                var lines = Wrap(g, ab.Description, rw - 28);
+                for (int i = 0; i < Math.Min(2, lines.Count); i++) Ui.Text(g, rx + 14, 262 + i * 30, lines[i]);
+            }
+            int need = pk.ExpForNextLevel(p) - pk.Exp, from = pk.ExpForThisLevel(p), to = pk.ExpForNextLevel(p);
+            Ui.Text(g, rx + 14, 326, "Exp. to next Lv.");
+            Ui.TextRight(g, rx + rw - 14, 326, Math.Max(0, need).ToString());
+            Ui.ExpBar(g, rx + 14, 360, rw - 28, to > from ? (double)(pk.Exp - from) / (to - from) : 1);
+        }
+
+        void DrawStats(Gfx g, Pokemon pk, int rx, int rw)
+        {
+            var stats = pk.Stats(Game.Project);
+            int max = stats[Stat.HP];
+            g.DrawText(rx + 14, 58, "HP", new Color(232, 88, 64), new Color(248, 192, 176));
+            Ui.TextRight(g, rx + rw - 14, 58, pk.HP + "/" + max);
+            Ui.HpBar(g, rx + 130, 98, rw - 150, pk.HP, max);
+            int[] order = { Stat.Attack, Stat.Defense, Stat.SpAtk, Stat.SpDef, Stat.Speed };
+            for (int i = 0; i < order.Length; i++)
+            {
+                int s = order[i], y = 120 + i * 36;
+                var labelColor = Natures.Raised(pk.Nature) == s ? new Color(232, 40, 40) : Natures.Lowered(pk.Nature) == s ? new Color(40, 96, 232) : new Color(120, 120, 128);
+                g.DrawText(rx + 14, y, Stat.Names[s] + (Natures.Raised(pk.Nature) == s ? " +" : Natures.Lowered(pk.Nature) == s ? " -" : ""), labelColor, Ui.DarkShadow);
+                Ui.TextRight(g, rx + rw - 14, y, stats[s].ToString());
+            }
+            Ui.Text(g, rx + 14, 310, "Nature: " + Natures.Display(pk.Nature));
+            Ui.Text(g, rx + 14, 340, "Happiness: " + pk.Happiness);
+        }
+
+        void DrawMoves(Gfx g, Pokemon pk, int rx, int rw)
+        {
+            var p = Game.Project;
+            for (int i = 0; i < 4; i++)
+            {
+                int y = 60 + i * 78;
+                Ui.Panel(g, rx + 8, y, rw - 16, 70, new Color(240, 240, 248), new Color(184, 192, 208));
+                if (i >= pk.Moves.Count) { Ui.Text(g, rx + 24, y + 18, "-"); continue; }
+                var m = pk.Moves[i];
+                var md = p.Moves.FirstOrDefault(x => x.Id == m.Id);
+                if (md != null) Ui.TypeBadge(g, Game, rx + 16, y + 6, md.Type);
+                Ui.Text(g, rx + 110, y + 4, md != null ? md.Name : m.Id);
+                int total = md != null ? Pokemon.TotalPP(md, m.PPUps) : m.PP;
+                Ui.TextRight(g, rx + rw - 22, y + 36, "PP " + m.PP + "/" + total);
+                if (md != null) Ui.Text(g, rx + 22, y + 36, md.Category);
+                if (md != null && md.Power > 1) Ui.Text(g, rx + 126, y + 36, md.Power.ToString());
+            }
+        }
+
+        static List<string> Wrap(Gfx g, string text, int width)
+        {
+            var lines = new List<string>(); string line = "";
+            foreach (var w in text.Split(' '))
+            {
+                string t = line.Length == 0 ? w : line + " " + w;
+                if (line.Length > 0 && g.TextWidth(t) > width) { lines.Add(line); line = w; } else line = t;
+            }
+            if (line.Length > 0) lines.Add(line);
+            return lines;
+        }
+    }
+
+    // =====================================================================================
+    /// <summary>Bag: pockets (Left/Right), item list, icon and description.</summary>
+    public class BagScene : Scene
+    {
+        static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
+        int _pocket, _index, _scroll;
+        CommandList _popup;
+
+        public BagScene(Game g) : base(g) { Opaque = true; }
+
+        List<KeyValuePair<ItemData, int>> Items()
+        {
+            var list = new List<KeyValuePair<ItemData, int>>();
+            foreach (var kv in Game.State.Bag)
+            {
+                var it = Game.Project.Items.FirstOrDefault(i => i.Id == kv.Key) ?? new ItemData { Id = kv.Key, Name = kv.Key, Pocket = 1 };
+                if (Math.Max(1, Math.Min(8, it.Pocket)) == _pocket + 1) list.Add(new KeyValuePair<ItemData, int>(it, kv.Value));
+            }
+            return list;
+        }
+
+        protected override void Update()
+        {
+            var items = Items();
+            if (_popup != null)
+            {
+                int r = _popup.Update(this, Cursor);
+                if (r == -2 || (r >= 0 && _popup.Items[r] == "Cancel")) { Cancel(); _popup = null; return; }
+                if (r < 0) return;
+                string cmd = _popup.Items[r]; _popup = null;
+                var it = items[_index].Key;
+                if (cmd == "Toss")
+                {
+                    Game.Message.Show("Throw away all " + (it.NamePlural ?? it.Name) + "?", new List<string> { "Yes", "No" }, 1, c =>
+                    {
+                        if (c == 0) { Game.State.Bag.Remove(it.Id); Game.Message.Show("Threw away the " + (it.NamePlural ?? it.Name) + "."); }
+                    });
+                }
+                else if (cmd == "Use") Game.Message.Show("Items can't be used from the Bag yet. That's coming with the battle system.");
+                return;
+            }
+            if (Input.Repeat(Button.Right)) { _pocket = (_pocket + 1) % 8; _index = 0; _scroll = 0; Cursor(); }
+            if (Input.Repeat(Button.Left)) { _pocket = (_pocket + 7) % 8; _index = 0; _scroll = 0; Cursor(); }
+            int n = items.Count + 1; // + Close bag
+            if (Input.Repeat(Button.Down)) { _index = (_index + 1) % n; Cursor(); }
+            if (Input.Repeat(Button.Up)) { _index = (_index + n - 1) % n; Cursor(); }
+            if (_index < _scroll) _scroll = _index;
+            if (_index >= _scroll + 7) _scroll = _index - 6;
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
+            if (Input.Trigger(Button.Action))
+            {
+                if (_index >= items.Count) { Cancel(); Close(); return; }
+                Decide();
+                var it = items[_index].Key;
+                var cmds = new List<string>();
+                if (!string.IsNullOrEmpty(it.FieldUse)) cmds.Add("Use");
+                if (it.Pocket != 8) cmds.Add("Toss");
+                cmds.Add("Cancel");
+                _popup = new CommandList(cmds);
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 200, 120), new Color(216, 136, 64));
+            // Bag panel on the left
+            Ui.Panel(g, 8, 8, 176, 268, new Color(248, 232, 200), new Color(160, 96, 48));
+            string pname = PocketNames[_pocket];
+            Ui.TextCenter(g, 96, 20, pname);
+            for (int i = 0; i < 8; i++) g.FillRect(24 + i * 18, 60, 12, 12, i == _pocket ? new Color(232, 64, 48) : new Color(200, 168, 128));
+            Ui.Text(g, 22, 84, "◀ ▶ to switch");
+            var items = Items();
+            if (_index < items.Count) Ui.ItemIcon(g, Game, items[_index].Key.Id, 72, 140);
+
+            // Item list
+            Ui.Panel(g, 192, 8, g.Width - 200, 268, new Color(248, 248, 248), new Color(160, 96, 48));
+            int lh = 36;
+            for (int row = 0; row < 7; row++)
+            {
+                int i = _scroll + row;
+                if (i > items.Count) break;
+                int y = 18 + row * lh;
+                if (i == _index) Ui.Arrow(g, 202, y + 8);
+                if (i == items.Count) { Ui.Text(g, 222, y, "Close bag"); continue; }
+                var it = items[i];
+                Ui.Text(g, 222, y, it.Key.Name ?? it.Key.Id);
+                if (it.Key.Pocket != 8) Ui.TextRight(g, g.Width - 24, y, "x" + it.Value);
+            }
+            if (items.Count == 0) Ui.Text(g, 222, 18 + lh, "(empty)");
+
+            // Description
+            Ui.Box(g, 4, 284, g.Width - 8, 96);
+            string desc = _index < items.Count ? items[_index].Key.Description ?? "" : "Close the bag.";
+            var words = desc.Split(' '); string line = ""; int ly = 298;
+            foreach (var w in words)
+            {
+                string t = line.Length == 0 ? w : line + " " + w;
+                if (line.Length > 0 && g.TextWidth(t) > g.Width - 48) { Ui.Text(g, 22, ly, line); ly += 32; line = w; if (ly > 340) break; }
+                else line = t;
+            }
+            if (ly <= 340) Ui.Text(g, 22, ly, line);
+            if (_popup != null) { int w = _popup.Width(g); _popup.Draw(g, g.Width - w - 8, 284 - _popup.Height(g) - 4); }
+        }
+    }
+
+    // =====================================================================================
+    public class TrainerCardScene : Scene
+    {
+        public TrainerCardScene(Game g) : base(g) { Opaque = true; g.Audio.PlaySe("GUI trainer card open"); }
+
+        protected override void Update()
+        {
+            if (Input.Trigger(Button.Cancel) || Input.Trigger(Button.Action)) { Cancel(); Close(); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 160, 232), new Color(40, 88, 176));
+            Ui.Panel(g, 24, 24, g.Width - 48, g.Height - 48, new Color(248, 240, 216), new Color(176, 136, 72));
+            var s = Game.State;
+            Ui.Text(g, 56, 44, "TRAINER CARD");
+            Ui.TextRight(g, g.Width - 56, 44, "IDNo. " + s.TrainerId.ToString("00000"));
+            Ui.Text(g, 56, 104, "Name");    Ui.TextRight(g, 300, 104, s.PlayerName);
+            Ui.Text(g, 56, 144, "Money");   Ui.TextRight(g, 300, 144, "$" + s.Money.ToString("N0"));
+            Ui.Text(g, 56, 184, "Pokémon"); Ui.TextRight(g, 300, 184, (s.Party.Count + s.Storage.Count).ToString());
+            Ui.Text(g, 56, 224, "Time");    Ui.TextRight(g, 300, 224, Ui.PlayTime(s.PlayFrames));
+            var look = Game.Player.Look;
+            var tex = look != null ? g.Load(Game.Project.FindAsset("Graphics/Trainers", look.TrainerType)) : null;
+            if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, g.Width - 48 - tex.Width - 16, 90);
+            for (int i = 0; i < Math.Min(6, s.Party.Count); i++) Ui.PokemonIcon(g, Game, s.Party[i], 48 + i * 68, 268, Frame);
+        }
+    }
+}

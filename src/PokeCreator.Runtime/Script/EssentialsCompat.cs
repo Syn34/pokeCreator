@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using PokeCreator.Runtime.World;
+using PokeCreator.Pkmn;
 
 namespace PokeCreator.Runtime.Script
 {
@@ -231,7 +232,13 @@ namespace PokeCreator.Runtime.Script
             Register("pbAddPokemon", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, true));
             Register("pbAddPokemonSilent", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false));
             Register("pbAddToParty", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, true));
-            Register("pbHealAll", (c, a) => true);
+            Handler heal = (c, a) => { foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; };
+            Register("pbHealAll", heal);
+            Register("$player.heal_party", heal);
+            Register("$Trainer.heal_party", heal);
+            Register("$player.able_pokemon_count", (c, a) => _game.State.Party.Count(pk => !pk.Fainted));
+            Register("$player.party_full?", (c, a) => _game.State.Party.Count >= GameState.MaxParty);
+            Register("pbBoxesFull?", (c, a) => false);
             Register("pbPokeCenterPC", (c, a) => { _game.Message.Show("The PC isn't available in this version of PokeCreator yet."); return true; });
             Register("pbTrainerPC", (c, a) => { _game.Message.Show("The PC isn't available in this version of PokeCreator yet."); return true; });
             Register("pbPokemonMart", (c, a) => { _game.Message.Show("Shops are coming in a future version of PokeCreator."); return true; });
@@ -289,11 +296,15 @@ namespace PokeCreator.Runtime.Script
 
         object AddPokemon(string species, int level, bool announce)
         {
-            _game.Party.Add(new Game.PartyMember { Species = species, Level = level });
+            var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, species, level, _game.Rng);
+            if (pk.Data(_game.Project) == null) { WarnOnce("Unknown species " + species); return false; }
+            pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId; pk.MetMap = _game.Map.Id;
+            bool toParty = _game.State.Party.Count < GameState.MaxParty;
+            if (toParty) _game.State.Party.Add(pk); else _game.State.Storage.Add(pk);
             if (announce)
             {
                 _game.Audio.PlayMe("Pkmn get");
-                _game.Message.Show("\\PN obtained " + SpeciesName(species) + "!");
+                _game.Message.Show("\\PN obtained " + pk.Name(_game.Project) + "!" + (toParty ? "" : "\\n" + pk.Name(_game.Project) + " was sent to the PC."));
             }
             return true;
         }

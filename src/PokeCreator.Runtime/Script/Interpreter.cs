@@ -211,7 +211,7 @@ namespace PokeCreator.Runtime.Script
 
                 case 301: _game.StartPlaceholderBattle("a trainer"); _branch[c.Indent] = 0; return true;
                 case 601: case 602: case 603: return BattleBranch(c);
-                case 314: return true;
+                case 314: foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; // Recover All
                 case 351: case 352: case 353: case 354: return true;
 
                 case 355: return RunScript();
