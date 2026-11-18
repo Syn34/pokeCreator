@@ -1,0 +1,469 @@
+[
+  {
+    "Id": "POKEMONTRAINER_Red",
+    "Name": "Pokémon Trainer",
+    "Gender": "Male",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "POKEMONTRAINER_Leaf",
+    "Name": "Pokémon Trainer",
+    "Gender": "Female",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "POKEMONTRAINER_Brendan",
+    "Name": "Pokémon Trainer",
+    "Gender": "Male",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "POKEMONTRAINER_May",
+    "Name": "Pokémon Trainer",
+    "Gender": "Female",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "RIVAL1",
+    "Name": "Rival",
+    "Gender": "Male",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "RIVAL2",
+    "Name": "Rival",
+    "Gender": "Male",
+    "BaseMoney": 36
+  },
+  {
+    "Id": "AROMALADY",
+    "Name": "Aroma Lady",
+    "Gender": "Female",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "BEAUTY",
+    "Name": "Beauty",
+    "Gender": "Female",
+    "BaseMoney": 56
+  },
+  {
+    "Id": "BIKER",
+    "Name": "Biker",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "BIRDKEEPER",
+    "Name": "Bird Keeper",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "BUGCATCHER",
+    "Name": "Bug Catcher",
+    "Gender": "Male",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "BURGLAR",
+    "Name": "Burglar",
+    "Gender": "Male",
+    "BaseMoney": 88,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "CHANNELER",
+    "Name": "Channeler",
+    "Gender": "Female",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "CUEBALL",
+    "Name": "Cue Ball",
+    "Gender": "Male",
+    "BaseMoney": 24
+  },
+  {
+    "Id": "ENGINEER",
+    "Name": "Engineer",
+    "Gender": "Male",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "FISHERMAN",
+    "Name": "Fisherman",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "GAMBLER",
+    "Name": "Gambler",
+    "Gender": "Male",
+    "BaseMoney": 72,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "GENTLEMAN",
+    "Name": "Gentleman",
+    "Gender": "Male",
+    "BaseMoney": 72
+  },
+  {
+    "Id": "HIKER",
+    "Name": "Hiker",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "JUGGLER",
+    "Name": "Juggler",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "LADY",
+    "Name": "Lady",
+    "Gender": "Female",
+    "BaseMoney": 160,
+    "SkillLevel": 72
+  },
+  {
+    "Id": "PAINTER",
+    "Name": "Painter",
+    "Gender": "Female",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "POKEMANIAC",
+    "Name": "Poké Maniac",
+    "Gender": "Male",
+    "BaseMoney": 64
+  },
+  {
+    "Id": "POKEMONBREEDER",
+    "Name": "Pokémon Breeder",
+    "Gender": "Female",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "PROFESSOR",
+    "Name": "Professor",
+    "Gender": "Male",
+    "BaseMoney": 100
+  },
+  {
+    "Id": "ROCKER",
+    "Name": "Rocker",
+    "Gender": "Male",
+    "BaseMoney": 24
+  },
+  {
+    "Id": "RUINMANIAC",
+    "Name": "Ruin Maniac",
+    "Gender": "Male",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "SAILOR",
+    "Name": "Sailor",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "SCIENTIST",
+    "Name": "Scientist",
+    "Gender": "Male",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "SUPERNERD",
+    "Name": "Super Nerd",
+    "Gender": "Male",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "TAMER",
+    "Name": "Tamer",
+    "Gender": "Male",
+    "BaseMoney": 40
+  },
+  {
+    "Id": "BLACKBELT",
+    "Name": "Black Belt",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "CRUSHGIRL",
+    "Name": "Crush Girl",
+    "Gender": "Female",
+    "BaseMoney": 24
+  },
+  {
+    "Id": "CAMPER",
+    "Name": "Camper",
+    "Gender": "Male",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "PICNICKER",
+    "Name": "Picnicker",
+    "Gender": "Female",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "COOLTRAINER_M",
+    "Name": "Cool Trainer",
+    "Gender": "Male",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "COOLTRAINER_F",
+    "Name": "Cool Trainer",
+    "Gender": "Female",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "YOUNGSTER",
+    "Name": "Youngster",
+    "Gender": "Male",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "LASS",
+    "Name": "Lass",
+    "Gender": "Female",
+    "BaseMoney": 16
+  },
+  {
+    "Id": "POKEMONRANGER_M",
+    "Name": "Pokémon Ranger",
+    "Gender": "Male",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "POKEMONRANGER_F",
+    "Name": "Pokémon Ranger",
+    "Gender": "Female",
+    "BaseMoney": 60
+  },
+  {
+    "Id": "PSYCHIC_M",
+    "Name": "Psychic",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "PSYCHIC_F",
+    "Name": "Psychic",
+    "Gender": "Female",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "SWIMMER_M",
+    "Name": "Swimmer",
+    "Gender": "Male",
+    "BaseMoney": 16,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "SWIMMER_F",
+    "Name": "Swimmer",
+    "Gender": "Female",
+    "BaseMoney": 16,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "SWIMMER2_M",
+    "Name": "Swimmer",
+    "Gender": "Male",
+    "BaseMoney": 16,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "SWIMMER2_F",
+    "Name": "Swimmer",
+    "Gender": "Female",
+    "BaseMoney": 16,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "TUBER_M",
+    "Name": "Tuber",
+    "Gender": "Male",
+    "BaseMoney": 4,
+    "SkillLevel": 16
+  },
+  {
+    "Id": "TUBER_F",
+    "Name": "Tuber",
+    "Gender": "Female",
+    "BaseMoney": 4,
+    "SkillLevel": 16
+  },
+  {
+    "Id": "TUBER2_M",
+    "Name": "Tuber",
+    "Gender": "Male",
+    "BaseMoney": 4,
+    "SkillLevel": 16
+  },
+  {
+    "Id": "TUBER2_F",
+    "Name": "Tuber",
+    "Gender": "Female",
+    "BaseMoney": 4,
+    "SkillLevel": 16
+  },
+  {
+    "Id": "COOLCOUPLE",
+    "Name": "Cool Couple",
+    "BaseMoney": 72,
+    "SkillLevel": 48
+  },
+  {
+    "Id": "CRUSHKIN",
+    "Name": "Crush Kin",
+    "BaseMoney": 48
+  },
+  {
+    "Id": "SISANDBRO",
+    "Name": "Sis and Bro",
+    "BaseMoney": 16,
+    "SkillLevel": 48
+  },
+  {
+    "Id": "TWINS",
+    "Name": "Twins",
+    "BaseMoney": 24
+  },
+  {
+    "Id": "YOUNGCOUPLE",
+    "Name": "Young Couple",
+    "BaseMoney": 60,
+    "SkillLevel": 32
+  },
+  {
+    "Id": "TEAMROCKET_M",
+    "Name": "Team Rocket",
+    "Gender": "Male",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "TEAMROCKET_F",
+    "Name": "Team Rocket",
+    "Gender": "Female",
+    "BaseMoney": 32
+  },
+  {
+    "Id": "ROCKETBOSS",
+    "Name": "Rocket Boss",
+    "Gender": "Male",
+    "BaseMoney": 100
+  },
+  {
+    "Id": "LEADER_Brock",
+    "Name": "Gym Leader",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Misty",
+    "Name": "Gym Leader",
+    "Gender": "Female",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Surge",
+    "Name": "Gym Leader",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Erika",
+    "Name": "Gym Leader",
+    "Gender": "Female",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Koga",
+    "Name": "Gym Leader",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Sabrina",
+    "Name": "Gym Leader",
+    "Gender": "Female",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Blaine",
+    "Name": "Gym Leader",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "LEADER_Giovanni",
+    "Name": "Gym Leader",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Gym Leader",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "ELITEFOUR_Lorelei",
+    "Name": "Elite Four",
+    "Gender": "Female",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Elite",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "ELITEFOUR_Bruno",
+    "Name": "Elite Four",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Elite",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "ELITEFOUR_Agatha",
+    "Name": "Elite Four",
+    "Gender": "Female",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Elite",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "ELITEFOUR_Lance",
+    "Name": "Elite Four",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Elite",
+    "VictoryBGM": "Battle victory leader"
+  },
+  {
+    "Id": "CHAMPION",
+    "Name": "Champion",
+    "Gender": "Male",
+    "BaseMoney": 100,
+    "BattleBGM": "Battle Champion",
+    "VictoryBGM": "Battle victory leader"
+  }
+]

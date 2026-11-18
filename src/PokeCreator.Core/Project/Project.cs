@@ -145,6 +145,9 @@ namespace PokeCreator.Projects
             p.MapInfos.Add(new MapInfo { Id = 1, Name = "MAP001", Order = 1 });
             p._maps[1] = map;
             p.Settings.StartMap = 1; p.Settings.StartX = 10; p.Settings.StartY = 7;
+            // Start with the complete built-in database (every Pokémon, move, ability, item...)
+            BaseData.Fill(p, BaseData.DefaultFolder);
+            p.Players.Add(new PlayerCharacter { TrainerType = "POKEMONTRAINER_Red", WalkCharset = "trainer_POKEMONTRAINER_Red" });
             p.Save();
             p.SaveMap(map);
             return p;

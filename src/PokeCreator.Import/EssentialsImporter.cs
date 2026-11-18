@@ -22,6 +22,8 @@ namespace PokeCreator.Import
     {
         public Action<string> Log = s => { };
         public bool CopyAssets = true;
+        /// <summary>Built-in database used to add what Essentials is missing (Gen 9, Hisuian forms...). Null = don't.</summary>
+        public string BaseDataFolder = BaseData.DefaultFolder;
         public readonly List<string> Warnings = new List<string>();
 
         string _src;
@@ -58,6 +60,12 @@ namespace PokeCreator.Import
             ImportSystem();
             ImportTilesets();
             ImportMaps();
+
+            if (BaseDataFolder != null)
+            {
+                Log("Adding Pokémon and data Essentials doesn't include (from PokeCreator's built-in database)...");
+                Log("  " + BaseData.MergeInto(_p, BaseDataFolder));
+            }
 
             Log("Saving project data...");
             _p.Save();

@@ -19,6 +19,8 @@ echo == Game runtime
 echo == Studio
 "%CSC%" %OPTS% /target:winexe /out:bin\PokeCreatorStudio.exe /recurse:src\PokeCreator.Studio\*.cs /r:bin\PokeCreator.Core.dll /r:bin\PokeCreator.Import.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Data.dll || goto :fail
 copy /y lib\win-x64\*.dll bin\ >nul
+if not exist bin\BaseData mkdir bin\BaseData
+copy /y data\base\*.json bin\BaseData\ >nul
 echo.
 echo Build OK. Run bin\PokeCreatorStudio.exe
 exit /b 0

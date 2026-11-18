@@ -106,6 +106,8 @@ namespace PokeCreator.Studio
                 db.DropDownItems.Clear();
                 if (Project == null) return;
                 foreach (var t in Project.Tables) { var table = t; db.DropDownItems.Add(t.Label, null, (a, b) => OpenTable(table)); }
+                db.DropDownItems.Add(new ToolStripSeparator());
+                db.DropDownItems.Add("Add Missing Pokémon && Data…", null, (a, b) => MergeBaseData());
             };
             db.DropDownItems.Add("(open a project)");
 
@@ -314,6 +316,24 @@ namespace PokeCreator.Studio
                 RefreshMapIcons(n.Nodes);
             }
             _tree.Invalidate();
+        }
+
+        /// <summary>Adds Pokémon, moves, abilities and items from the built-in database that this project doesn't have.</summary>
+        void MergeBaseData()
+        {
+            if (Project == null) return;
+            string folder = BaseData.DefaultFolder;
+            if (folder == null) { MessageBox.Show(this, "The BaseData folder wasn't found next to PokeCreatorStudio.exe.", "Add missing data"); return; }
+            if (MessageBox.Show(this, "Add every Pokémon, form, move, ability and item from PokeCreator's built-in database that this project doesn't have yet?\n\n" +
+                "Nothing you've already made or edited will be changed. New evolutions are added to existing Pokémon only when they lead to a newly added Pokémon.",
+                "Add missing Pokémon & data", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            SaveAll();
+            foreach (TabPage tp in _tabs.TabPages.Cast<TabPage>().Where(t => (t.Name ?? "").StartsWith("db:")).ToList()) { _tabs.TabPages.Remove(tp); tp.Dispose(); }
+            var result = BaseData.MergeInto(Project, folder);
+            foreach (var t in Project.Tables) Json.Json.ToFile(Project.DataFile(t.FileName), t.Items);
+            RebuildTree();
+            SetStatus(result.ToString());
+            MessageBox.Show(this, result.ToString() + "\n\nYour project now has " + Project.Species.Count(sp => sp.Form == 0) + " Pokémon.", "Add missing Pokémon & data");
         }
 
         void OpenAppearance() { OpenDocument("sys:appearance", () => new AppearanceEditor(_settings, s => ApplyAppearance(s, true))); }
