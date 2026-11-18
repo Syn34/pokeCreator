@@ -16,5 +16,6 @@
     <ProjectReference Include="..\PokeCreator.Import\PokeCreator.Import.csproj" />
     <ProjectReference Include="..\PokeCreator.Runtime\PokeCreator.Runtime.csproj" ReferenceOutputAssembly="false" />
     <None Include="..\..\data\base\*.json" Link="BaseData\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\data\base\Tilesets\README.txt" Link="BaseData\Tilesets\README.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

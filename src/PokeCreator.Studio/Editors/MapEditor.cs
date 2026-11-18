@@ -51,6 +51,16 @@ namespace PokeCreator.Studio.Editors
             var left = new Panel { Dock = DockStyle.Left, Width = 8 * 32 + 26 };
             left.Controls.Add(palScroll);
             left.Controls.Add(new Label { Text = "Tiles: click or drag to select", Dock = DockStyle.Top, Height = 20, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) });
+            left.Controls.Add(_sheetList);
+            left.Controls.Add(_sheetHeader);
+            _sheetList.SelectedIndexChanged += (s, e) =>
+            {
+                if (_fillingSheets || _sheetList.SelectedIndex < 0) return;
+                _palette.Slot = _sheetSlots[_sheetList.SelectedIndex];
+                palScroll.AutoScrollPosition = Point.Empty;
+            };
+            _palette.SlotChanged += () => { int k = _sheetSlots.IndexOf(_palette.Slot); if (k >= 0 && k != _sheetList.SelectedIndex) { _fillingSheets = true; _sheetList.SelectedIndex = k; _fillingSheets = false; } };
+            FillSheets();
 
             Controls.Add(scroller);
             Controls.Add(new Splitter { Dock = DockStyle.Left });
@@ -109,6 +119,29 @@ namespace PokeCreator.Studio.Editors
         public int Layer { get; private set; }
         public Palette PaletteControl { get { return _palette; } }
 
+        // Sheets (areas) of the map's tileset folder; any of them can be painted on this map
+        readonly ListBox _sheetList = new ListBox { Dock = DockStyle.Top, IntegralHeight = false, Height = 60 };
+        readonly Label _sheetHeader = new Label { Dock = DockStyle.Top, Height = 20, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(4, 0, 0, 0) };
+        readonly List<int> _sheetSlots = new List<int>();
+        bool _fillingSheets;
+
+        void FillSheets()
+        {
+            _fillingSheets = true;
+            _sheetList.BeginUpdate();
+            _sheetList.Items.Clear(); _sheetSlots.Clear();
+            foreach (var sh in _tiles.Sheets) { _sheetSlots.Add(sh.Key); _sheetList.Items.Add(sh.Value); }
+            _sheetList.EndUpdate();
+            int rows = Math.Max(1, Math.Min(8, _sheetSlots.Count));
+            _sheetList.Height = rows * Math.Max(_sheetList.ItemHeight, _sheetList.Font.Height + 3) + 8;
+            var ts = _tiles.Tileset;
+            _sheetHeader.Text = (string.IsNullOrEmpty(ts.Folder) ? "Tileset: " + ts.Name : "Tileset folder: " + ts.Folder) + (_sheetSlots.Count > 1 ? "  (" + _sheetSlots.Count + " areas)" : "");
+            int k = _sheetSlots.IndexOf(_palette.Slot);
+            if (k < 0 && _sheetSlots.Count > 0) { k = 0; _palette.Slot = _sheetSlots[0]; }
+            if (k >= 0) _sheetList.SelectedIndex = k;
+            _fillingSheets = false;
+        }
+
         void SetLayer(int l)
         {
             Layer = l;
@@ -130,7 +163,7 @@ namespace PokeCreator.Studio.Editors
             {
                 int id = _map.GetTile(x, y, Layer);
                 var ts = _tiles.Tileset;
-                s += "   tile " + id + (id >= 48 && id < 384 ? " (autotile " + (id / 48) + ")" : "") + "   priority " + ts.Priority(id) + "   terrain " + TerrainName(ts.TerrainTag(id)) + "   " + ((ts.Passage(id) & 0x0f) == 0x0f ? "blocked" : "passable");
+                s += "   tile " + id + (id >= 48 && id < 384 ? " (autotile " + (id / 48) + ")" : id >= 384 && ts.AllSheets().Count > 1 ? " (" + TilesetData.LabelOf(ts.SheetImage(TilesetData.SlotOf(id))) + ")" : "") + "   priority " + ts.Priority(id) + "   terrain " + TerrainName(ts.TerrainTag(id)) + "   " + ((ts.Passage(id) & 0x0f) == 0x0f ? "blocked" : "passable");
             }
             var ev = _map.Events.FirstOrDefault(e => e.X == x && e.Y == y);
             if (ev != null) s += "   event " + ev.Id + ": " + ev.Name;
@@ -224,6 +257,7 @@ namespace PokeCreator.Studio.Editors
                 _map.TilesetId = s.TilesetId;
                 _tiles.Load(_p.GetTileset(s.TilesetId));
                 _palette.Reload();
+                FillSheets();
             }
             _map.AutoplayBgm = s.AutoplayBgm;
             if (_map.Bgm == null) _map.Bgm = new AudioFile();
@@ -259,13 +293,22 @@ namespace PokeCreator.Studio.Editors
         }
     }
 
-    /// <summary>Tileset palette: blank + 7 autotiles on the first row, then the tileset image.</summary>
+    /// <summary>Tileset palette: blank + 7 autotiles on the first row, then the selected sheet's tiles.</summary>
     public class Palette : Control
     {
         readonly TileGraphics _tiles;
         Point _selStart, _selEnd;
         bool _dragging;
+        int _slot;
         public event Action SelectionChanged;
+        public event Action SlotChanged;
+
+        /// <summary>Which sheet (area) of the tileset folder is shown.</summary>
+        public int Slot
+        {
+            get { return _slot; }
+            set { if (_slot == value) return; _slot = value; Reload(); if (SlotChanged != null) SlotChanged(); }
+        }
 
         public Palette(TileGraphics tiles)
         {
@@ -276,12 +319,13 @@ namespace PokeCreator.Studio.Editors
 
         public void Reload()
         {
-            Width = 8 * 32; Height = (1 + _tiles.TileRows) * 32;
+            Width = 8 * 32; Height = (1 + _tiles.Rows(_slot)) * 32;
             _selStart = _selEnd = new Point(0, 1);
             Invalidate();
         }
 
-        public static int IdAt(int col, int row) { return row == 0 ? (col == 0 ? 0 : col * 48) : 384 + (row - 1) * 8 + col; }
+        public static int IdAt(int col, int row) { return IdAt(col, row, 0); }
+        public static int IdAt(int col, int row, int slot) { return row == 0 ? (col == 0 ? 0 : col * 48) : TilesetData.TileId(slot, (row - 1) * 8 + col); }
 
         public Rectangle Selection
         {
@@ -301,7 +345,7 @@ namespace PokeCreator.Studio.Editors
             {
                 var r = Selection;
                 var b = new int[r.Height, r.Width];
-                for (int y = 0; y < r.Height; y++) for (int x = 0; x < r.Width; x++) b[y, x] = IdAt(r.X + x, r.Y + y);
+                for (int y = 0; y < r.Height; y++) for (int x = 0; x < r.Width; x++) b[y, x] = IdAt(r.X + x, r.Y + y, _slot);
                 return b;
             }
         }
@@ -310,8 +354,8 @@ namespace PokeCreator.Studio.Editors
         {
             Point p;
             if (id == 0) p = new Point(0, 0);
-            else if (id < 384) p = new Point(id / 48, 0);
-            else { int i = id - 384; p = new Point(i % 8, i / 8 + 1); }
+            else if (id < TilesetData.FirstTile) p = new Point(id / 48, 0);
+            else { Slot = TilesetData.SlotOf(id); int i = TilesetData.IndexOf(id); p = new Point(i % 8, i / 8 + 1); }
             _selStart = _selEnd = p;
             Invalidate();
             var parent = Parent as ScrollableControl;
@@ -325,7 +369,7 @@ namespace PokeCreator.Studio.Editors
         protected override void OnMouseMove(MouseEventArgs e) { if (_dragging) { _selEnd = Cell(e.Location); Invalidate(); } }
         protected override void OnMouseUp(MouseEventArgs e) { _dragging = false; if (SelectionChanged != null) SelectionChanged(); }
 
-        Point Cell(Point p) { return new Point(Math.Max(0, Math.Min(7, p.X / 32)), Math.Max(0, Math.Min(_tiles.TileRows, p.Y / 32))); }
+        Point Cell(Point p) { return new Point(Math.Max(0, Math.Min(7, p.X / 32)), Math.Max(0, Math.Min(_tiles.Rows(_slot), p.Y / 32))); }
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -336,7 +380,8 @@ namespace PokeCreator.Studio.Editors
                 g.FillRectangle(checker, ClientRectangle);
             for (int i = 1; i < 8; i++) _tiles.Draw(g, i * 48 + 47, i * 32, 0);
             g.DrawString("∅", Font, Brushes.Gray, 10, 9);
-            if (_tiles.TilesetImage != null) g.DrawImage(_tiles.TilesetImage, new Rectangle(0, 32, 256, _tiles.TilesetImage.Height), new Rectangle(0, 0, 256, _tiles.TilesetImage.Height), GraphicsUnit.Pixel);
+            var sheet = _tiles.Image(_slot);
+            if (sheet != null) g.DrawImage(sheet, new Rectangle(0, 32, 256, sheet.Height), new Rectangle(0, 0, 256, sheet.Height), GraphicsUnit.Pixel);
             g.DrawLine(Pens.DimGray, 0, 32, Width, 32);
             var r = Selection;
             var rect = new Rectangle(r.X * 32, r.Y * 32, r.Width * 32 - 1, r.Height * 32 - 1);

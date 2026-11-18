@@ -9,3 +9,6 @@ obj/
 # Test projects / scratch
 /TestProjects/
 *.tmp
+# Default tileset art is added by each user (no Nintendo graphics in the repo)
+data/base/Tilesets/*/
+data/base/Tilesets/default.txt

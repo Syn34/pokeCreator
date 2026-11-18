@@ -179,6 +179,16 @@ namespace PokeCreator.Projects
             return p;
         }
 
+        public string TilesetsDir { get { return Path.Combine(Root, "Graphics", "Tilesets"); } }
+
+        /// <summary>Adds new images found in tileset folders as sheets. Returns true if anything changed (save tilesets.json).</summary>
+        public bool SyncTilesetFolders()
+        {
+            bool changed = false;
+            foreach (var t in Tilesets) if (t.SyncFolder(TilesetsDir).Count > 0) changed = true;
+            return changed;
+        }
+
         static T LoadOr<T>(string path, T fallback)
         {
             if (!File.Exists(path)) return fallback;

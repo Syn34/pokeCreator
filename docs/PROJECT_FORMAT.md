@@ -19,7 +19,7 @@ MyGame/
     encounters.json         wild encounter tables per map
     town_maps.json          region map points
     regional_dexes.json
-    tilesets.json           tileset images + per-tile passability / priority / terrain tag
+    tilesets.json           tilesets: folder of area images, autotiles, per-tile passability / priority / terrain tag
     mapinfos.json           map tree (names, parents, order)
     map_connections.json    maps that join at their edges (edited in the World Map)
     world.json              Studio only: where each map sits on the World Map ({"5": [x, y]} in tiles)
@@ -95,6 +95,24 @@ public static class Rewards
 
 Take the point `Offset1` tiles along Map1's edge and the point `Offset2` tiles along Map2's edge (offsets run left-to-right on North/South edges, top-to-bottom on East/West edges); the maps are placed so those two points meet. Above, Map 52's top-left corner sits 8 tiles below Map 47's top-right corner. Missing offsets are 0. The World Map writes these for you.
 
+## Default tilesets
+
+`BaseData/Tilesets/<Folder>/` next to the Studio: images (one per area), an optional `Autotiles/` folder and an optional `tileset.json` (written by **Make Default for New Projects**, holds passability). `BaseData/Tilesets/default.txt` names the folder new maps use. New projects get a copy of every folder.
+
 ## Built-in database
 
 `BaseData/*.json` next to the Studio (from `data/base` in the repo) holds every Pokémon, move, ability, item, type and trainer type. New projects are created from it, and **Database → Add Missing Pokémon & Data** merges in records whose ID the project doesn't have yet. Existing records are never changed. See `tools/basedata/README.md` for how it's generated.
+
+## Tilesets and tile IDs
+
+A tileset is either one image (`TilesetName`, as imported from Essentials) or a **folder** (`Folder`) in `Graphics/Tilesets` holding one image per area. Every image is a *sheet* with a fixed slot number; the first sheet is slot 0 (`TilesetName`), the rest are listed in `Sheets`:
+
+```json
+{ "Id": 1, "Name": "FireRed", "Folder": "FireRed", "TilesetName": "FireRed/Outdoor",
+  "Sheets": [ { "Name": "FireRed/Cave", "Slot": 1, "Passages": [...] },
+              { "Name": "FireRed/Pokemon Center", "Slot": 2, "Passages": [...] } ] }
+```
+
+Tile IDs in map layers follow RPG Maker XP: 0 is empty, 48–383 are autotiles (48 per autotile), and sheet tiles are `384 + slot × 32768 + row × 8 + column`. Slot 0 therefore uses exactly RMXP's IDs. Slots are never reused or renumbered, so adding, removing or re-ordering images never changes existing maps. A deleted image's slot stays reserved. Passability, priority and terrain tags for slot 0 (and autotiles) are in the tileset's own lists, indexed by tile ID; other sheets keep theirs in their entry, indexed by `row × 8 + column`.
+
+New images dropped into a tileset's folder are added as new sheets when the project is opened or **Refresh Folder** is clicked. Don't rename sheet images after maps use them (the name is how the sheet is found).

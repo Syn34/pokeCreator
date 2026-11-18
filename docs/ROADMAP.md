@@ -17,6 +17,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Complete built-in database: all 1025 Pokémon with forms, moves, abilities and items; Add Missing Data for existing projects
 - [x] World Map: drag-to-connect map connections, new connected maps, unplaced-map list
 - [x] Tileset and autotile image import with 16×16 and wide-sheet conversion
+- [x] Tileset folders: one image per area, maps paint from all of them; default tilesets for new projects
+- [x] Script editor with line numbers and Visual Studio colours
 - [ ] Using items from the Bag (Potions, Repels...), giving held items
 - [ ] Evolution on level up (needs battles for EXP)
 - [ ] Pokédex (seen/caught), Options menu

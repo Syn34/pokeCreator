@@ -35,7 +35,7 @@ namespace PokeCreator.Runtime.Render
         public int Frame;
         public TileDrawer(Gfx g, Project p) { _g = g; _p = p; }
 
-        public Texture TilesetTexture(TilesetData ts) { return _g.Load(_p.FindAsset("Graphics/Tilesets", ts.TilesetName)); }
+        public Texture TilesetTexture(TilesetData ts, int slot = 0) { return _g.Load(_p.FindAsset("Graphics/Tilesets", ts.SheetImage(slot))); }
         public Texture AutotileTexture(TilesetData ts, int index)
         {
             if (index < 0 || index >= ts.AutotileNames.Count) return null;
@@ -46,8 +46,9 @@ namespace PokeCreator.Runtime.Render
         {
             if (id >= 384)
             {
-                var tex = TilesetTexture(ts);
-                int i = id - 384;
+                var tex = TilesetTexture(ts, TilesetData.SlotOf(id));
+                if (tex == null) return;
+                int i = TilesetData.IndexOf(id);
                 _g.Draw(tex, (i % 8) * 32, (i / 8) * 32, 32, 32, x, y, -1, -1, alpha);
                 return;
             }

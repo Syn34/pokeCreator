@@ -187,6 +187,8 @@ namespace PokeCreator.Studio
             {
                 Cursor = Cursors.WaitCursor;
                 var p = Project.Load(dir);
+                // New images dropped into tileset folders become new areas
+                try { if (p.SyncTilesetFolders()) Json.Json.ToFile(p.DataFile("tilesets.json"), p.Tilesets); } catch { }
                 Project = p;
                 FormBuilder.Project = p;
                 foreach (TabPage tp in _tabs.TabPages.Cast<TabPage>().ToList()) { _tabs.TabPages.Remove(tp); tp.Dispose(); }

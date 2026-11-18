@@ -141,7 +141,10 @@ namespace PokeCreator.Studio.Editors
             {
                 Cursor = Cursors.WaitCursor;
                 Directory.CreateDirectory(folder);
-                Project.Create(folder, ProjectName);
+                var project = Project.Create(folder, ProjectName);
+                // Start with the default tileset folders (e.g. FireRed) if any are set up next to the Studio
+                try { DefaultTilesets.InstallInto(project); }
+                catch (Exception ex) { MessageBox.Show(this, "The project was created, but the default tilesets couldn't be copied:\n" + ex.Message, "New Project", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
                 ProjectFolder = folder;
                 DialogResult = DialogResult.OK;
                 Close();

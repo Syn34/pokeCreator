@@ -18,16 +18,23 @@ using PokeCreator.Studio.Controls;
 namespace PokeCreator.Studio.Editors
 {
     // =====================================================================================
-    /// <summary>Tilesets: images plus per-tile passability, priority and terrain tags.</summary>
+    /// <summary>
+    /// Tilesets: a folder of sheets (one image per area) plus autotiles, with per-tile passability,
+    /// priority and terrain tags. Maps using a tileset can paint from every sheet in its folder.
+    /// </summary>
     public class TilesetEditor : UserControl, IDocument
     {
         enum Mode { Passage, Priority, Terrain, Bush, Counter }
         readonly Project _p;
         readonly ListBox _list = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
-        readonly Panel _formHost = new Panel { Dock = DockStyle.Top, Height = 230 };
+        readonly ListBox _sheets = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+        readonly Label _sheetInfo = new Label { Dock = DockStyle.Bottom, Height = 60, ForeColor = Color.DimGray, Padding = new Padding(2) };
+        readonly List<int> _sheetSlots = new List<int>();
+        readonly Panel _formHost = new Panel { Dock = DockStyle.Top, Height = 200 };
         readonly Panel _scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.FromArgb(60, 62, 70) };
         readonly TilesetCanvas _canvas;
         Mode _mode = Mode.Passage;
+        public int Slot { get; private set; }
         public string Title { get { return "Tilesets"; } }
         public bool Dirty { get; private set; }
         public event Action DirtyChanged;
@@ -37,9 +44,12 @@ namespace PokeCreator.Studio.Editors
             _p = p; Dock = DockStyle.Fill;
             _canvas = new TilesetCanvas(this);
             _scroll.Controls.Add(_canvas);
+
+            // Left: tilesets
             var left = new Panel { Dock = DockStyle.Left, Width = 220 };
-            var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 68 };
-            var add = new Button { Text = "New Tileset" }; add.Click += (s, e) => { int id = _p.Tilesets.Count == 0 ? 1 : _p.Tilesets.Max(t => t.Id) + 1; _p.Tilesets.Add(new TilesetData { Id = id, Name = "New tileset" }); Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark(); };
+            var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 140, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(2) };
+            var fromFolder = new Button { Text = "New Tileset Folder…", AutoSize = true };
+            fromFolder.Click += (s, e) => { var ts = TilesetImport.PickFolder(FindForm(), _p); if (ts == null) return; Fill(); _list.SelectedItem = ts; Mark(); };
             var fromImage = new Button { Text = "New From Image…", AutoSize = true };
             fromImage.Click += (s, e) =>
             {
@@ -49,9 +59,25 @@ namespace PokeCreator.Studio.Editors
                 _p.Tilesets.Add(new TilesetData { Id = id, Name = name, TilesetName = name });
                 Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark();
             };
-            bar.Controls.Add(add);
-            bar.Controls.Add(fromImage);
+            var add = new Button { Text = "New Empty", AutoSize = true };
+            add.Click += (s, e) => { int id = _p.Tilesets.Count == 0 ? 1 : _p.Tilesets.Max(t => t.Id) + 1; _p.Tilesets.Add(new TilesetData { Id = id, Name = "New tileset" }); Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark(); };
+            var makeDefault = new Button { Text = "Make Default for New Projects", AutoSize = true };
+            makeDefault.Click += (s, e) => MakeDefault();
+            bar.Controls.AddRange(new Control[] { fromFolder, fromImage, add, makeDefault });
             left.Controls.Add(_list); left.Controls.Add(bar);
+            left.Controls.Add(new Label { Text = "Tilesets", Dock = DockStyle.Top, Height = 22, Font = Theme.HeaderFont });
+
+            // Middle: sheets (areas) in the selected tileset's folder
+            var mid = new Panel { Dock = DockStyle.Left, Width = 190 };
+            var sheetBar = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 140, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(2) };
+            var addSheet = new Button { Text = "Add Area Image…", AutoSize = true }; addSheet.Click += (s, e) => AddSheet();
+            var replace = new Button { Text = "Replace Image…", AutoSize = true }; replace.Click += (s, e) => ReplaceSheet();
+            var refresh = new Button { Text = "Refresh Folder", AutoSize = true }; refresh.Click += (s, e) => RefreshFolder(true);
+            var open = new Button { Text = "Open Folder", AutoSize = true }; open.Click += (s, e) => { var d = FolderPath(); if (d != null) { Directory.CreateDirectory(d); MainForm.OpenInShell(d); } };
+            sheetBar.Controls.AddRange(new Control[] { addSheet, replace, refresh, open });
+            mid.Controls.Add(_sheets); mid.Controls.Add(_sheetInfo); mid.Controls.Add(sheetBar);
+            mid.Controls.Add(new Label { Text = "Areas (sheets)", Dock = DockStyle.Top, Height = 22, Font = Theme.HeaderFont });
+            _sheets.SelectedIndexChanged += (s, e) => { if (_sheets.SelectedIndex >= 0) { Slot = _sheetSlots[_sheets.SelectedIndex]; SizeCanvas(); } };
 
             var modes = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
             modes.Controls.Add(new Label { Text = "Click tiles to change:", AutoSize = true, Margin = new Padding(4, 8, 6, 0) });
@@ -63,14 +89,6 @@ namespace PokeCreator.Studio.Editors
                 modes.Controls.Add(rb);
             }
             var imageBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
-            var changeImage = new Button { Text = "Replace Tileset Image…", AutoSize = true };
-            changeImage.Click += (s, e) =>
-            {
-                var ts = Current; if (ts == null) return;
-                string name = TilesetImport.PickTileset(FindForm(), _p);
-                if (name == null) return;
-                ts.TilesetName = name; Mark(); ShowSelected();
-            };
             var autotile = new Button { Text = "Import Autotile…", AutoSize = true };
             autotile.Click += (s, e) =>
             {
@@ -83,54 +101,179 @@ namespace PokeCreator.Studio.Editors
                 if (name == null) return;
                 ts.AutotileNames[slot] = name; Mark(); ShowSelected();
             };
-            imageBar.Controls.Add(changeImage);
             imageBar.Controls.Add(autotile);
-            imageBar.Controls.Add(new Label { Text = "16×16 sheets are doubled and wide sheets re-arranged to 8 tiles across automatically.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(8, 8, 0, 0) });
+            imageBar.Controls.Add(new Label { Text = "Maps using this tileset can paint from every area. 16×16 images are doubled and wide images re-arranged to 8 tiles across.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(8, 8, 0, 0) });
             var help = new Label { Dock = DockStyle.Top, Height = 20, ForeColor = Color.DimGray, Text = "Left-click to raise/toggle, right-click to lower. Terrain: 1 ledge, 2 grass, 5-9 water, 10 tall grass, 12 ice, 15 bridge." };
 
             var right = new Panel { Dock = DockStyle.Fill };
             right.Controls.Add(_scroll); right.Controls.Add(help); right.Controls.Add(modes); right.Controls.Add(imageBar); right.Controls.Add(_formHost);
-            Controls.Add(right); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(left);
+            Controls.Add(right); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(mid); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(left);
             _list.SelectedIndexChanged += (s, e) => ShowSelected();
             Fill();
             if (_list.Items.Count > 0) _list.SelectedIndex = 0;
         }
 
-        void Fill() { _list.Items.Clear(); foreach (var t in _p.Tilesets) _list.Items.Add(t); }
+        void Fill() { var sel = Current; _list.Items.Clear(); foreach (var t in _p.Tilesets) _list.Items.Add(t); if (sel != null && _list.Items.Contains(sel)) _list.SelectedItem = sel; }
         void Mark() { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } }
         public TilesetData Current { get { return _list.SelectedItem as TilesetData; } }
         public TileGraphics Graphics;
+
+        string FolderPath()
+        {
+            var ts = Current; if (ts == null) return null;
+            if (string.IsNullOrEmpty(ts.Folder)) return null;
+            return Path.Combine(_p.TilesetsDir, ts.Folder);
+        }
 
         void ShowSelected()
         {
             _formHost.Controls.Clear();
             var ts = Current; if (ts == null) return;
+            RefreshFolder(false);
             var fb = new FormBuilder();
-            fb.Changed += () => { Mark(); ReloadGraphics(); };
-            _formHost.Controls.Add(fb.Build(ts, "Passages", "Priorities", "TerrainTags", "Id"));
-            ReloadGraphics();
+            fb.Changed += () => { Mark(); RefreshFolder(false); };
+            _formHost.Controls.Add(fb.Build(ts, "Passages", "Priorities", "TerrainTags", "Id", "Sheets"));
         }
 
-        void ReloadGraphics()
+        /// <summary>Picks up new images in the folder (converting any that need it) and reloads the graphics.</summary>
+        void RefreshFolder(bool tell)
         {
+            var ts = Current; if (ts == null) return;
+            var notes = new List<string>();
+            string dir = FolderPath();
+            if (dir != null && Directory.Exists(dir))
+            {
+                foreach (var f in Directory.GetFiles(dir))
+                {
+                    string ext = Path.GetExtension(f).ToLowerInvariant();
+                    if (ext != ".png" && ext != ".bmp" && ext != ".gif" && ext != ".jpg") continue;
+                    try { var n = TilesetImport.ConvertInPlace(f); if (n != null) notes.Add(n); }
+                    catch (Exception ex) { notes.Add(ex.Message); }
+                }
+                var added = ts.SyncFolder(_p.TilesetsDir);
+                if (added.Count > 0) { Mark(); notes.Insert(0, "New areas: " + string.Join(", ", added.Select(TilesetData.LabelOf))); }
+            }
+            int keep = Slot;
             if (Graphics != null) Graphics.Dispose();
-            Graphics = new TileGraphics(_p, Current);
-            _canvas.Width = 256; _canvas.Height = (Graphics.TileRows + 1) * 32;
+            Graphics = new TileGraphics(_p, ts);
+            _sheets.BeginUpdate();
+            _sheets.Items.Clear(); _sheetSlots.Clear();
+            foreach (var sh in Graphics.Sheets) { _sheetSlots.Add(sh.Key); _sheets.Items.Add(sh.Value); }
+            _sheets.EndUpdate();
+            int k = _sheetSlots.IndexOf(keep);
+            if (k < 0) k = _sheetSlots.Count > 0 ? 0 : -1;
+            Slot = k >= 0 ? _sheetSlots[k] : 0;
+            if (k >= 0) _sheets.SelectedIndex = k;
+            _sheetInfo.Text = string.IsNullOrEmpty(ts.Folder)
+                ? "This tileset is a single image. Set Folder (above) to a folder in Graphics/Tilesets to use one image per area."
+                : "Folder: Graphics/Tilesets/" + ts.Folder + "\nAdd images to it for more areas.";
+            SizeCanvas();
+            if (tell) MessageBox.Show(this, notes.Count == 0 ? "The folder is up to date." : string.Join("\n", notes.Take(15)), "Refresh Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        void SizeCanvas()
+        {
+            _canvas.Width = 256; _canvas.Height = (Graphics == null ? 1 : Graphics.Rows(Slot) + 1) * 32;
+            _scroll.AutoScrollPosition = Point.Empty;
             _canvas.Invalidate();
+        }
+
+        /// <summary>Adds an image to the tileset's folder as a new area (creating the folder if the tileset has none).</summary>
+        void AddSheet()
+        {
+            var ts = Current; if (ts == null) return;
+            using (var dlg = new OpenFileDialog { Title = "Add Area Image", Filter = TilesetImport.Filter, Multiselect = true })
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                if (string.IsNullOrEmpty(ts.Folder))
+                {
+                    string folder = new string((ts.Name ?? "").Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray()).Trim();
+                    if (folder.Length == 0) folder = "Tileset " + ts.Id;
+                    ts.Folder = folder;
+                }
+                string dir = FolderPath();
+                Directory.CreateDirectory(dir);
+                var notes = new List<string>();
+                foreach (var f in dlg.FileNames)
+                {
+                    string target = Path.Combine(dir, Path.GetFileNameWithoutExtension(f) + ".png");
+                    if (File.Exists(target) && MessageBox.Show(this, Path.GetFileName(target) + " is already in the folder. Replace it?", "Add Area Image", MessageBoxButtons.YesNo) != DialogResult.Yes) continue;
+                    try
+                    {
+                        using (var img = (Bitmap)Theme.LoadImage(f))
+                        {
+                            if (img == null) { notes.Add(Path.GetFileName(f) + ": couldn't be read."); continue; }
+                            if (TilesetImport.IsEngineSheet(img.Width, img.Height)) img.Save(target, System.Drawing.Imaging.ImageFormat.Png);
+                            else { string n; using (var c = TilesetImport.ToEngineTileset(img, TilesetImport.GuessTileSize(img.Width), out n)) c.Save(target, System.Drawing.Imaging.ImageFormat.Png); notes.Add(Path.GetFileName(f) + ": " + n.Trim()); }
+                        }
+                    }
+                    catch (Exception ex) { notes.Add(Path.GetFileName(f) + ": " + ex.Message); }
+                }
+                Mark();
+                ShowSelected();
+                if (notes.Count > 0) MessageBox.Show(this, string.Join("\n", notes), "Add Area Image", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        /// <summary>Replaces the selected area's image, keeping its tiles' settings and the maps that use it.</summary>
+        void ReplaceSheet()
+        {
+            var ts = Current; if (ts == null) return;
+            string current = _p.FindAsset("Graphics/Tilesets", ts.SheetImage(Slot));
+            using (var dlg = new OpenFileDialog { Title = "Replace Image", Filter = TilesetImport.Filter })
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    using (var img = (Bitmap)Theme.LoadImage(dlg.FileName))
+                    {
+                        if (img == null) throw new InvalidDataException("Couldn't read the image.");
+                        string n = "";
+                        Bitmap conv = TilesetImport.IsEngineSheet(img.Width, img.Height) ? new Bitmap(img) : TilesetImport.ToEngineTileset(img, TilesetImport.GuessTileSize(img.Width), out n);
+                        using (conv)
+                        {
+                            if (current == null)
+                            {
+                                string name = TilesetImport.SaveInto(_p, "Tilesets", Path.GetFileNameWithoutExtension(dlg.FileName), conv);
+                                if (Slot == 0) ts.TilesetName = name; else ts.Sheet(Slot).Name = name;
+                            }
+                            else
+                            {
+                                if (Graphics != null) { Graphics.Dispose(); Graphics = null; }
+                                conv.Save(Path.ChangeExtension(current, ".png"), System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                        }
+                        if (n != "") MessageBox.Show(this, n, "Replace Image", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    Mark(); ShowSelected();
+                }
+                catch (Exception ex) { MessageBox.Show(this, ex.Message, "Replace Image", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            }
+        }
+
+        void MakeDefault()
+        {
+            var ts = Current; if (ts == null) return;
+            try
+            {
+                string dest = DefaultTilesets.MakeDefault(_p, ts);
+                MessageBox.Show(this, "New projects will now start with \"" + ts.Name + "\" (images, autotiles and passability), and their first map will use it.\n\nSaved in:\n" + dest, "Make Default", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { MessageBox.Show(this, "Couldn't save the default tileset:\n" + ex.Message, "Make Default", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
         public void Click(int id, bool left)
         {
             var ts = Current; if (ts == null) return;
-            ts.EnsureSize(Graphics.TileRows);
-            if (id >= ts.Passages.Count) return;
+            if (Graphics != null) ts.EnsureSize(Slot, Graphics.Rows(Slot));
+            int pass = ts.Passage(id);
             switch (_mode)
             {
-                case Mode.Passage: ts.Passages[id] = (ts.Passages[id] & 0x0f) == 0x0f ? ts.Passages[id] & ~0x0f : ts.Passages[id] | 0x0f; break;
-                case Mode.Priority: ts.Priorities[id] = Math.Max(0, Math.Min(5, ts.Priorities[id] + (left ? 1 : -1))); break;
-                case Mode.Terrain: ts.TerrainTags[id] = Math.Max(0, Math.Min(17, ts.TerrainTags[id] + (left ? 1 : -1))); break;
-                case Mode.Bush: ts.Passages[id] ^= 0x40; break;
-                case Mode.Counter: ts.Passages[id] ^= 0x80; break;
+                case Mode.Passage: ts.SetPassage(id, (pass & 0x0f) == 0x0f ? pass & ~0x0f : pass | 0x0f); break;
+                case Mode.Priority: ts.SetPriority(id, Math.Max(0, Math.Min(5, ts.Priority(id) + (left ? 1 : -1)))); break;
+                case Mode.Terrain: ts.SetTerrainTag(id, Math.Max(0, Math.Min(17, ts.TerrainTag(id) + (left ? 1 : -1)))); break;
+                case Mode.Bush: ts.SetPassage(id, pass ^ 0x40); break;
+                case Mode.Counter: ts.SetPassage(id, pass ^ 0x80); break;
             }
             Mark(); _canvas.Invalidate();
         }
@@ -151,6 +294,8 @@ namespace PokeCreator.Studio.Editors
 
         public void Save() { Json.Json.ToFile(_p.DataFile("tilesets.json"), _p.Tilesets); Dirty = false; if (DirtyChanged != null) DirtyChanged(); }
 
+        protected override void Dispose(bool disposing) { if (disposing && Graphics != null) Graphics.Dispose(); base.Dispose(disposing); }
+
         class TilesetCanvas : Control
         {
             readonly TilesetEditor _ed;
@@ -162,13 +307,16 @@ namespace PokeCreator.Studio.Editors
                 if (tg == null) return;
                 g.InterpolationMode = InterpolationMode.NearestNeighbor; g.PixelOffsetMode = PixelOffsetMode.Half;
                 for (int i = 1; i < 8; i++) tg.Draw(g, i * 48 + 47, i * 32, 0);
-                if (tg.TilesetImage != null) g.DrawImage(tg.TilesetImage, new Rectangle(0, 32, 256, tg.TilesetImage.Height), new Rectangle(0, 0, 256, tg.TilesetImage.Height), GraphicsUnit.Pixel);
+                var img = tg.Image(_ed.Slot);
+                if (img != null) g.DrawImage(img, new Rectangle(0, 32, 256, img.Height), new Rectangle(0, 0, 256, img.Height), GraphicsUnit.Pixel);
+                int rows = tg.Rows(_ed.Slot);
+                int firstRow = Math.Max(0, e.ClipRectangle.Top / 32), lastRow = Math.Min(rows, e.ClipRectangle.Bottom / 32 + 1);
                 using (var f = new Font("Segoe UI", 11f, FontStyle.Bold))
                 using (var shadow = new SolidBrush(Color.FromArgb(200, 0, 0, 0)))
-                    for (int row = 0; row <= tg.TileRows; row++)
+                    for (int row = firstRow; row <= lastRow; row++)
                         for (int col = 0; col < 8; col++)
                         {
-                            int id = Palette.IdAt(col, row);
+                            int id = Palette.IdAt(col, row, _ed.Slot);
                             string s = _ed.Overlay(id);
                             if (s == "") continue;
                             g.DrawString(s, f, shadow, col * 32 + 9, row * 32 + 7);
@@ -179,7 +327,7 @@ namespace PokeCreator.Studio.Editors
             {
                 int col = e.X / 32, row = e.Y / 32;
                 if (col < 0 || col > 7 || row < 0) return;
-                _ed.Click(Palette.IdAt(col, row), e.Button == MouseButtons.Left);
+                _ed.Click(Palette.IdAt(col, row, _ed.Slot), e.Button == MouseButtons.Left);
             }
         }
     }

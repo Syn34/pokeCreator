@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
 using PokeCreator.Maps;
@@ -29,9 +30,21 @@ namespace PokeCreator.Studio.Editors
 
         readonly Project _p;
         public TilesetData Tileset { get; private set; }
-        public Bitmap TilesetImage { get; private set; }
+        /// <summary>Sheet images by slot (slot 0 is the first sheet).</summary>
+        public readonly Dictionary<int, Bitmap> SheetImages = new Dictionary<int, Bitmap>();
         public readonly Bitmap[] Autotiles = new Bitmap[7];
-        public int TileRows { get { return TilesetImage == null ? 0 : TilesetImage.Height / 32; } }
+        /// <summary>The first sheet's image (slot 0).</summary>
+        public Bitmap TilesetImage { get { return Image(0); } }
+        public int TileRows { get { return Rows(0); } }
+
+        public Bitmap Image(int slot) { Bitmap b; return SheetImages.TryGetValue(slot, out b) ? b : null; }
+        public int Rows(int slot) { var b = Image(slot); return b == null ? 0 : b.Height / 32; }
+
+        /// <summary>Sheets as (slot, label), first sheet first. Missing images still appear so their tiles can be found.</summary>
+        public List<KeyValuePair<int, string>> Sheets
+        {
+            get { return Tileset.AllSheets().Select(k => new KeyValuePair<int, string>(k.Key, TilesetData.LabelOf(k.Value) + (Image(k.Key) == null ? " (missing)" : ""))).ToList(); }
+        }
 
         public TileGraphics(Project p, TilesetData ts) { _p = p; Load(ts); }
 
@@ -39,20 +52,27 @@ namespace PokeCreator.Studio.Editors
         {
             DisposeImages();
             Tileset = ts ?? new TilesetData();
-            TilesetImage = Theme.LoadImage(_p.FindAsset("Graphics/Tilesets", Tileset.TilesetName)) as Bitmap;
+            foreach (var sh in Tileset.AllSheets())
+            {
+                var img = Theme.LoadImage(_p.FindAsset("Graphics/Tilesets", sh.Value)) as Bitmap;
+                if (img == null) continue;
+                SheetImages[sh.Key] = img;
+                Tileset.EnsureSize(sh.Key, img.Height / 32);
+            }
             for (int i = 0; i < 7; i++)
                 Autotiles[i] = i < Tileset.AutotileNames.Count ? Theme.LoadImage(_p.FindAsset("Graphics/Autotiles", Tileset.AutotileNames[i])) as Bitmap : null;
-            if (TilesetImage != null) Tileset.EnsureSize(TileRows);
         }
 
         /// <summary>Draws one tile at (x,y) in a 32x32 cell scaled by 'size'.</summary>
         public void Draw(Graphics g, int id, int x, int y, int size = 32)
         {
-            if (id >= 384)
+            if (id >= TilesetData.FirstTile)
             {
-                if (TilesetImage == null) return;
-                int i = id - 384;
-                g.DrawImage(TilesetImage, new Rectangle(x, y, size, size), new Rectangle((i % 8) * 32, (i / 8) * 32, 32, 32), GraphicsUnit.Pixel);
+                var img = Image(TilesetData.SlotOf(id));
+                if (img == null) return;
+                int i = TilesetData.IndexOf(id);
+                if ((i / 8) * 32 >= img.Height) return;
+                g.DrawImage(img, new Rectangle(x, y, size, size), new Rectangle((i % 8) * 32, (i / 8) * 32, 32, 32), GraphicsUnit.Pixel);
                 return;
             }
             if (id < 48) return;
@@ -146,9 +166,9 @@ namespace PokeCreator.Studio.Editors
 
         void DisposeImages()
         {
-            if (TilesetImage != null) TilesetImage.Dispose();
+            foreach (var b in SheetImages.Values) b.Dispose();
+            SheetImages.Clear();
             for (int i = 0; i < 7; i++) if (Autotiles[i] != null) { Autotiles[i].Dispose(); Autotiles[i] = null; }
-            TilesetImage = null;
         }
 
         public void Dispose() { DisposeImages(); }

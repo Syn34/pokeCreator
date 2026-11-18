@@ -18,6 +18,6 @@ if [ -d src/PokeCreator.Studio ]; then
   echo "== Studio";  $MCS -target:winexe -out:$OUT/PokeCreatorStudio.exe -recurse:'src/PokeCreator.Studio/*.cs' -r:$OUT/PokeCreator.Core.dll -r:$OUT/PokeCreator.Import.dll -r:$API/System.Core.dll -r:$API/System.Drawing.dll -r:$API/System.Windows.Forms.dll -r:$API/System.Data.dll
 fi
 cp src/PokeCreator.Runtime/Game.exe.config "$OUT"/ 2>/dev/null || true
-if [ -d data/base ]; then mkdir -p "$OUT/BaseData" && cp data/base/*.json "$OUT/BaseData/"; fi
+if [ -d data/base ]; then mkdir -p "$OUT/BaseData/Tilesets" && cp data/base/*.json "$OUT/BaseData/" && cp data/base/Tilesets/README.txt "$OUT/BaseData/Tilesets/"; fi
 if [ -d lib/win-x64 ]; then cp lib/win-x64/*.dll "$OUT"/ 2>/dev/null || true; fi
 echo "Build OK -> $OUT/"

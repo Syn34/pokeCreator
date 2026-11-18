@@ -89,6 +89,27 @@ public static class CoreTests
             }
         }
 
+        // Tileset folders: tile IDs carry the sheet, settings are per sheet, folder scans keep slots stable
+        Check(TilesetData.TileId(0, 9) == 393 && TilesetData.SlotOf(393) == 0 && TilesetData.IndexOf(393) == 9, "tile id: first sheet keeps RMXP ids (393 = tile 9)");
+        Check(TilesetData.SlotOf(TilesetData.TileId(3, 4095)) == 3 && TilesetData.IndexOf(TilesetData.TileId(3, 4095)) == 4095 && TilesetData.SlotOf(100) == -1, "tile id: slot and index round trip");
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "pc_tiles_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(dir, "Pack"));
+            foreach (var n in new[] { "Cave", "Outdoor", "Mart" }) File.WriteAllBytes(Path.Combine(dir, "Pack", n + ".png"), new byte[0]);
+            var ts = new TilesetData { Folder = "Pack" };
+            var added = ts.SyncFolder(dir);
+            Check(added.Count == 3 && ts.TilesetName == "Pack/Outdoor" && ts.Sheet(1).Name == "Pack/Cave" && ts.Sheet(2).Name == "Pack/Mart", "folder: Outdoor becomes the first sheet, others get slots 1, 2");
+            File.WriteAllBytes(Path.Combine(dir, "Pack", "Beach.png"), new byte[0]);
+            File.Delete(Path.Combine(dir, "Pack", "Cave.png"));
+            added = ts.SyncFolder(dir);
+            Check(added.Count == 1 && ts.Sheet(3).Name == "Pack/Beach" && ts.Sheet(1).Name == "Pack/Cave", "folder: new image gets the next slot, deleted image keeps its slot");
+            ts.SetPassage(TilesetData.TileId(2, 5), 0x0f); ts.SetPriority(TilesetData.TileId(2, 5), 1); ts.SetTerrainTag(TilesetData.TileId(0, 5), 2);
+            Check(ts.Passage(TilesetData.TileId(2, 5)) == 0x0f && ts.Passage(TilesetData.TileId(0, 5)) == 0 && ts.Passage(TilesetData.TileId(1, 5)) == 0 && ts.TerrainTag(389) == 2, "folder: passability is per sheet");
+            var tsBack = Json.ConvertTo(Json.Parse(Json.Write(ts)), typeof(TilesetData)) as TilesetData;
+            Check(tsBack != null && tsBack.Sheets.Count == 3 && tsBack.Priority(TilesetData.TileId(2, 5)) == 1 && tsBack.Folder == "Pack", "folder: tileset with sheets survives save/load");
+            Directory.Delete(dir, true);
+        }
+
         Console.WriteLine(_fail == 0 ? "All tests passed" : _fail + " test(s) failed");
         return _fail;
     }

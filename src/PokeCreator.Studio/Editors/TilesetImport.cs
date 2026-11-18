@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using PokeCreator.Maps;
 using PokeCreator.Projects;
 using PokeCreator.Studio.Controls;
 
@@ -95,6 +97,121 @@ namespace PokeCreator.Studio.Editors
             while (File.Exists(Path.Combine(dir, name + ".png"))) name = baseName + " " + n++;
             img.Save(Path.Combine(dir, name + ".png"), ImageFormat.Png);
             return name;
+        }
+
+        static bool IsImage(string f) { var e = Path.GetExtension(f).ToLowerInvariant(); return e == ".png" || e == ".bmp" || e == ".gif" || e == ".jpg"; }
+
+        /// <summary>Tile size to assume for a sheet when nobody is asked: 256 wide = 32 px, 128 wide = 16 px.</summary>
+        public static int GuessTileSize(int width)
+        {
+            if (width % 256 == 0) return 32;
+            if (width == 128 || width % 32 != 0) return 16;
+            return 32;
+        }
+
+        /// <summary>True if an image already has the engine's layout (256 px wide, whole 32 px rows).</summary>
+        public static bool IsEngineSheet(int w, int h) { return w == 256 && h % 32 == 0; }
+
+        /// <summary>Converts a sheet file to the engine layout in place. Returns a note, or null if it was already fine.</summary>
+        public static string ConvertInPlace(string file, int tileSize = 0)
+        {
+            Bitmap src;
+            using (var img = (Bitmap)Theme.LoadImage(file)) src = img == null ? null : new Bitmap(img);
+            if (src == null) throw new InvalidDataException("Couldn't read " + Path.GetFileName(file) + ".");
+            using (src)
+            {
+                if (IsEngineSheet(src.Width, src.Height)) return null;
+                string note;
+                using (var conv = ToEngineTileset(src, tileSize > 0 ? tileSize : GuessTileSize(src.Width), out note))
+                {
+                    string png = Path.ChangeExtension(file, ".png");
+                    conv.Save(png + ".tmp", ImageFormat.Png);
+                    if (!string.Equals(png, file, StringComparison.OrdinalIgnoreCase)) File.Delete(file);
+                    if (File.Exists(png)) File.Delete(png);
+                    File.Move(png + ".tmp", png);
+                }
+                return Path.GetFileName(file) + ": " + note.Trim();
+            }
+        }
+
+        /// <summary>
+        /// Copies every image in srcDir into Graphics/Tilesets/&lt;folderName&gt;, converting each to the engine layout,
+        /// and any images in srcDir/Autotiles into Graphics/Autotiles. Returns the autotile names copied.
+        /// </summary>
+        public static List<string> CopyFolder(Project p, string srcDir, string folderName, int tileSize, List<string> notes)
+        {
+            string dest = Path.Combine(p.TilesetsDir, folderName);
+            Directory.CreateDirectory(dest);
+            foreach (var f in Directory.GetFiles(srcDir).Where(IsImage).OrderBy(x => x))
+            {
+                string target = Path.Combine(dest, Path.GetFileNameWithoutExtension(f) + ".png");
+                using (var img = (Bitmap)Theme.LoadImage(f))
+                {
+                    if (img == null) { notes.Add(Path.GetFileName(f) + ": couldn't be read, skipped."); continue; }
+                    if (IsEngineSheet(img.Width, img.Height)) { img.Save(target, ImageFormat.Png); continue; }
+                    string note;
+                    using (var conv = ToEngineTileset(img, tileSize > 0 ? tileSize : GuessTileSize(img.Width), out note)) conv.Save(target, ImageFormat.Png);
+                    notes.Add(Path.GetFileName(f) + ": " + note.Trim());
+                }
+            }
+            var autotiles = new List<string>();
+            string autoDir = Path.Combine(srcDir, "Autotiles");
+            if (Directory.Exists(autoDir))
+            {
+                string adest = Path.Combine(p.Root, "Graphics", "Autotiles");
+                Directory.CreateDirectory(adest);
+                foreach (var f in Directory.GetFiles(autoDir).Where(IsImage).OrderBy(x => x))
+                {
+                    using (var img = (Bitmap)Theme.LoadImage(f))
+                    {
+                        if (img == null) continue;
+                        try
+                        {
+                            string note;
+                            using (var conv = ToEngineAutotile(img, out note)) conv.Save(Path.Combine(adest, Path.GetFileNameWithoutExtension(f) + ".png"), ImageFormat.Png);
+                            autotiles.Add(Path.GetFileNameWithoutExtension(f));
+                        }
+                        catch (InvalidDataException ex) { notes.Add("Autotiles/" + Path.GetFileName(f) + ": " + ex.Message); }
+                    }
+                }
+            }
+            return autotiles;
+        }
+
+        /// <summary>Picks a folder of tileset images (one per area) and makes a new tileset from it. Returns it, or null.</summary>
+        public static TilesetData PickFolder(IWin32Window owner, Project p)
+        {
+            using (var d = new FolderBrowserDialog { Description = "Choose a folder of tileset images, one image per area (Outdoor, Cave, Poké Center...). An Autotiles sub-folder is imported too." })
+            {
+                if (d.ShowDialog(owner) != DialogResult.OK) return null;
+                var images = Directory.GetFiles(d.SelectedPath).Where(IsImage).ToList();
+                if (images.Count == 0) { MessageBox.Show(owner, "There are no images in that folder.", "New Tileset Folder"); return null; }
+                // Ask once if any sheet's tile size can't be told from its width
+                int tile = 0;
+                bool unsure = false;
+                foreach (var f in images)
+                    using (var img = Theme.LoadImage(f)) if (img != null && img.Width != 256 && img.Width != 128 && img.Width % 256 != 0) unsure = true;
+                if (unsure)
+                {
+                    int k = ChoiceDialog.Ask(owner, "How big are the tiles in these images?", new[] { "32×32 (RPG Maker XP / Essentials)", "16×16 (GBA style, will be doubled)" });
+                    if (k < 0) return null;
+                    tile = k == 0 ? 32 : 16;
+                }
+                string baseName = Path.GetFileName(d.SelectedPath.TrimEnd('\\', '/'));
+                string name = baseName; int n = 2;
+                while (Directory.Exists(Path.Combine(p.TilesetsDir, name))) name = baseName + " " + n++;
+                var notes = new List<string>();
+                List<string> autotiles;
+                try { autotiles = CopyFolder(p, d.SelectedPath, name, tile, notes); }
+                catch (Exception ex) { MessageBox.Show(owner, ex.Message, "New Tileset Folder", MessageBoxButtons.OK, MessageBoxIcon.Warning); return null; }
+                var ts = new TilesetData { Id = p.Tilesets.Count == 0 ? 1 : p.Tilesets.Max(t => t.Id) + 1, Name = name, Folder = name };
+                for (int i = 0; i < Math.Min(7, autotiles.Count); i++) ts.AutotileNames[i] = autotiles[i];
+                ts.SyncFolder(p.TilesetsDir);
+                p.Tilesets.Add(ts);
+                MessageBox.Show(owner, "Created tileset \"" + name + "\" with " + ts.AllSheets().Count + " areas" + (autotiles.Count > 0 ? " and " + Math.Min(7, autotiles.Count) + " autotiles" : "") + "." +
+                    (notes.Count > 0 ? "\n\n" + string.Join("\n", notes.Take(12)) : ""), "New Tileset Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return ts;
+            }
         }
 
         /// <summary>Asks for a tileset image and converts it. Returns the saved name, or null if cancelled.</summary>

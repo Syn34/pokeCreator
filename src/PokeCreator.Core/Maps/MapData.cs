@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using PokeCreator.Data;
 using PokeCreator.Json;
 
@@ -209,11 +210,52 @@ namespace PokeCreator.Maps
         }
     }
 
+    /// <summary>
+    /// One image of a tileset folder, usually one per area (Outdoor, Cave, Poké Center...).
+    /// Its tiles have IDs 384 + Slot × 32768 + index, so a map can mix tiles from every sheet in its folder.
+    /// </summary>
+    public class TileSheet
+    {
+        /// <summary>Image in Graphics/Tilesets without extension, e.g. "FireRed/Cave".</summary>
+        public string Name { get; set; }
+        /// <summary>Fixed number that tile IDs use to point at this sheet. Never reused or changed.</summary>
+        public int Slot { get; set; }
+        /// <summary>Per tile (row × 8 + column): passage bits, see TilesetData.Passages.</summary>
+        [JsonCompact] public List<int> Passages { get; set; }
+        [JsonCompact] public List<int> Priorities { get; set; }
+        [JsonCompact] public List<int> TerrainTags { get; set; }
+
+        public TileSheet() { Name = ""; Passages = new List<int>(); Priorities = new List<int>(); TerrainTags = new List<int>(); }
+
+        /// <summary>Area name shown in the editor: the image's file name.</summary>
+        public string Label { get { int k = (Name ?? "").LastIndexOfAny(new[] { '/', '\\' }); return k >= 0 ? Name.Substring(k + 1) : Name; } }
+
+        public void EnsureSize(int tileRows)
+        {
+            int n = tileRows * 8;
+            while (Passages.Count < n) Passages.Add(0);
+            while (Priorities.Count < n) Priorities.Add(0);
+            while (TerrainTags.Count < n) TerrainTags.Add(0);
+        }
+        public override string ToString() { return Label; }
+    }
+
+    /// <summary>
+    /// A tileset: 7 autotiles plus one or more tile sheets. With <see cref="Folder"/> set, every image in
+    /// Graphics/Tilesets/&lt;Folder&gt; is a sheet, and maps using this tileset can paint from all of them.
+    /// </summary>
     public class TilesetData
     {
+        public const int FirstTile = 384;
+        /// <summary>Tile IDs reserved per sheet (8 columns × 4096 rows).</summary>
+        public const int SheetTiles = 8 * 4096;
+
         public int Id { get; set; }
         public string Name { get; set; }
-        /// <summary>Image in Graphics/Tilesets (8 tiles = 256px wide).</summary>
+        /// <summary>Folder in Graphics/Tilesets holding this tileset's sheets (one image per area). Empty = single image.</summary>
+        [Field("Folder (one image per area)", Help = "A folder in Graphics/Tilesets. Every image in it becomes an area this tileset's maps can paint from.")]
+        public string Folder { get; set; }
+        /// <summary>First sheet (slot 0): image in Graphics/Tilesets (8 tiles = 256px wide).</summary>
         public string TilesetName { get; set; }
         /// <summary>7 autotile images in Graphics/Autotiles.</summary>
         public List<string> AutotileNames { get; set; }
@@ -221,7 +263,9 @@ namespace PokeCreator.Maps
         public int PanoramaHue { get; set; }
         public string FogName { get; set; }
         public string BattlebackName { get; set; }
-        /// <summary>Per tile ID: bit 1 down, 2 left, 4 right, 8 up blocked; 0x40 bush; 0x80 counter.</summary>
+        /// <summary>More sheets (slot 1 and up) from the tileset's folder.</summary>
+        public List<TileSheet> Sheets { get; set; }
+        /// <summary>Per tile ID (autotiles and the first sheet): bit 1 down, 2 left, 4 right, 8 up blocked; 0x40 bush; 0x80 counter.</summary>
         [JsonCompact] public List<int> Passages { get; set; }
         /// <summary>Per tile ID: 0 = below characters, 1-5 = drawn above.</summary>
         [JsonCompact] public List<int> Priorities { get; set; }
@@ -230,15 +274,66 @@ namespace PokeCreator.Maps
 
         public TilesetData()
         {
-            Name = ""; TilesetName = ""; AutotileNames = new List<string> { "", "", "", "", "", "", "" };
+            Name = ""; Folder = ""; TilesetName = ""; AutotileNames = new List<string> { "", "", "", "", "", "", "" };
+            Sheets = new List<TileSheet>();
             Passages = new List<int>(); Priorities = new List<int>(); TerrainTags = new List<int>();
         }
 
-        public int Passage(int id) { return id >= 0 && id < Passages.Count ? Passages[id] : 0; }
-        public int Priority(int id) { return id >= 0 && id < Priorities.Count ? Priorities[id] : 0; }
-        public int TerrainTag(int id) { return id >= 0 && id < TerrainTags.Count ? TerrainTags[id] : 0; }
+        // ------------------------------------------------------------------ tile IDs
+        public static int TileId(int slot, int index) { return FirstTile + slot * SheetTiles + index; }
+        /// <summary>Which sheet a tile comes from (-1 for autotiles and blank).</summary>
+        public static int SlotOf(int id) { return id < FirstTile ? -1 : (id - FirstTile) / SheetTiles; }
+        /// <summary>Tile index within its sheet (row × 8 + column).</summary>
+        public static int IndexOf(int id) { return id < FirstTile ? -1 : (id - FirstTile) % SheetTiles; }
 
-        /// <summary>Make the per-tile tables long enough for a tileset image with the given number of rows.</summary>
+        /// <summary>Image name for a slot (slot 0 = TilesetName), or null.</summary>
+        public string SheetImage(int slot)
+        {
+            if (slot == 0) return string.IsNullOrEmpty(TilesetName) ? null : TilesetName;
+            var s = Sheet(slot);
+            return s == null ? null : s.Name;
+        }
+
+        public TileSheet Sheet(int slot)
+        {
+            if (Sheets == null) return null;
+            foreach (var s in Sheets) if (s.Slot == slot) return s;
+            return null;
+        }
+
+        /// <summary>Every sheet as (slot, image name, label), first sheet first.</summary>
+        public List<KeyValuePair<int, string>> AllSheets()
+        {
+            var list = new List<KeyValuePair<int, string>>();
+            if (!string.IsNullOrEmpty(TilesetName)) list.Add(new KeyValuePair<int, string>(0, TilesetName));
+            if (Sheets != null) foreach (var s in Sheets.OrderBy(x => x.Slot)) list.Add(new KeyValuePair<int, string>(s.Slot, s.Name));
+            return list;
+        }
+
+        public static string LabelOf(string image) { int k = (image ?? "").LastIndexOfAny(new[] { '/', '\\' }); return k >= 0 ? image.Substring(k + 1) : image ?? ""; }
+
+        // ------------------------------------------------------------------ per-tile settings
+        static int Get(List<int> l, int i) { return l != null && i >= 0 && i < l.Count ? l[i] : 0; }
+        static void Set(List<int> l, int i, int v) { if (i < 0) return; while (l.Count <= i) l.Add(0); l[i] = v; }
+
+        List<int> Table(int id, int which, out int index)
+        {
+            int slot = SlotOf(id);
+            if (slot <= 0) { index = id; return which == 0 ? Passages : which == 1 ? Priorities : TerrainTags; }
+            index = IndexOf(id);
+            var s = Sheet(slot);
+            if (s == null) return null;
+            return which == 0 ? s.Passages : which == 1 ? s.Priorities : s.TerrainTags;
+        }
+
+        public int Passage(int id) { int i; return Get(Table(id, 0, out i), i); }
+        public int Priority(int id) { int i; return Get(Table(id, 1, out i), i); }
+        public int TerrainTag(int id) { int i; return Get(Table(id, 2, out i), i); }
+        public void SetPassage(int id, int v) { int i; var t = Table(id, 0, out i); if (t != null) Set(t, i, v); }
+        public void SetPriority(int id, int v) { int i; var t = Table(id, 1, out i); if (t != null) Set(t, i, v); }
+        public void SetTerrainTag(int id, int v) { int i; var t = Table(id, 2, out i); if (t != null) Set(t, i, v); }
+
+        /// <summary>Make the per-tile tables long enough for the first sheet with the given number of rows.</summary>
         public void EnsureSize(int tileRows)
         {
             int n = 384 + tileRows * 8;
@@ -246,6 +341,54 @@ namespace PokeCreator.Maps
             while (Priorities.Count < n) Priorities.Add(0);
             while (TerrainTags.Count < n) TerrainTags.Add(0);
         }
+
+        public void EnsureSize(int slot, int tileRows)
+        {
+            if (slot <= 0) { EnsureSize(tileRows); return; }
+            var s = Sheet(slot); if (s != null) s.EnsureSize(tileRows);
+        }
+
+        // ------------------------------------------------------------------ folders
+        static readonly string[] ImageExts = { ".png", ".bmp", ".gif", ".jpg" };
+
+        /// <summary>
+        /// Adds every image in Graphics/Tilesets/&lt;Folder&gt; that isn't a sheet yet (new slots, alphabetical).
+        /// Sheets whose image was deleted are kept so maps that use them don't change. Returns the images added.
+        /// </summary>
+        public List<string> SyncFolder(string tilesetsDir)
+        {
+            var added = new List<string>();
+            if (string.IsNullOrEmpty(Folder)) return added;
+            string dir = System.IO.Path.Combine(tilesetsDir, Folder);
+            if (!System.IO.Directory.Exists(dir)) return added;
+            var known = new HashSet<string>(AllSheets().Select(k => k.Value.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase);
+            var files = System.IO.Directory.GetFiles(dir)
+                .Where(f => ImageExts.Contains(System.IO.Path.GetExtension(f).ToLowerInvariant()))
+                .OrderBy(f => SortKey(System.IO.Path.GetFileNameWithoutExtension(f)), StringComparer.OrdinalIgnoreCase);
+            foreach (var f in files)
+            {
+                string name = Folder.Replace('\\', '/').TrimEnd('/') + "/" + System.IO.Path.GetFileNameWithoutExtension(f);
+                if (known.Contains(name)) continue;
+                if (string.IsNullOrEmpty(TilesetName)) TilesetName = name;
+                else
+                {
+                    int slot = 1;
+                    foreach (var s in Sheets) slot = Math.Max(slot, s.Slot + 1);
+                    Sheets.Add(new TileSheet { Name = name, Slot = slot });
+                }
+                known.Add(name);
+                added.Add(name);
+            }
+            return added;
+        }
+
+        /// <summary>Outdoor/Outside sheets sort first so they become the first sheet.</summary>
+        static string SortKey(string n)
+        {
+            string l = n.ToLowerInvariant();
+            return (l.StartsWith("outdoor") || l.StartsWith("outside") || l.StartsWith("overworld") || l.StartsWith("general") ? "0" : "1") + n;
+        }
+
         public override string ToString() { return Id.ToString("000") + ": " + Name; }
     }
 
