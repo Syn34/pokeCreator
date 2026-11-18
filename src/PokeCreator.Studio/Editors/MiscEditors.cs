@@ -278,28 +278,34 @@ namespace PokeCreator.Studio.Editors
             Highlight();
             _loading = false;
             _box.TextChanged += (s, e) => { if (!_loading && !Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } };
+            Action rehighlight = () => { if (!IsDisposed) Highlight(); };
+            Theme.Changed += rehighlight;
+            Disposed += (s, e) => Theme.Changed -= rehighlight;
             _find.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { FindNext(); e.SuppressKeyPress = true; } };
         }
 
         void Highlight()
         {
             if (_box.TextLength > 200000) return;
+            bool wasLoading = _loading; _loading = true;
             string ext = Path.GetExtension(_path).ToLowerInvariant();
             string t = _box.Text;
-            _box.SelectAll(); _box.SelectionColor = Color.Black;
+            bool dark = Theme.Dark;
+            _box.SelectAll(); _box.SelectionColor = Theme.Text;
             if (ext == ".cs")
             {
-                Tint(@"\b(" + string.Join("|", CsKeywords) + @")\b", System.Drawing.Color.Blue, t);
-                Tint("\"(\\\\.|[^\"\\\\])*\"", System.Drawing.Color.FromArgb(163, 21, 21), t);
-                Tint(@"//[^\n]*", System.Drawing.Color.Green, t);
-                Tint(@"\[[A-Z]\w*\(", System.Drawing.Color.Teal, t);
+                Tint(@"\b(" + string.Join("|", CsKeywords) + @")\b", dark ? System.Drawing.Color.FromArgb(86, 156, 214) : System.Drawing.Color.Blue, t);
+                Tint("\"(\\\\.|[^\"\\\\])*\"", dark ? System.Drawing.Color.FromArgb(206, 145, 120) : System.Drawing.Color.FromArgb(163, 21, 21), t);
+                Tint(@"//[^\n]*", dark ? System.Drawing.Color.FromArgb(106, 153, 85) : System.Drawing.Color.Green, t);
+                Tint(@"\[[A-Z]\w*\(", dark ? System.Drawing.Color.FromArgb(78, 201, 176) : System.Drawing.Color.Teal, t);
             }
             else if (ext == ".json")
             {
-                Tint("\"(\\\\.|[^\"\\\\])*\"\\s*:", System.Drawing.Color.FromArgb(4, 81, 165), t);
-                Tint(@"\b(true|false|null)\b", System.Drawing.Color.Blue, t);
+                Tint("\"(\\\\.|[^\"\\\\])*\"\\s*:", dark ? System.Drawing.Color.FromArgb(156, 220, 254) : System.Drawing.Color.FromArgb(4, 81, 165), t);
+                Tint(@"\b(true|false|null)\b", dark ? System.Drawing.Color.FromArgb(86, 156, 214) : System.Drawing.Color.Blue, t);
             }
             _box.Select(0, 0);
+            _loading = wasLoading;
         }
 
         void Tint(string pattern, Color c, string text)

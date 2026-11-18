@@ -23,6 +23,8 @@ namespace PokeCreator.Maps
         public int ParentId { get; set; }
         public int Order { get; set; }
         public bool Expanded { get; set; }
+        /// <summary>Optional icon shown in the Studio's map tree ("town", "route", "cave"...). Empty = guess from the name.</summary>
+        public string Icon { get; set; }
         public override string ToString() { return Id.ToString("000") + ": " + Name; }
     }
 

@@ -17,7 +17,8 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 ## What works today (v0.1)
 
 **Studio (editor)**
-- Project explorer for every data table, map, script, asset folder and file
+- Project explorer for every data table, map, script, asset folder and file, with an icon for everything (houses for towns, signposts for routes, caves, Pokémon Centers, gyms, Poké Balls...) and colour-coded indent guides like a code editor. Right-click a map → **Change Icon…** to choose your own
+- **View → Appearance**: light/dark mode (Ctrl+Shift+D), accent colours, rainbow / per-section / plain tree guides, icons on/off, text size
 - Database editors generated from the data model: dropdowns for types/moves/abilities/items, grids for level-up moves, evolutions, EVs, trainer parties and encounter slots, sprite previews
 - Map editor: tileset palette, 3 tile layers + events layer, pencil / rectangle / flood fill / eraser, right-click eyedropper, automatic autotile shapes, dim-other-layers, grid, passability overlay, undo/redo, zoom, map properties (size, tileset, music, Pokémon settings)
 - Event editor: pages, conditions, sprite picker with preview, triggers and movement, readable command list, one-click Text / Choices / If / Switch / Self Switch / Variable / Warp / Sound / Music / Wait / Give Item / Script, plus quick templates for NPCs, doors and item balls

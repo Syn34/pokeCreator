@@ -17,7 +17,7 @@ namespace PokeCreator.Studio
     public class MainForm : Form
     {
         public Project Project { get; private set; }
-        readonly TreeView _tree = new TreeView { Dock = DockStyle.Fill, HideSelection = false, Font = new Font("Segoe UI", 9.5f), BorderStyle = BorderStyle.None, BackColor = Theme.Sidebar, ItemHeight = 22 };
+        readonly ProjectTree _tree = new ProjectTree { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f), BackColor = Theme.Sidebar };
         readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 4) };
         readonly StatusStrip _status = new StatusStrip();
         readonly ToolStripStatusLabel _statusText = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
@@ -26,6 +26,7 @@ namespace PokeCreator.Studio
 
         public MainForm(string openPath)
         {
+            ApplyAppearance(_settings, false);
             Text = "PokeCreator Studio";
             Width = 1400; Height = 900; StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Segoe UI", 9f);
@@ -60,6 +61,7 @@ namespace PokeCreator.Studio
             _tabs.Visible = false;
             SetStatus("Welcome to PokeCreator Studio");
 
+            ApplyAppearance(_settings, true);
             if (openPath != null) OpenProject(openPath);
         }
 
@@ -107,11 +109,17 @@ namespace PokeCreator.Studio
             };
             db.DropDownItems.Add("(open a project)");
 
+            var view = new ToolStripMenuItem("&View");
+            view.DropDownItems.Add(new ToolStripMenuItem("&Appearance…", null, (s, e) => OpenAppearance()));
+            var darkItem = new ToolStripMenuItem("&Dark Mode", null, (s, e) => { _settings.DarkMode = !_settings.DarkMode; ApplyAppearance(_settings, true); }) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.D };
+            view.DropDownOpening += (s, e) => darkItem.Checked = _settings.DarkMode;
+            view.DropDownItems.Add(darkItem);
+
             var help = new ToolStripMenuItem("&Help");
             help.DropDownItems.Add("Getting Started", null, (s, e) => ShowHelp());
             help.DropDownItems.Add("About PokeCreator", null, (s, e) => MessageBox.Show(this, "PokeCreator Studio " + Project.EngineVersion + "\nA standalone engine and editor for Pokémon fan games.\n\nhttps://github.com/Syn34/pokeCreator", "About"));
 
-            m.Items.AddRange(new ToolStripItem[] { file, game, db, help });
+            m.Items.AddRange(new ToolStripItem[] { file, view, game, db, help });
             return m;
         }
 
@@ -244,47 +252,88 @@ namespace PokeCreator.Studio
             _tree.Nodes.Clear();
             var p = Project;
 
-            var settings = _tree.Nodes.Add("⚙  Game Settings");
-            settings.Tag = "sys:settings";
-            settings.Nodes.Add("Game Settings").Tag = "sys:settings";
-            settings.Nodes.Add("Player Characters").Tag = "sys:players";
-            settings.Nodes.Add("Switches & Variables").Tag = "sys:switches";
-            settings.Nodes.Add("Tilesets").Tag = "sys:tilesets";
-            settings.Nodes.Add("Map Connections").Tag = "sys:connections";
+            var settings = Node(_tree.Nodes, "Game Settings", "settings", "sys:settings");
+            Node(settings.Nodes, "Game Settings", "settings", "sys:settings");
+            Node(settings.Nodes, "Player Characters", "players", "sys:players");
+            Node(settings.Nodes, "Switches & Variables", "switches", "sys:switches");
+            Node(settings.Nodes, "Tilesets", "tilesets", "sys:tilesets");
+            Node(settings.Nodes, "Map Connections", "connections", "sys:connections");
+            Node(settings.Nodes, "Appearance (Studio)", "appearance", "sys:appearance");
 
-            var db = _tree.Nodes.Add("📖  Database");
-            foreach (var t in p.Tables) db.Nodes.Add(t.Label + "  (" + t.Items.Count + ")").Tag = t;
+            var db = Node(_tree.Nodes, "Database", "database", null);
+            foreach (var t in p.Tables) Node(db.Nodes, t.Label + " (" + t.Items.Count + ")", t.Key, t);
             db.Expand();
 
-            var maps = _tree.Nodes.Add("🗺  Maps");
-            maps.Tag = "maps";
+            var maps = Node(_tree.Nodes, "Maps (" + p.MapInfos.Count + ")", "maps", "maps");
             AddMapNodes(maps.Nodes, 0, new HashSet<int>());
             maps.Expand();
 
-            var scripts = _tree.Nodes.Add("📜  Scripts");
-            scripts.Tag = "dir:" + p.ScriptsDir;
+            var scripts = Node(_tree.Nodes, "Scripts", "scripts", "dir:" + p.ScriptsDir);
             if (Directory.Exists(p.ScriptsDir))
-                foreach (var f in Directory.GetFiles(p.ScriptsDir, "*.cs").OrderBy(x => x)) scripts.Nodes.Add(Path.GetFileName(f)).Tag = "file:" + f;
+                foreach (var f in Directory.GetFiles(p.ScriptsDir, "*.cs").OrderBy(x => x)) Node(scripts.Nodes, Path.GetFileName(f), "cs", "file:" + f);
 
-            var assets = _tree.Nodes.Add("🖼  Graphics & Audio");
+            var assets = Node(_tree.Nodes, "Graphics & Audio", "assets", null);
             foreach (var top in new[] { "Graphics", "Audio", "Fonts" })
             {
                 string dir = Path.Combine(p.Root, top);
                 if (!Directory.Exists(dir)) continue;
-                var n = assets.Nodes.Add(top); n.Tag = "assets:" + dir;
+                var n = Node(assets.Nodes, top, top == "Audio" ? "audio" : top == "Fonts" ? "font" : "image", "assets:" + dir);
                 foreach (var sub in Directory.GetDirectories(dir).OrderBy(x => x)) AddAssetDir(n.Nodes, sub, 0);
             }
 
-            var files = _tree.Nodes.Add("📁  All Project Files");
-            files.Tag = "dir:" + p.Root;
+            var files = Node(_tree.Nodes, "All Project Files", "files", "dir:" + p.Root);
             files.Nodes.Add("(loading…)");
             _tree.BeforeExpand -= LazyFiles; _tree.BeforeExpand += LazyFiles;
             _tree.EndUpdate();
         }
 
+        static TreeNode Node(TreeNodeCollection parent, string text, string icon, object tag)
+        {
+            var n = parent.Add(text);
+            n.ImageKey = icon; n.SelectedImageKey = icon; n.Tag = tag;
+            return n;
+        }
+
+        void ChangeMapIcon(MapInfo mi)
+        {
+            var labels = new List<string> { "Automatic (from the map's name)" };
+            labels.AddRange(Icons.MapChoices.Select(c => c[1]));
+            int k = ChoiceDialog.Ask(this, "Icon for " + mi.Name, labels.ToArray());
+            if (k < 0) return;
+            mi.Icon = k == 0 ? null : Icons.MapChoices[k - 1][0];
+            Json.Json.ToFile(Project.DataFile("mapinfos.json"), Project.MapInfos);
+            RefreshMapIcons(_tree.Nodes);
+        }
+
+        void RefreshMapIcons(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode n in nodes)
+            {
+                var mi = n.Tag as MapInfo;
+                if (mi != null) n.ImageKey = n.SelectedImageKey = Icons.ForMap(mi, Project.GetMapInfo(mi.ParentId));
+                RefreshMapIcons(n.Nodes);
+            }
+            _tree.Invalidate();
+        }
+
+        void OpenAppearance() { OpenDocument("sys:appearance", () => new AppearanceEditor(_settings, s => ApplyAppearance(s, true))); }
+
+        /// <summary>Applies the Studio appearance settings (and saves them when 'live').</summary>
+        void ApplyAppearance(Settings s, bool live)
+        {
+            GuideStyle guides;
+            if (!Enum.TryParse(s.Guides ?? "", out guides)) guides = GuideStyle.Rainbow;
+            var size = s.FontSize >= 8 && s.FontSize <= 14 ? s.FontSize : 9;
+            Font = new Font("Segoe UI", size);
+            _tree.Font = new Font("Segoe UI", size + 0.5f);
+            _tree.ItemHeight = (int)Math.Round(24 * size / 9.0);
+            if (live) { Theme.Set(s.DarkMode, AppearanceEditor.ParseColor(s.Accent), guides, s.ShowIcons); s.Save(); }
+            else Theme.Set(s.DarkMode, AppearanceEditor.ParseColor(s.Accent), guides, s.ShowIcons);
+        }
+
         void AddAssetDir(TreeNodeCollection parent, string dir, int depth)
         {
-            var n = parent.Add(Path.GetFileName(dir)); n.Tag = "assets:" + dir;
+            var n = Node(parent, Path.GetFileName(dir), "folder", "assets:" + dir);
             if (depth < 2) foreach (var sub in Directory.GetDirectories(dir).OrderBy(x => x)) AddAssetDir(n.Nodes, sub, depth + 1);
         }
 
@@ -296,9 +345,9 @@ namespace PokeCreator.Studio
             string dir = tag.Substring(4);
             foreach (var d in Directory.GetDirectories(dir).OrderBy(x => x))
             {
-                var n = e.Node.Nodes.Add("📁 " + Path.GetFileName(d)); n.Tag = "dir:" + d; n.Nodes.Add("(loading…)");
+                var n = Node(e.Node.Nodes, Path.GetFileName(d), "folder", "dir:" + d); n.Nodes.Add("(loading…)");
             }
-            foreach (var f in Directory.GetFiles(dir).OrderBy(x => x)) e.Node.Nodes.Add(Path.GetFileName(f)).Tag = "file:" + f;
+            foreach (var f in Directory.GetFiles(dir).OrderBy(x => x)) Node(e.Node.Nodes, Path.GetFileName(f), Icons.ForFile(f), "file:" + f);
         }
 
         void AddMapNodes(TreeNodeCollection parent, int parentId, HashSet<int> seen)
@@ -306,8 +355,7 @@ namespace PokeCreator.Studio
             foreach (var mi in Project.MapInfos.Where(m => m.ParentId == parentId).OrderBy(m => m.Order))
             {
                 if (!seen.Add(mi.Id)) continue;
-                var n = parent.Add(mi.Id.ToString("000") + "  " + mi.Name);
-                n.Tag = mi;
+                var n = Node(parent, mi.Id.ToString("000") + "  " + mi.Name, Icons.ForMap(mi, Project.GetMapInfo(mi.ParentId)), mi);
                 AddMapNodes(n.Nodes, mi.Id, seen);
                 if (mi.Expanded) n.Expand();
             }
@@ -324,13 +372,14 @@ namespace PokeCreator.Studio
                 {
                     menu.Items.Add("Open", null, (s, e) => OpenMap(mi.Id));
                     menu.Items.Add("Rename…", null, (s, e) => RenameMap(mi));
+                    menu.Items.Add("Change Icon…", null, (s, e) => ChangeMapIcon(mi));
                     menu.Items.Add("Map Properties…", null, (s, e) => { var ed = OpenMap(mi.Id); if (ed != null) ed.ShowProperties(); });
                     menu.Items.Add("Playtest from Here", null, (s, e) => { var m = Project.LoadMap(mi.Id); Playtest(new[] { "--map", mi.Id.ToString(), "--x", (m.Width / 2).ToString(), "--y", (m.Height / 2).ToString() }); });
                     menu.Items.Add(new ToolStripSeparator());
                     menu.Items.Add("Delete Map", null, (s, e) => DeleteMap(mi));
                 }
             }
-            else if ((node.Tag as string ?? "").StartsWith("dir:" + (Project != null ? Project.ScriptsDir : "\0")) || (node.Parent != null && node.Parent.Text.Contains("Scripts")))
+            else if ((node.Tag as string ?? "").StartsWith("dir:" + (Project != null ? Project.ScriptsDir : "\0")) || (node.Parent != null && node.Parent.ImageKey == "scripts"))
             {
                 menu.Items.Add("New Script…", null, (s, e) => NewScript());
                 menu.Items.Add("Open Scripts Folder", null, (s, e) => OpenInShell(Project.ScriptsDir));
@@ -357,6 +406,7 @@ namespace PokeCreator.Studio
             var s = tag as string;
             if (s == null) return;
             if (s == "sys:settings") OpenSettings();
+            else if (s == "sys:appearance") OpenAppearance();
             else if (s == "sys:players") OpenPlayers();
             else if (s == "sys:switches") OpenDocument(s, () => new SwitchesDocument(Project));
             else if (s == "sys:tilesets") OpenDocument(s, () => new TilesetEditor(Project));
@@ -555,7 +605,12 @@ namespace PokeCreator.Studio
     public class Settings
     {
         public List<string> Recent { get; set; }
-        public Settings() { Recent = new List<string>(); }
+        public bool DarkMode { get; set; }
+        public string Accent { get; set; }
+        public string Guides { get; set; }
+        public bool ShowIcons { get; set; }
+        public int FontSize { get; set; }
+        public Settings() { Recent = new List<string>(); Accent = "200,48,48"; Guides = "Rainbow"; ShowIcons = true; FontSize = 9; }
         static string FilePath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PokeCreator", "studio.json"); } }
         public static Settings Load() { try { return File.Exists(FilePath) ? Json.Json.FromFile<Settings>(FilePath) : new Settings(); } catch { return new Settings(); } }
         public void Save() { try { Json.Json.ToFile(FilePath, this); } catch { } }
@@ -610,6 +665,7 @@ namespace PokeCreator.Studio
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            Application.Idle += (s, e) => { foreach (Form f in Application.OpenForms) Theme.ApplyIfNeeded(f); };
             Application.ThreadException += (s, e) => MessageBox.Show("Something went wrong:\n\n" + e.Exception.Message + "\n\n" + e.Exception.StackTrace, "PokeCreator Studio", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Application.Run(new MainForm(args.Length > 0 ? args[0] : null));
         }

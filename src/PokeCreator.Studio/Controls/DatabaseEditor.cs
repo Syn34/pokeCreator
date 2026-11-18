@@ -11,29 +11,6 @@ using PokeCreator.Projects;
 
 namespace PokeCreator.Studio.Controls
 {
-    public static class Theme
-    {
-        public static readonly Color Panel = Color.FromArgb(250, 250, 252);
-        public static readonly Color Sidebar = Color.FromArgb(240, 242, 246);
-        public static readonly Color Accent = Color.FromArgb(200, 48, 48);
-        public static readonly Font HeaderFont = new Font("Segoe UI", 10.5f, FontStyle.Bold);
-        public static readonly Font TitleFont = new Font("Segoe UI", 14f, FontStyle.Bold);
-        public static readonly Font Mono = new Font(FontFamily.GenericMonospace, 10f);
-
-        /// <summary>Loads an image without locking the file (so it can be replaced while the Studio runs).</summary>
-        public static Image LoadImage(string path)
-        {
-            if (path == null || !File.Exists(path)) return null;
-            try
-            {
-                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var img = Image.FromStream(fs))
-                    return new Bitmap(img);
-            }
-            catch { return null; }
-        }
-    }
-
     /// <summary>Document tab contents that can be saved.</summary>
     public interface IDocument
     {
