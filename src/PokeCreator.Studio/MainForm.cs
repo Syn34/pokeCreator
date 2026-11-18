@@ -18,7 +18,7 @@ namespace PokeCreator.Studio
     {
         public Project Project { get; private set; }
         readonly ProjectTree _tree = new ProjectTree { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f), BackColor = Theme.Sidebar };
-        readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(12, 4) };
+        readonly DocumentTabs _tabs = new DocumentTabs { Dock = DockStyle.Fill };
         readonly StatusStrip _status = new StatusStrip();
         readonly ToolStripStatusLabel _statusText = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
         readonly Panel _welcome = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
@@ -54,7 +54,7 @@ namespace PokeCreator.Studio
             _tree.NodeMouseDoubleClick += (s, e) => OpenNode(e.Node);
             _tree.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter && _tree.SelectedNode != null) OpenNode(_tree.SelectedNode); };
             _tree.NodeMouseClick += (s, e) => { if (e.Button == MouseButtons.Right) { _tree.SelectedNode = e.Node; ShowTreeMenu(e.Node, e.Location); } };
-            _tabs.MouseUp += (s, e) => { if (e.Button == MouseButtons.Middle) CloseTabAt(e.Location); };
+            _tabs.CloseRequested += CloseTab;
             FormClosing += (s, e) => { if (!ConfirmDiscard()) e.Cancel = true; else _settings.Save(); };
 
             BuildWelcome();
