@@ -1,0 +1,673 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using PokeCreator.Data;
+using PokeCreator.Json;
+using PokeCreator.Maps;
+using PokeCreator.Projects;
+using PokeCreator.Ruby;
+
+namespace PokeCreator.Import
+{
+    /// <summary>
+    /// Converts a Pokémon Essentials (v20/v21) project folder into a PokeCreator project.
+    /// Reads PBS/*.txt for game data and Data/*.rxdata for maps, tilesets and switch names,
+    /// then copies Graphics/, Audio/ and Fonts/.
+    /// </summary>
+    public class EssentialsImporter
+    {
+        public Action<string> Log = s => { };
+        public bool CopyAssets = true;
+        public readonly List<string> Warnings = new List<string>();
+
+        string _src;
+        Project _p;
+
+        public Project Import(string essentialsRoot, string targetRoot)
+        {
+            _src = Path.GetFullPath(essentialsRoot);
+            if (!Directory.Exists(Path.Combine(_src, "PBS")) && !File.Exists(Path.Combine(_src, "Data", "MapInfos.rxdata")))
+                throw new DirectoryNotFoundException("This folder does not look like an Essentials project (no PBS folder or Data/MapInfos.rxdata): " + _src);
+
+            _p = new Project();
+            _p.SetRoot(targetRoot);
+            Directory.CreateDirectory(_p.Root);
+            _p.Info.Name = ReadGameTitle() ?? Path.GetFileName(_src);
+            _p.Info.ImportedFrom = "Pokémon Essentials: " + _src;
+            _p.Settings.Title = _p.Info.Name;
+
+            Step("types", ImportTypes);
+            Step("abilities", ImportAbilities);
+            Step("moves", ImportMoves);
+            Step("items", ImportItems);
+            Step("pokemon", ImportSpecies);
+            Step("pokemon_forms", ImportForms);
+            Step("pokemon_metrics", ImportMetrics);
+            Step("trainer_types", ImportTrainerTypes);
+            Step("trainers", ImportTrainers);
+            Step("encounters", ImportEncounters);
+            Step("metadata", ImportMetadata);
+            Step("town_map", ImportTownMap);
+            Step("regional_dexes", ImportDexes);
+            Step("map_connections", ImportConnections);
+
+            ImportSystem();
+            ImportTilesets();
+            ImportMaps();
+
+            Log("Saving project data...");
+            _p.Save();
+            Directory.CreateDirectory(_p.ScriptsDir);
+
+            if (CopyAssets)
+            {
+                foreach (var dir in new[] { "Graphics", "Audio", "Fonts" })
+                {
+                    string from = Path.Combine(_src, dir);
+                    if (!Directory.Exists(from)) continue;
+                    Log("Copying " + dir + "...");
+                    CopyDirectory(from, Path.Combine(_p.Root, dir));
+                }
+            }
+            Log("Import finished: " + _p.Species.Count + " Pokémon, " + _p.Moves.Count + " moves, " + _p.Items.Count + " items, " + _p.MapInfos.Count + " maps. " + Warnings.Count + " warnings.");
+            return _p;
+        }
+
+        void Step(string pbsName, Action<List<PbsSection>, List<PbsLine>> action)
+        {
+            string f = Path.Combine(_src, "PBS", pbsName + ".txt");
+            if (!File.Exists(f)) { Log("  (no " + pbsName + ".txt, skipped)"); return; }
+            Log("Reading PBS/" + pbsName + ".txt");
+            List<PbsLine> loose;
+            var sections = PbsFile.Read(f, out loose);
+            try { action(sections, loose); }
+            catch (Exception ex) { Warn(pbsName + ".txt: " + ex.Message); }
+        }
+
+        void Warn(string msg) { Warnings.Add(msg); Log("  WARNING: " + msg); }
+
+        string ReadGameTitle()
+        {
+            string ini = Path.Combine(_src, "Game.ini");
+            if (!File.Exists(ini)) return null;
+            foreach (var l in File.ReadAllLines(ini))
+                if (l.StartsWith("Title=", StringComparison.OrdinalIgnoreCase)) return l.Substring(6).Trim();
+            return null;
+        }
+
+        // ------------------------------------------------------------------ generic key -> property mapping
+        static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        /// <summary>Assigns PBS "Key = Value" lines to same-named properties. Returns keys it did not understand.</summary>
+        List<string> Apply(object target, IEnumerable<PbsLine> lines, params string[] skip)
+        {
+            var unknown = new List<string>();
+            var t = target.GetType();
+            foreach (var l in lines)
+            {
+                if (l.Key == null || l.Indented || Array.IndexOf(skip, l.Key) >= 0) continue;
+                var prop = t.GetProperty(l.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (prop == null || !prop.CanWrite) { unknown.Add(l.Key); continue; }
+                try { prop.SetValue(target, ConvertValue(l.Value, prop.PropertyType), null); }
+                catch (Exception ex) { Warn("line " + l.LineNumber + " (" + l.Key + "): " + ex.Message); }
+            }
+            return unknown;
+        }
+
+        static object ConvertValue(string v, Type t)
+        {
+            var nt = Nullable.GetUnderlyingType(t);
+            if (nt != null) t = nt;
+            if (t == typeof(string)) return v;
+            if (t == typeof(int)) return int.Parse(v.Trim(), Inv);
+            if (t == typeof(double)) return double.Parse(v.Trim(), Inv);
+            if (t == typeof(bool)) { var s = v.Trim().ToLowerInvariant(); return s == "true" || s == "yes" || s == "y" || s == "1"; }
+            if (t == typeof(List<string>)) return PbsFile.Csv(v);
+            if (t == typeof(List<int>)) return PbsFile.Csv(v).Where(x => x.Length > 0).Select(x => int.Parse(x, Inv)).ToList();
+            throw new NotSupportedException("can't convert to " + t.Name);
+        }
+
+        static void WarnUnknown(EssentialsImporter imp, string file, string header, List<string> unknown)
+        {
+            foreach (var k in unknown) imp.Warn(file + " [" + header + "]: unknown key " + k);
+        }
+
+        // ------------------------------------------------------------------ PBS importers
+        void ImportTypes(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new TypeData { Id = s.Header };
+                WarnUnknown(this, "types", s.Header, Apply(d, s.Lines));
+                _p.Types.Add(d);
+            }
+        }
+
+        void ImportAbilities(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new AbilityData { Id = s.Header };
+                WarnUnknown(this, "abilities", s.Header, Apply(d, s.Lines));
+                _p.Abilities.Add(d);
+            }
+        }
+
+        void ImportMoves(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new MoveData { Id = s.Header };
+                WarnUnknown(this, "moves", s.Header, Apply(d, s.Lines));
+                _p.Moves.Add(d);
+            }
+        }
+
+        void ImportItems(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new ItemData { Id = s.Header };
+                WarnUnknown(this, "items", s.Header, Apply(d, s.Lines));
+                _p.Items.Add(d);
+            }
+        }
+
+        void ApplySpeciesSpecial(SpeciesData d, PbsSection s, string file)
+        {
+            var unknown = Apply(d, s.Lines, "EVs", "Moves", "Evolutions", "MegaStone", "MegaMove", "MegaMessage", "FormName", "PokedexForm");
+            WarnUnknown(this, file, s.Header, unknown);
+            foreach (var l in s.Lines)
+            {
+                if (l.Key == null) continue;
+                var parts = PbsFile.Csv(l.Value);
+                switch (l.Key)
+                {
+                    case "EVs":
+                        d.EVs = new List<StatValue>();
+                        for (int i = 0; i + 1 < parts.Count; i += 2) d.EVs.Add(new StatValue { Stat = parts[i], Value = int.Parse(parts[i + 1], Inv) });
+                        break;
+                    case "Moves":
+                        d.Moves = new List<LevelMove>();
+                        for (int i = 0; i + 1 < parts.Count; i += 2) d.Moves.Add(new LevelMove { Level = int.Parse(parts[i], Inv), Move = parts[i + 1] });
+                        break;
+                    case "Evolutions":
+                        d.Evolutions = new List<Evolution>();
+                        for (int i = 0; i + 1 < parts.Count; i += 3)
+                            d.Evolutions.Add(new Evolution { Species = parts[i], Method = parts[i + 1], Parameter = i + 2 < parts.Count ? parts[i + 2] : "" });
+                        break;
+                    case "MegaStone": d.MegaStone = l.Value; break;
+                    case "MegaMove": d.MegaMove = l.Value; break;
+                    case "MegaMessage": d.MegaMessage = int.Parse(l.Value, Inv); break;
+                    case "FormName": d.FormName = l.Value; break;
+                    case "PokedexForm": d.PokedexForm = l.Value; break;
+                }
+            }
+        }
+
+        void ImportSpecies(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var parts = PbsFile.Csv(s.Header);
+                var d = new SpeciesData { Id = parts[0], Species = parts[0], Form = parts.Count > 1 ? int.Parse(parts[1], Inv) : 0 };
+                if (d.Form > 0) d.Id = d.Species + "_" + d.Form;
+                ApplySpeciesSpecial(d, s, "pokemon");
+                _p.Species.Add(d);
+            }
+        }
+
+        void ImportForms(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var parts = PbsFile.Csv(s.Header);
+                if (parts.Count < 2) { Warn("pokemon_forms [" + s.Header + "]: missing form number"); continue; }
+                var baseSp = _p.Species.FirstOrDefault(x => x.Id == parts[0]);
+                if (baseSp == null) { Warn("pokemon_forms [" + s.Header + "]: unknown species " + parts[0]); continue; }
+                // A form starts as a copy of its base species, then the section's keys override.
+                var d = Json.Json.Deserialize<SpeciesData>(Json.Json.Write(baseSp, false));
+                d.Form = int.Parse(parts[1], Inv);
+                d.Id = d.Species + "_" + d.Form;
+                d.FormName = null; d.MegaStone = null; d.MegaMove = null; d.MegaMessage = 0; d.PokedexForm = null;
+                ApplySpeciesSpecial(d, s, "pokemon_forms");
+                int idx = _p.Species.IndexOf(baseSp);
+                int insert = idx + 1;
+                while (insert < _p.Species.Count && _p.Species[insert].Species == d.Species) insert++;
+                _p.Species.Insert(insert, d);
+            }
+        }
+
+        void ImportMetrics(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var parts = PbsFile.Csv(s.Header);
+                string id = parts.Count > 1 && parts[1] != "0" ? parts[0] + "_" + parts[1] : parts[0];
+                var d = _p.Species.FirstOrDefault(x => x.Id == id);
+                if (d == null) { Warn("pokemon_metrics [" + s.Header + "]: unknown species"); continue; }
+                WarnUnknown(this, "pokemon_metrics", s.Header, Apply(d, s.Lines));
+            }
+        }
+
+        void ImportTrainerTypes(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new TrainerTypeData { Id = s.Header };
+                WarnUnknown(this, "trainer_types", s.Header, Apply(d, s.Lines));
+                _p.TrainerTypes.Add(d);
+            }
+        }
+
+        void ImportTrainers(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var h = PbsFile.Csv(s.Header);
+                var d = new TrainerData { TrainerType = h[0], Name = h.Count > 1 ? h[1] : "", Version = h.Count > 2 ? int.Parse(h[2], Inv) : 0 };
+                d.Id = TrainerData.MakeId(d.TrainerType, d.Name, d.Version);
+                TrainerPokemon cur = null;
+                foreach (var l in s.Lines)
+                {
+                    if (l.Key == null) continue;
+                    if (l.Key == "Pokemon")
+                    {
+                        var p = PbsFile.Csv(l.Value);
+                        cur = new TrainerPokemon { Species = p[0], Level = p.Count > 1 ? int.Parse(p[1], Inv) : 5 };
+                        d.Pokemon.Add(cur);
+                        continue;
+                    }
+                    if (cur != null && (l.Indented || IsTrainerPokemonKey(l.Key)))
+                    {
+                        ApplyTrainerPokemonKey(cur, l, s.Header);
+                        continue;
+                    }
+                    switch (l.Key)
+                    {
+                        case "Items": d.Items = PbsFile.Csv(l.Value); break;
+                        case "LoseText": d.LoseText = l.Value; break;
+                        default: Warn("trainers [" + s.Header + "]: unknown key " + l.Key); break;
+                    }
+                }
+                _p.Trainers.Add(d);
+            }
+        }
+
+        static bool IsTrainerPokemonKey(string k)
+        {
+            switch (k) { case "Form": case "Name": case "Moves": case "Ability": case "AbilityIndex": case "Item": case "Gender": case "Nature": case "IV": case "EV": case "Happiness": case "Shiny": case "SuperShiny": case "Shadow": case "Ball": return true; }
+            return false;
+        }
+
+        void ApplyTrainerPokemonKey(TrainerPokemon p, PbsLine l, string header)
+        {
+            string v = l.Value;
+            switch (l.Key)
+            {
+                case "Form": p.Form = int.Parse(v, Inv); break;
+                case "Name": p.Name = v; break;
+                case "Moves": p.Moves = PbsFile.Csv(v); break;
+                case "Ability": p.Ability = v; break;
+                case "AbilityIndex": p.AbilityIndex = int.Parse(v, Inv); break;
+                case "Item": p.Item = v; break;
+                case "Gender": p.Gender = v; break;
+                case "Nature": p.Nature = v; break;
+                case "IV": p.IV = ExpandStats(v); break;
+                case "EV": p.EV = ExpandStats(v); break;
+                case "Happiness": p.Happiness = int.Parse(v, Inv); break;
+                case "Shiny": p.Shiny = (bool)ConvertValue(v, typeof(bool)); break;
+                case "SuperShiny": p.SuperShiny = (bool)ConvertValue(v, typeof(bool)); break;
+                case "Shadow": p.Shadow = (bool)ConvertValue(v, typeof(bool)); break;
+                case "Ball": p.Ball = v; break;
+                default: Warn("trainers [" + header + "]: unknown Pokémon key " + l.Key); break;
+            }
+        }
+
+        static List<int> ExpandStats(string v)
+        {
+            var vals = PbsFile.Csv(v).Select(x => int.Parse(x, Inv)).ToList();
+            if (vals.Count == 1) return Enumerable.Repeat(vals[0], 6).ToList();
+            return vals;
+        }
+
+        void ImportEncounters(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var h = PbsFile.Csv(s.Header);
+                var d = new EncounterData { Map = int.Parse(h[0], Inv), Version = h.Count > 1 ? int.Parse(h[1], Inv) : 0, Comment = s.Comment };
+                d.Id = d.Map.ToString("000") + (d.Version > 0 ? "," + d.Version : "");
+                EncounterMethod cur = null;
+                foreach (var l in s.Lines)
+                {
+                    var parts = PbsFile.Csv(l.Value);
+                    int chance;
+                    if (parts.Count >= 3 && int.TryParse(parts[0], NumberStyles.Integer, Inv, out chance) && cur != null)
+                    {
+                        int min = int.Parse(parts[2], Inv);
+                        cur.Slots.Add(new EncounterSlot { Chance = chance, Species = parts[1], MinLevel = min, MaxLevel = parts.Count > 3 ? int.Parse(parts[3], Inv) : min });
+                    }
+                    else
+                    {
+                        cur = new EncounterMethod { Type = parts[0], Density = parts.Count > 1 && parts[1].Length > 0 ? int.Parse(parts[1], Inv) : 0 };
+                        d.Methods.Add(cur);
+                    }
+                }
+                _p.Encounters.Add(d);
+            }
+        }
+
+        void ImportMetadata(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                if (s.Header == "0")
+                {
+                    WarnUnknown(this, "metadata", s.Header, Apply(_p.Settings, s.Lines));
+                }
+                else
+                {
+                    var pc = new PlayerCharacter();
+                    WarnUnknown(this, "metadata", s.Header, Apply(pc, s.Lines));
+                    _p.Players.Add(pc);
+                }
+            }
+        }
+
+        void ImportTownMap(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var r = new TownMapRegion { Id = s.Header };
+                foreach (var l in s.Lines)
+                {
+                    if (l.Key == "Name") r.Name = l.Value;
+                    else if (l.Key == "Filename") r.Filename = l.Value;
+                    else if (l.Key == "Point")
+                    {
+                        var p = PbsFile.Csv(l.Value);
+                        Func<int, string> at = i => i < p.Count ? p[i] : "";
+                        Func<int, int> num = i => { int x; return int.TryParse(at(i), NumberStyles.Integer, Inv, out x) ? x : 0; };
+                        r.Points.Add(new TownMapPoint { X = num(0), Y = num(1), Name = at(2), PointOfInterest = at(3), FlyMap = num(4), FlyX = num(5), FlyY = num(6), Switch = at(7) });
+                    }
+                }
+                _p.TownMaps.Add(r);
+            }
+        }
+
+        void ImportDexes(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var d = new RegionalDex { Id = s.Header };
+                foreach (var l in s.Lines) d.Species.AddRange(PbsFile.Csv(l.Value).Where(x => x.Length > 0));
+                _p.RegionalDexes.Add(d);
+            }
+        }
+
+        void ImportConnections(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var l in loose)
+            {
+                var p = PbsFile.Csv(l.Value);
+                if (p.Count < 6) { Warn("map_connections line " + l.LineNumber + ": expected 6 values"); continue; }
+                _p.Connections.Add(new MapConnection
+                {
+                    Map1 = int.Parse(p[0], Inv), Edge1 = NormEdge(p[1]), Offset1 = int.Parse(p[2], Inv),
+                    Map2 = int.Parse(p[3], Inv), Edge2 = NormEdge(p[4]), Offset2 = int.Parse(p[5], Inv)
+                });
+            }
+        }
+
+        static string NormEdge(string e)
+        {
+            switch (e.Trim().ToUpperInvariant()) { case "N": case "NORTH": return "North"; case "S": case "SOUTH": return "South"; case "E": case "EAST": return "East"; case "W": case "WEST": return "West"; }
+            return e;
+        }
+
+        // ------------------------------------------------------------------ RMXP data
+        string RxPath(string name) { return Path.Combine(_src, "Data", name); }
+
+        void ImportSystem()
+        {
+            string f = RxPath("System.rxdata");
+            if (!File.Exists(f)) { Warn("Data/System.rxdata not found"); return; }
+            Log("Reading Data/System.rxdata");
+            var sys = (RObject)MarshalReader.Load(f);
+            _p.System.Switches = sys.List("switches").Select(o => o == null ? null : o.ToString()).ToList();
+            _p.System.Variables = sys.List("variables").Select(o => o == null ? null : o.ToString()).ToList();
+            _p.Settings.StartMap = sys.Int("start_map_id");
+            _p.Settings.StartX = sys.Int("start_x");
+            _p.Settings.StartY = sys.Int("start_y");
+            if (sys.Str("windowskin_name").Length > 0) _p.Settings.Windowskin = sys.Str("windowskin_name");
+            var titleBgm = sys.Obj("title_bgm");
+            if (titleBgm != null) _p.Settings.TitleBGM = titleBgm.Str("name");
+        }
+
+        void ImportTilesets()
+        {
+            string f = RxPath("Tilesets.rxdata");
+            if (!File.Exists(f)) { Warn("Data/Tilesets.rxdata not found"); return; }
+            Log("Reading Data/Tilesets.rxdata");
+            var list = (List<object>)MarshalReader.Load(f);
+            foreach (var o in list)
+            {
+                var t = o as RObject;
+                if (t == null) continue;
+                var ts = new TilesetData
+                {
+                    Id = t.Int("id"), Name = t.Str("name"), TilesetName = t.Str("tileset_name"),
+                    AutotileNames = t.List("autotile_names").Select(x => x == null ? "" : x.ToString()).ToList(),
+                    PanoramaName = t.Str("panorama_name"), PanoramaHue = t.Int("panorama_hue"),
+                    FogName = t.Str("fog_name"), BattlebackName = t.Str("battleback_name")
+                };
+                while (ts.AutotileNames.Count < 7) ts.AutotileNames.Add("");
+                ts.Passages = TableList(t.Get("passages"));
+                ts.Priorities = TableList(t.Get("priorities"));
+                ts.TerrainTags = TableList(t.Get("terrain_tags"));
+                _p.Tilesets.Add(ts);
+            }
+        }
+
+        static List<int> TableList(object o)
+        {
+            var u = o as RUserData;
+            return u == null ? new List<int>() : u.AsTable().Data.ToList();
+        }
+
+        void ImportMaps()
+        {
+            string f = RxPath("MapInfos.rxdata");
+            if (!File.Exists(f)) { Warn("Data/MapInfos.rxdata not found"); return; }
+            Log("Reading Data/MapInfos.rxdata");
+            var infos = (RHash)MarshalReader.Load(f);
+            foreach (var kv in infos.Pairs)
+            {
+                var mi = (RObject)kv.Value;
+                _p.MapInfos.Add(new MapInfo { Id = Convert.ToInt32(kv.Key), Name = mi.Str("name"), ParentId = mi.Int("parent_id"), Order = mi.Int("order"), Expanded = mi.Bool("expanded") });
+            }
+            _p.MapInfos.Sort((a, b) => a.Order.CompareTo(b.Order));
+
+            // Pokémon map settings from PBS/map_metadata.txt
+            var meta = new Dictionary<int, PbsSection>();
+            string mm = Path.Combine(_src, "PBS", "map_metadata.txt");
+            if (File.Exists(mm)) { List<PbsLine> loose; foreach (var s in PbsFile.Read(mm, out loose)) { int id; if (int.TryParse(s.Header, out id)) meta[id] = s; } }
+
+            Directory.CreateDirectory(_p.MapsDir);
+            foreach (var info in _p.MapInfos)
+            {
+                string mf = RxPath("Map" + info.Id.ToString("000") + ".rxdata");
+                if (!File.Exists(mf)) { Warn("Map file missing for map " + info.Id + " (" + info.Name + ")"); continue; }
+                try
+                {
+                    var map = ConvertMap(info.Id, (RObject)MarshalReader.Load(mf));
+                    PbsSection ms;
+                    if (meta.TryGetValue(info.Id, out ms)) WarnUnknown(this, "map_metadata", ms.Header, Apply(map.Properties, ms.Lines));
+                    _p.SaveMap(map);
+                    _p.ForgetMap(map.Id);
+                }
+                catch (Exception ex) { Warn("Map " + info.Id + " (" + info.Name + "): " + ex.Message); }
+            }
+            Log("Converted " + _p.MapInfos.Count + " maps");
+
+            // Essentials' start map is usually the intro (driven by Ruby script calls).
+            // Start new games at the "Home" location from metadata instead when one is set.
+            if (_p.Settings.Home != null && _p.Settings.Home.Count >= 3)
+            {
+                _p.Settings.StartMap = _p.Settings.Home[0];
+                _p.Settings.StartX = _p.Settings.Home[1];
+                _p.Settings.StartY = _p.Settings.Home[2];
+                if (_p.Settings.Home.Count >= 4) _p.Settings.StartDirection = _p.Settings.Home[3];
+            }
+        }
+
+        MapData ConvertMap(int id, RObject m)
+        {
+            int w = m.Int("width"), h = m.Int("height");
+            var map = MapData.Create(id, w, h, m.Int("tileset_id"));
+            map.AutoplayBgm = m.Bool("autoplay_bgm");
+            map.Bgm = ConvertAudio(m.Obj("bgm"));
+            map.AutoplayBgs = m.Bool("autoplay_bgs");
+            map.Bgs = ConvertAudio(m.Obj("bgs"));
+            map.EncounterStep = m.Int("encounter_step");
+            var data = m.Get("data") as RUserData;
+            if (data != null)
+            {
+                var t = data.AsTable();
+                for (int z = 0; z < Math.Min(3, t.ZSize); z++)
+                    for (int y = 0; y < h; y++)
+                        for (int x = 0; x < w; x++)
+                            map.Layers[z][y][x] = t[x, y, z];
+            }
+            var events = m.Get("events") as RHash;
+            if (events != null)
+            {
+                foreach (var kv in events.Pairs)
+                {
+                    var e = (RObject)kv.Value;
+                    var ev = new MapEvent { Id = e.Int("id"), Name = e.Str("name"), X = e.Int("x"), Y = e.Int("y"), Pages = new List<EventPage>() };
+                    foreach (RObject pg in e.List("pages")) ev.Pages.Add(ConvertPage(pg));
+                    map.Events.Add(ev);
+                }
+                map.Events.Sort((a, b) => a.Id.CompareTo(b.Id));
+            }
+            return map;
+        }
+
+        static AudioFile ConvertAudio(RObject a)
+        {
+            if (a == null) return new AudioFile();
+            return new AudioFile(a.Str("name"), a.Int("volume"), a.Int("pitch"));
+        }
+
+        EventPage ConvertPage(RObject pg)
+        {
+            var p = new EventPage();
+            var c = pg.Obj("condition");
+            if (c != null)
+            {
+                p.Condition = new EventCondition
+                {
+                    Switch1Valid = c.Bool("switch1_valid"), Switch1Id = c.Int("switch1_id"),
+                    Switch2Valid = c.Bool("switch2_valid"), Switch2Id = c.Int("switch2_id"),
+                    VariableValid = c.Bool("variable_valid"), VariableId = c.Int("variable_id"), VariableValue = c.Int("variable_value"),
+                    SelfSwitchValid = c.Bool("self_switch_valid"), SelfSwitchCh = c.Str("self_switch_ch")
+                };
+            }
+            var g = pg.Obj("graphic");
+            if (g != null)
+            {
+                p.Graphic = new EventGraphic
+                {
+                    TileId = g.Int("tile_id"), CharacterName = g.Str("character_name"), CharacterHue = g.Int("character_hue"),
+                    Direction = g.Int("direction"), Pattern = g.Int("pattern"), Opacity = g.Int("opacity"), BlendType = g.Int("blend_type")
+                };
+            }
+            p.MoveType = pg.Int("move_type");
+            p.MoveSpeed = pg.Int("move_speed");
+            p.MoveFrequency = pg.Int("move_frequency");
+            p.MoveRoute = ConvertMoveRoute(pg.Obj("move_route"));
+            p.WalkAnime = pg.Bool("walk_anime");
+            p.StepAnime = pg.Bool("step_anime");
+            p.DirectionFix = pg.Bool("direction_fix");
+            p.Through = pg.Bool("through");
+            p.AlwaysOnTop = pg.Bool("always_on_top");
+            p.Trigger = pg.Int("trigger");
+            p.List = new List<EventCommand>();
+            foreach (RObject cmd in pg.List("list"))
+                p.List.Add(new EventCommand { Code = cmd.Int("code"), Indent = cmd.Int("indent"), Params = cmd.List("parameters").Select(ToPlain).ToList() });
+            return p;
+        }
+
+        static MoveRoute ConvertMoveRoute(RObject r)
+        {
+            var mr = new MoveRoute();
+            if (r == null) return mr;
+            mr.Repeat = r.Bool("repeat");
+            mr.Skippable = r.Bool("skippable");
+            mr.List = new List<EventCommand>();
+            foreach (RObject c in r.List("list"))
+                mr.List.Add(new EventCommand { Code = c.Int("code"), Params = c.List("parameters").Select(ToPlain).ToList() });
+            return mr;
+        }
+
+        /// <summary>Converts an event command parameter into a plain JSON value.</summary>
+        static object ToPlain(object o)
+        {
+            if (o == null || o is bool || o is int || o is long || o is double) return o;
+            if (o is RString || o is RSymbol) return o.ToString();
+            var list = o as List<object>;
+            if (list != null) return list.Select(ToPlain).ToList();
+            var ro = o as RObject;
+            if (ro != null)
+            {
+                if (ro.ClassName == "RPG::AudioFile")
+                {
+                    var a = new JsonObject(); a["Name"] = ro.Str("name"); a["Volume"] = ro.Int("volume"); a["Pitch"] = ro.Int("pitch"); return a;
+                }
+                if (ro.ClassName == "RPG::MoveRoute") return Json.Json.ToJsonObject(ConvertMoveRoute(ro));
+                if (ro.ClassName == "RPG::MoveCommand")
+                {
+                    var mc = new JsonObject(); mc["Code"] = ro.Int("code"); mc["Params"] = ro.List("parameters").Select(ToPlain).ToList(); return mc;
+                }
+                var jo = new JsonObject(); jo["_class"] = ro.ClassName;
+                foreach (var kv in ro.Ivars) jo[kv.Key] = ToPlain(kv.Value);
+                return jo;
+            }
+            var u = o as RUserData;
+            if (u != null)
+            {
+                var jo = new JsonObject(); jo["_class"] = u.ClassName;
+                jo["Values"] = u.AsDoubles().Select(d => (object)Math.Round(d, 3)).ToList();
+                return jo;
+            }
+            var h = o as RHash;
+            if (h != null)
+            {
+                var jo = new JsonObject();
+                foreach (var kv in h.Pairs) jo[Convert.ToString(ToPlain(kv.Key), Inv)] = ToPlain(kv.Value);
+                return jo;
+            }
+            return o.ToString();
+        }
+
+        // ------------------------------------------------------------------ files
+        static void CopyDirectory(string from, string to)
+        {
+            Directory.CreateDirectory(to);
+            foreach (var f in Directory.GetFiles(from))
+            {
+                string name = Path.GetFileName(f);
+                if (name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase) || name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase)) continue;
+                string dest = Path.Combine(to, name);
+                if (!File.Exists(dest) || new FileInfo(dest).Length != new FileInfo(f).Length) File.Copy(f, dest, true);
+            }
+            foreach (var d in Directory.GetDirectories(from)) CopyDirectory(d, Path.Combine(to, Path.GetFileName(d)));
+        }
+    }
+}

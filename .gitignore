@@ -1,0 +1,11 @@
+# Build output
+bin/
+obj/
+*.pdb
+*.mdb
+*.user
+*.suo
+.vs/
+# Test projects / scratch
+/TestProjects/
+*.tmp
