@@ -26,7 +26,8 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **World Map** (Ctrl+M): every outdoor map laid out by its connections as live thumbnails. Drag maps so their edges touch to connect them, pull them apart to disconnect, nudge with the arrow keys, drop unplaced maps in from the side list, and right-click empty space to create a new connected map. Writes the same `map_connections.json` the game uses
 - Tileset editor: passability, priority, terrain tags, bush and counter flags. **New From Image / Replace Tileset Image / Import Autotile**: 16×16 sheets are doubled and wide sheets re-arranged to 8 tiles across automatically
 - **Complete built-in database**: all 1025 Pokémon (#1–1025, with regional and alternate forms), 921 moves, 316 abilities and 715 items. New projects start with it, imports top up what Essentials lacks, and **Database → Add Missing Pokémon & Data** adds anything missing to an existing project without touching your edits
-- Asset browser with thumbnails and drag-and-drop import; text/script editor with highlighting and find
+- Asset browser with thumbnails and drag-and-drop import
+- **Script editor** like Visual Studio: line numbers (click or drag them to select lines), Visual Studio's C# colours in light and dark mode (keywords, control keywords, classes/structs/interfaces/enums from .NET and the engine, methods, strings and escapes, numbers, comments and XML doc tags, `#region`), recolouring as you type, Tab = 4 spaces, Enter keeps the indent, Ctrl+/ toggles comments, find (Ctrl+F / F3) and a line/column readout. JSON files get key/value colours
 - Game settings, player characters, switches & variables
 
 **Game runtime (`Game.exe`, SDL2)**

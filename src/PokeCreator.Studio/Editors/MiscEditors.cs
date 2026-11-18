@@ -289,14 +289,12 @@ namespace PokeCreator.Studio.Editors
     public class TextEditor : UserControl, IDocument
     {
         readonly string _path;
-        readonly RichTextBox _box = new RichTextBox { Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 10f), AcceptsTab = true, WordWrap = false, DetectUrls = false, BorderStyle = BorderStyle.None };
+        readonly CodeEditor _code = new CodeEditor { Dock = DockStyle.Fill };
         readonly TextBox _find = new TextBox { Width = 200 };
-        bool _loading;
+        readonly Label _pos = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(12, 8, 0, 0) };
         public string Title { get { return Path.GetFileName(_path); } }
         public bool Dirty { get; private set; }
         public event Action DirtyChanged;
-
-        static readonly string[] CsKeywords = { "using", "namespace", "class", "public", "private", "protected", "internal", "static", "void", "return", "if", "else", "for", "foreach", "while", "new", "var", "int", "string", "bool", "object", "true", "false", "null", "in", "switch", "case", "break", "default", "double", "List", "this", "override", "virtual" };
 
         public TextEditor(string path)
         {
@@ -305,65 +303,44 @@ namespace PokeCreator.Studio.Editors
             var save = new Button { Text = "Save", AutoSize = true }; save.Click += (s, e) => Save();
             var findBtn = new Button { Text = "Find next", AutoSize = true }; findBtn.Click += (s, e) => FindNext();
             var ext = new Button { Text = "Open in external editor", AutoSize = true }; ext.Click += (s, e) => MainForm.OpenInShell(_path);
-            bar.Controls.AddRange(new Control[] { save, new Label { Text = "Find:", AutoSize = true, Margin = new Padding(12, 8, 2, 0) }, _find, findBtn, ext, new Label { Text = path, AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 0, 0) } });
-            Controls.Add(_box); Controls.Add(bar);
-            _loading = true;
-            _box.Text = File.ReadAllText(path, Encoding.UTF8);
-            Highlight();
-            _loading = false;
-            _box.TextChanged += (s, e) => { if (!_loading && !Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } };
-            Action rehighlight = () => { if (!IsDisposed) Highlight(); };
-            Theme.Changed += rehighlight;
-            Disposed += (s, e) => Theme.Changed -= rehighlight;
+            bar.Controls.AddRange(new Control[] { save, new Label { Text = "Find:", AutoSize = true, Margin = new Padding(12, 8, 2, 0) }, _find, findBtn, ext, _pos, new Label { Text = path, AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 0, 0) } });
+            Controls.Add(_code); Controls.Add(bar);
+            string ext2 = Path.GetExtension(path).ToLowerInvariant();
+            _code.LoadText(File.ReadAllText(path, Encoding.UTF8));
+            _code.Language = ext2 == ".cs" ? "cs" : ext2 == ".json" ? "json" : "";
+            _code.TextEdited += (s, e) => { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } };
+            _code.Box.SelectionChanged += (s, e) => ShowPosition();
             _find.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { FindNext(); e.SuppressKeyPress = true; } };
+            ShowPosition();
         }
 
-        void Highlight()
+        void ShowPosition()
         {
-            if (_box.TextLength > 200000) return;
-            bool wasLoading = _loading; _loading = true;
-            string ext = Path.GetExtension(_path).ToLowerInvariant();
-            string t = _box.Text;
-            bool dark = Theme.Dark;
-            _box.SelectAll(); _box.SelectionColor = Theme.Text;
-            if (ext == ".cs")
-            {
-                Tint(@"\b(" + string.Join("|", CsKeywords) + @")\b", dark ? System.Drawing.Color.FromArgb(86, 156, 214) : System.Drawing.Color.Blue, t);
-                Tint("\"(\\\\.|[^\"\\\\])*\"", dark ? System.Drawing.Color.FromArgb(206, 145, 120) : System.Drawing.Color.FromArgb(163, 21, 21), t);
-                Tint(@"//[^\n]*", dark ? System.Drawing.Color.FromArgb(106, 153, 85) : System.Drawing.Color.Green, t);
-                Tint(@"\[[A-Z]\w*\(", dark ? System.Drawing.Color.FromArgb(78, 201, 176) : System.Drawing.Color.Teal, t);
-            }
-            else if (ext == ".json")
-            {
-                Tint("\"(\\\\.|[^\"\\\\])*\"\\s*:", dark ? System.Drawing.Color.FromArgb(156, 220, 254) : System.Drawing.Color.FromArgb(4, 81, 165), t);
-                Tint(@"\b(true|false|null)\b", dark ? System.Drawing.Color.FromArgb(86, 156, 214) : System.Drawing.Color.Blue, t);
-            }
-            _box.Select(0, 0);
-            _loading = wasLoading;
-        }
-
-        void Tint(string pattern, Color c, string text)
-        {
-            foreach (Match m in Regex.Matches(text, pattern)) { _box.Select(m.Index, m.Length); _box.SelectionColor = c; }
+            var b = _code.Box;
+            int line = b.GetLineFromCharIndex(b.SelectionStart);
+            int col = b.SelectionStart - b.GetFirstCharIndexFromLine(line);
+            _pos.Text = "Ln " + (line + 1) + "   Ch " + (col + 1);
         }
 
         void FindNext()
         {
+            var box = _code.Box;
             if (_find.Text.Length == 0) return;
-            int start = _box.SelectionStart + _box.SelectionLength;
-            int i = _box.Text.IndexOf(_find.Text, start, StringComparison.OrdinalIgnoreCase);
-            if (i < 0) i = _box.Text.IndexOf(_find.Text, 0, StringComparison.OrdinalIgnoreCase);
-            if (i >= 0) { _box.Select(i, _find.Text.Length); _box.ScrollToCaret(); _box.Focus(); }
+            int start = box.SelectionStart + box.SelectionLength;
+            int i = box.Text.IndexOf(_find.Text, start, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) i = box.Text.IndexOf(_find.Text, 0, StringComparison.OrdinalIgnoreCase);
+            if (i >= 0) { box.Select(i, _find.Text.Length); box.ScrollToCaret(); box.Focus(); }
         }
 
         public void Save()
         {
+            string text = _code.Box.Text;
             if (_path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
-                try { Json.Json.Parse(_box.Text); }
+                try { Json.Json.Parse(text); }
                 catch (Exception ex) { MessageBox.Show(this, "This JSON has a mistake and was not saved:\n" + ex.Message, "Save", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             }
-            File.WriteAllText(_path, _box.Text.Replace("\r\n", "\n"), new UTF8Encoding(false));
+            File.WriteAllText(_path, text.Replace("\r\n", "\n"), new UTF8Encoding(false));
             Dirty = false; if (DirtyChanged != null) DirtyChanged();
         }
 
