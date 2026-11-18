@@ -26,6 +26,7 @@ namespace PokeCreator.Studio
 
         public MainForm(string openPath)
         {
+            WheelScroll.Install();
             ApplyAppearance(_settings, false);
             Text = "PokeCreator Studio";
             Width = 1400; Height = 900; StartPosition = FormStartPosition.CenterScreen;
@@ -51,7 +52,15 @@ namespace PokeCreator.Studio
             Controls.Add(MainMenuStrip);
             Controls.Add(_status);
 
-            _tree.NodeMouseDoubleClick += (s, e) => OpenNode(e.Node);
+            // One click opens an item; on a folder-like item it expands/collapses it
+            _tree.NodeClicked += n =>
+            {
+                if (OpenNode(n)) { BeginInvoke(new Action(() => _tree.Focus())); return; }
+                if (n.Nodes.Count == 0) return;
+                bool secondOfDouble = n == _lastToggled && (DateTime.Now - _lastToggleTime).TotalMilliseconds < SystemInformation.DoubleClickTime;
+                if (secondOfDouble) { _lastToggled = null; return; }
+                n.Toggle(); _lastToggled = n; _lastToggleTime = DateTime.Now;
+            };
             _tree.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter && _tree.SelectedNode != null) OpenNode(_tree.SelectedNode); };
             _tree.NodeMouseClick += (s, e) => { if (e.Button == MouseButtons.Right) { _tree.SelectedNode = e.Node; ShowTreeMenu(e.Node, e.Location); } };
             _tabs.CloseRequested += CloseTab;
@@ -422,14 +431,17 @@ namespace PokeCreator.Studio
             if (menu.Items.Count > 0) menu.Show(_tree, at);
         }
 
-        void OpenNode(TreeNode n)
+        TreeNode _lastToggled; DateTime _lastToggleTime;
+
+        /// <summary>Opens what a tree item stands for. Returns false for items that only group others.</summary>
+        bool OpenNode(TreeNode n)
         {
-            if (Project == null || n == null) return;
+            if (Project == null || n == null) return false;
             var tag = n.Tag;
-            if (tag is DatabaseTable) { OpenTable((DatabaseTable)tag); return; }
-            if (tag is MapInfo) { OpenMap(((MapInfo)tag).Id); return; }
+            if (tag is DatabaseTable) { OpenTable((DatabaseTable)tag); return true; }
+            if (tag is MapInfo) { OpenMap(((MapInfo)tag).Id); return true; }
             var s = tag as string;
-            if (s == null) return;
+            if (s == null || !(s.StartsWith("sys:") || s.StartsWith("assets:") || s.StartsWith("file:"))) return false;
             if (s == "sys:settings") OpenSettings();
             else if (s == "sys:appearance") OpenAppearance();
             else if (s == "sys:players") OpenPlayers();
@@ -439,6 +451,8 @@ namespace PokeCreator.Studio
             else if (s == "sys:connections") { var w = FindTab("sys:world"); if (w != null) CloseTab(w); if (FindTab("sys:world") == null) OpenDocument(s, () => new ObjectDocument("Map Connections", Project.Connections, () => Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections), "Maps that join seamlessly at their edges. Edge is North/South/East/West; offsets line the maps up.")); }
             else if (s.StartsWith("assets:")) { string dir = s.Substring(7); OpenDocument(s, () => new AssetBrowser(Project, dir)); }
             else if (s.StartsWith("file:")) OpenFile(s.Substring(5));
+            else return false;
+            return true;
         }
 
         public void OpenFile(string path)

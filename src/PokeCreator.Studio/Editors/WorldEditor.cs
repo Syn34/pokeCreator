@@ -319,8 +319,9 @@ namespace PokeCreator.Studio.Editors
     }
 
     /// <summary>Zoomable, pannable canvas that draws map thumbnails and lets you drag them.</summary>
-    public class WorldCanvas : Control
+    public class WorldCanvas : Control, IWheelTarget
     {
+        public void Wheel(int delta) { ZoomBy(delta > 0 ? 1.2f : 1 / 1.2f, PointToClient(Cursor.Position)); }
         const int TilePx = 8; // thumbnail resolution
         readonly WorldEditor _ed;
         readonly Project _p;

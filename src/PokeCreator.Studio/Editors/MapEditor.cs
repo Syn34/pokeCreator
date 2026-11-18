@@ -294,8 +294,9 @@ namespace PokeCreator.Studio.Editors
     }
 
     /// <summary>Tileset palette: blank + 7 autotiles on the first row, then the selected sheet's tiles.</summary>
-    public class Palette : Control
+    public class Palette : Control, IWheelTarget
     {
+        public void Wheel(int delta) { WheelScroll.ScrollParent(this, delta); }
         readonly TileGraphics _tiles;
         Point _selStart, _selEnd;
         bool _dragging;
@@ -362,6 +363,8 @@ namespace PokeCreator.Studio.Editors
             if (parent != null) parent.ScrollControlIntoView(this);
         }
 
+        protected override void OnMouseWheel(MouseEventArgs e) { WheelScroll.ToParent(this, e); }
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             _selStart = _selEnd = Cell(e.Location); _dragging = true; Invalidate();
@@ -391,8 +394,9 @@ namespace PokeCreator.Studio.Editors
     }
 
     /// <summary>The map drawing surface. Tiles are cached in 16x16-tile chunks per layer.</summary>
-    public class MapCanvas : Control
+    public class MapCanvas : Control, IWheelTarget
     {
+        public void Wheel(int delta) { WheelScroll.ScrollParent(this, delta); }
         const int Chunk = 16;
         readonly MapEditor _ed;
         readonly Project _p;
@@ -626,6 +630,8 @@ namespace PokeCreator.Studio.Editors
             foreach (var p in cells) TileGraphics.FixAutotiles(_map, layer, p.X, p.Y);
             InvalidateAll(); _ed.MarkDirty();
         }
+
+        protected override void OnMouseWheel(MouseEventArgs e) { WheelScroll.ToParent(this, e); }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {

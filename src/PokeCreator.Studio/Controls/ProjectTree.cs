@@ -93,16 +93,35 @@ namespace PokeCreator.Studio.Controls
             if (n.Level == 0) font.Dispose();
         }
 
+        /// <summary>Raised when an item is clicked once with the left button (not on its expand arrow).</summary>
+        public event Action<TreeNode> NodeClicked;
+        TreeNode _downNode;
+
+        bool OnChevron(TreeNode n, int x) { int cx = ChevronX(n); return n.Nodes.Count > 0 && x >= cx - 2 && x <= cx + Chevron + 2; }
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             var n = GetNodeAt(e.Location);
-            if (n != null && e.Button == MouseButtons.Left && n.Nodes.Count > 0)
-            {
-                int cx = ChevronX(n);
-                if (e.X >= cx - 2 && e.X <= cx + Chevron + 2) { n.Toggle(); return; }
-            }
+            _downNode = null;
+            if (n != null && e.Button == MouseButtons.Left && OnChevron(n, e.X)) { n.Toggle(); return; }
             if (n != null) SelectedNode = n;
+            if (e.Button == MouseButtons.Left) _downNode = n;
             base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            var n = _downNode; _downNode = null;
+            if (n != null && e.Button == MouseButtons.Left && GetNodeAt(e.Location) == n && NodeClicked != null) NodeClicked(n);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            // Items open on one click, so a double-click is just two clicks (no built-in expand/collapse)
+            const int WM_LBUTTONDBLCLK = 0x0203, WM_LBUTTONDOWN = 0x0201;
+            if (m.Msg == WM_LBUTTONDBLCLK) m.Msg = WM_LBUTTONDOWN;
+            base.WndProc(ref m);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)

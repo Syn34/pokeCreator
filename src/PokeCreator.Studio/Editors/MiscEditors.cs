@@ -296,10 +296,11 @@ namespace PokeCreator.Studio.Editors
 
         protected override void Dispose(bool disposing) { if (disposing && Graphics != null) Graphics.Dispose(); base.Dispose(disposing); }
 
-        class TilesetCanvas : Control
+        class TilesetCanvas : Control, IWheelTarget
         {
+            public void Wheel(int delta) { WheelScroll.ScrollParent(this, delta); }
             readonly TilesetEditor _ed;
-            public TilesetCanvas(TilesetEditor ed) { _ed = ed; DoubleBuffered = true; }
+            public TilesetCanvas(TilesetEditor ed) { _ed = ed; DoubleBuffered = true; SetStyle(ControlStyles.Selectable, true); }
             protected override void OnPaint(PaintEventArgs e)
             {
                 var g = e.Graphics; var tg = _ed.Graphics;
@@ -323,8 +324,10 @@ namespace PokeCreator.Studio.Editors
                             g.DrawString(s, f, s == "✕" ? Brushes.OrangeRed : Brushes.White, col * 32 + 8, row * 32 + 6);
                         }
             }
+            protected override void OnMouseWheel(MouseEventArgs e) { WheelScroll.ToParent(this, e); }
             protected override void OnMouseDown(MouseEventArgs e)
             {
+                Focus();
                 int col = e.X / 32, row = e.Y / 32;
                 if (col < 0 || col > 7 || row < 0) return;
                 _ed.Click(Palette.IdAt(col, row, _ed.Slot), e.Button == MouseButtons.Left);
