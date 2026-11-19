@@ -92,8 +92,8 @@ namespace PokeCreator.Studio.Editors
                 _toolButtons.Add(b); t.Items.Add(b);
             }
             t.Items.Add(new ToolStripSeparator());
-            var undo = new ToolStripButton("Undo") { ToolTipText = "Ctrl+Z" }; undo.Click += (s, e) => Undo(); t.Items.Add(undo);
-            var redo = new ToolStripButton("Redo") { ToolTipText = "Ctrl+Y" }; redo.Click += (s, e) => Redo(); t.Items.Add(redo);
+            _undoButton = new ToolStripButton("Undo") { ToolTipText = "Ctrl+Z", Enabled = false }; _undoButton.Click += (s, e) => Undo(); t.Items.Add(_undoButton);
+            _redoButton = new ToolStripButton("Redo") { ToolTipText = "Ctrl+Y", Enabled = false }; _redoButton.Click += (s, e) => Redo(); t.Items.Add(_redoButton);
             t.Items.Add(new ToolStripSeparator());
             var zoom = new ToolStripComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 70 };
             zoom.Items.AddRange(new object[] { "25%", "50%", "75%", "100%", "150%", "200%" });
@@ -165,7 +165,7 @@ namespace PokeCreator.Studio.Editors
                 var ts = _tiles.Tileset;
                 s += "   tile " + id + (id >= 48 && id < 384 ? " (autotile " + (id / 48) + ")" : id >= 384 && ts.AllSheets().Count > 1 ? " (" + TilesetData.LabelOf(ts.SheetImage(TilesetData.SlotOf(id))) + ")" : "") + "   priority " + ts.Priority(id) + "   terrain " + TerrainName(ts.TerrainTag(id)) + "   " + ((ts.Passage(id) & 0x0f) == 0x0f ? "blocked" : "passable");
             }
-            var ev = _map.Events.FirstOrDefault(e => e.X == x && e.Y == y);
+            var ev = _map.Events == null ? null : _map.Events.FirstOrDefault(e => e != null && e.X == x && e.Y == y);
             if (ev != null) s += "   event " + ev.Id + ": " + ev.Name;
             s += "     Left: paint   Right: pick tile   Events layer: double-click to edit, right-click for menu";
             _info.Text = s;
@@ -176,34 +176,62 @@ namespace PokeCreator.Studio.Editors
         public void MarkDirty() { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } }
 
         // ------------------------------------------------------------------ undo
-        public void Snapshot()
+        ToolStripButton _undoButton, _redoButton;
+
+        /// <summary>Undo/Redo are only clickable when there is something to undo or redo.</summary>
+        void UpdateUndoButtons()
         {
-            _undo.Push(Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events }, false));
-            if (_undo.Count > 60) { var keep = _undo.Take(60).Reverse().ToList(); _undo.Clear(); foreach (var k in keep) _undo.Push(k); }
-            _redo.Clear();
+            if (_undoButton != null) _undoButton.Enabled = _undo.Count > 0;
+            if (_redoButton != null) _redoButton.Enabled = _redo.Count > 0;
         }
 
-        class UndoState { public List<List<List<int>>> Layers { get; set; } public List<MapEvent> Events { get; set; } }
+        string CurrentState() { return Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events }, false); }
+
+        /// <summary>Remembers the map for Undo. Returns false if it was the same as the last remembered state.</summary>
+        public bool Snapshot()
+        {
+            string now = CurrentState();
+            // Don't stack identical states (e.g. clicking without changing anything)
+            bool pushed = _undo.Count == 0 || _undo.Peek() != now;
+            if (pushed) _undo.Push(now);
+            if (_undo.Count > 60) { var keep = _undo.Take(60).Reverse().ToList(); _undo.Clear(); foreach (var k in keep) _undo.Push(k); }
+            _redo.Clear();
+            UpdateUndoButtons();
+            return pushed;
+        }
+
+        class UndoState
+        {
+            public List<List<List<int>>> Layers { get; set; }
+            public List<MapEvent> Events { get; set; }
+            // Empty lists aren't written to the snapshot, so they must exist after reading it back
+            public UndoState() { Layers = new List<List<List<int>>>(); Events = new List<MapEvent>(); }
+        }
 
         void Restore(string snap)
         {
             var st = Json.Json.Deserialize<UndoState>(snap);
-            _map.Layers = st.Layers; _map.Events = st.Events;
+            // Only take layers that fit this map (a damaged snapshot must not break the map)
+            if (st.Layers != null && st.Layers.Count == _map.Layers.Count && st.Layers.All(l => l != null && l.Count == _map.Height && l.All(r => r != null && r.Count == _map.Width)))
+                _map.Layers = st.Layers;
+            _map.Events = st.Events ?? new List<MapEvent>();
             _canvas.InvalidateAll(); MarkDirty();
         }
 
         public void Undo()
         {
-            if (_undo.Count == 0) return;
-            _redo.Push(Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events }, false));
+            if (_undo.Count == 0) { UpdateUndoButtons(); return; }
+            _redo.Push(CurrentState());
             Restore(_undo.Pop());
+            UpdateUndoButtons();
         }
 
         public void Redo()
         {
-            if (_redo.Count == 0) return;
-            _undo.Push(Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events }, false));
+            if (_redo.Count == 0) { UpdateUndoButtons(); return; }
+            _undo.Push(CurrentState());
             Restore(_redo.Pop());
+            UpdateUndoButtons();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -284,11 +312,11 @@ namespace PokeCreator.Studio.Editors
 
         public void EditEvent(MapEvent ev)
         {
-            Snapshot();
+            bool pushed = Snapshot();
             using (var dlg = new EventEditor(_p, _map, ev))
             {
                 if (dlg.ShowDialog(this) == DialogResult.OK) { MarkDirty(); _canvas.Invalidate(); }
-                else _undo.Pop();
+                else if (pushed && _undo.Count > 0) { _undo.Pop(); UpdateUndoButtons(); }
             }
         }
     }
