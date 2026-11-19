@@ -95,25 +95,24 @@ namespace PokeCreator.Studio.Controls
 
         /// <summary>Raised when an item is clicked once with the left button (not on its expand arrow).</summary>
         public event Action<TreeNode> NodeClicked;
-        TreeNode _downNode;
 
         bool OnChevron(TreeNode n, int x) { int cx = ChevronX(n); return n.Nodes.Count > 0 && x >= cx - 2 && x <= cx + Chevron + 2; }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
             var n = GetNodeAt(e.Location);
-            _downNode = null;
             if (n != null && e.Button == MouseButtons.Left && OnChevron(n, e.X)) { n.Toggle(); return; }
             if (n != null) SelectedNode = n;
-            if (e.Button == MouseButtons.Left) _downNode = n;
             base.OnMouseDown(e);
         }
 
-        protected override void OnMouseUp(MouseEventArgs e)
+        // The click notification is used rather than MouseUp: on Windows the tree control often swallows
+        // the button-up of a plain click (it waits to see if a drag starts), so MouseUp isn't reliable.
+        protected override void OnNodeMouseClick(TreeNodeMouseClickEventArgs e)
         {
-            base.OnMouseUp(e);
-            var n = _downNode; _downNode = null;
-            if (n != null && e.Button == MouseButtons.Left && GetNodeAt(e.Location) == n && NodeClicked != null) NodeClicked(n);
+            base.OnNodeMouseClick(e);
+            if (e.Button != MouseButtons.Left || e.Node == null || OnChevron(e.Node, e.X)) return;
+            if (NodeClicked != null) NodeClicked(e.Node);
         }
 
         protected override void WndProc(ref Message m)

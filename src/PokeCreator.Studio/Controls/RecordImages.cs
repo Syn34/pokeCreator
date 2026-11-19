@@ -78,6 +78,8 @@ namespace PokeCreator.Studio.Controls
 
         public bool Has(GameRecord r, Kind k) { HashSet<string> set; return r != null && _files.TryGetValue(k.Folder, out set) && set.Contains(Key(r)); }
         public bool HasMain(GameRecord r) { return Has(r, Main); }
+        /// <summary>True if any of the entry's images (front, back, shiny, icon...) is missing.</summary>
+        public bool MissingAny(GameRecord r) { return Kinds.Any(k => !Has(r, k)); }
 
         public string PathOf(GameRecord r, Kind k) { return Has(r, k) ? _p.FindAsset(k.Folder, Key(r)) : null; }
 
@@ -169,7 +171,7 @@ namespace PokeCreator.Studio.Controls
             for (int i = 0; i < _small.Count; i++)
             {
                 var k = _images.Kinds[i + 1];
-                _small[i].SetImage(r == null ? null : _images.PathOf(r, k), k.Label, false);
+                _small[i].SetImage(r == null ? null : _images.PathOf(r, k), k.Label, r != null && !_images.Has(r, k));
             }
         }
 
@@ -218,13 +220,13 @@ namespace PokeCreator.Studio.Controls
                 {
                     using (var f = new Font("Segoe UI", Small ? 8f : 10f))
                     using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                        g.DrawString(_missing ? "No image yet\n\nUse Import Image…\nor the Import button" : "—", f, _missing ? Brushes.IndianRed : Brushes.Gray, area, sf);
+                        g.DrawString(_missing ? (Small ? "Missing" : "No image yet\n\nUse Import Image…\nor the Import button") : "—", f, _missing ? Brushes.IndianRed : Brushes.Gray, area, sf);
                 }
                 using (var pen = new Pen(_missing ? Color.IndianRed : dark ? Color.FromArgb(70, 72, 80) : Color.FromArgb(210, 210, 216))) g.DrawRectangle(pen, area);
                 if (Small)
                     using (var f = new Font("Segoe UI", 8.5f))
                     using (var sf = new StringFormat { Alignment = StringAlignment.Center })
-                    using (var br = new SolidBrush(dark ? Color.Gainsboro : Color.DimGray))
+                    using (var br = new SolidBrush(_missing ? Color.IndianRed : dark ? Color.Gainsboro : Color.DimGray))
                         g.DrawString(_label, f, br, new RectangleF(0, Height - 19, Width, 18), sf);
             }
 

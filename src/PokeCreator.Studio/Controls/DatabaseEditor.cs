@@ -34,8 +34,9 @@ namespace PokeCreator.Studio.Controls
         // Pokémon and trainer types: their images, highlighting of entries without one, and the image pane
         readonly RecordImages _images;
         readonly SpritePanel _sprites;
-        readonly CheckBox _onlyMissing = new CheckBox { Text = "Only show entries without images", Dock = DockStyle.Top, Height = 22 };
-        readonly Label _legend = new Label { Dock = DockStyle.Top, Height = 20, ForeColor = Color.IndianRed };
+        readonly ComboBox _show = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+        readonly Panel _showRow = new Panel { Dock = DockStyle.Top, Height = 26, Padding = new Padding(0, 2, 0, 2) };
+        readonly Label _legend = new Label { Dock = DockStyle.Top, Height = 20, ForeColor = Color.IndianRed, Padding = new Padding(0, 2, 0, 0) };
         public bool Dirty { get; private set; }
         public string Title { get { return _table.Label; } }
         public event Action DirtyChanged;
@@ -58,7 +59,18 @@ namespace PokeCreator.Studio.Controls
             bar.Controls.AddRange(new Control[] { up, down });
             var searchLabel = new Label { Text = "Search (name or ID):", Dock = DockStyle.Top, Height = 18 };
             left.Controls.Add(_list);
-            if (_images != null) { left.Controls.Add(_onlyMissing); left.Controls.Add(_legend); }
+            if (_images != null)
+            {
+                // Under the search bar: how many entries miss each image, and a filter
+                _legend.Height = _images.Kinds.Length > 1 ? 54 : 20;
+                _showRow.Controls.Add(_show);
+                _showRow.Controls.Add(new Label { Text = "Show:", Dock = DockStyle.Left, Width = 44, TextAlign = ContentAlignment.MiddleLeft });
+                _show.Items.Add("All entries");
+                _show.Items.Add(_images.Kinds.Length > 1 ? "Entries missing any image" : "Entries missing the " + _images.Main.Label.ToLowerInvariant() + " image");
+                if (_images.Kinds.Length > 1) foreach (var k in _images.Kinds) _show.Items.Add("Missing " + k.Label.ToLowerInvariant());
+                _show.SelectedIndex = 0;
+                left.Controls.Add(_showRow); left.Controls.Add(_legend);
+            }
             left.Controls.Add(_search); left.Controls.Add(searchLabel); left.Controls.Add(bar);
 
             var right = new Panel { Dock = DockStyle.Fill };
@@ -72,7 +84,7 @@ namespace PokeCreator.Studio.Controls
                 _list.DrawMode = DrawMode.OwnerDrawFixed;
                 _list.ItemHeight = Math.Max(18, _list.Font.Height + 4);
                 _list.DrawItem += DrawItem;
-                _onlyMissing.CheckedChanged += (s, e) => Refill(Selected);
+                _show.SelectedIndexChanged += (s, e) => Refill(Selected);
                 import.Click += (s, e) => ImportFiles();
                 new ToolTip().SetToolTip(import, "Import images named after IDs (e.g. YOUNGSTER.png, CHARIZARD_1.png). Matching entries get the image; other names become new entries.");
             }
@@ -98,14 +110,11 @@ namespace PokeCreator.Studio.Controls
         void Refill(GameRecord select)
         {
             string q = _search.Text.Trim().ToLowerInvariant();
-            bool onlyMissing = _images != null && _onlyMissing.Checked;
-            _view = Items.Cast<GameRecord>().Where(r => (q == "" || (r.Id ?? "").ToLowerInvariant().Contains(q) || r.DisplayName.ToLowerInvariant().Contains(q)) && (!onlyMissing || !_images.HasMain(r))).ToList();
-            if (_images != null)
-            {
-                int missing = Items.Cast<GameRecord>().Count(r => !_images.HasMain(r));
-                _legend.Text = missing == 0 ? "Every entry has an image." : "Highlighted: no " + _images.Main.Label.ToLowerInvariant() + " image (" + missing + ")";
-                _legend.ForeColor = missing == 0 ? Color.SeaGreen : Color.IndianRed;
-            }
+            Func<GameRecord, bool> shown = r => true;
+            if (_images != null && _show.SelectedIndex == 1) shown = r => _images.MissingAny(r);
+            else if (_images != null && _show.SelectedIndex >= 2) { var k = _images.Kinds[_show.SelectedIndex - 2]; shown = r => !_images.Has(r, k); }
+            _view = Items.Cast<GameRecord>().Where(r => (q == "" || (r.Id ?? "").ToLowerInvariant().Contains(q) || r.DisplayName.ToLowerInvariant().Contains(q)) && shown(r)).ToList();
+            if (_images != null) UpdateLegend();
             _list.BeginUpdate();
             _list.Items.Clear();
             foreach (var r in _view) _list.Items.Add(r.DisplayName);
@@ -144,12 +153,27 @@ namespace PokeCreator.Studio.Controls
             _formHost.ResumeLayout();
         }
 
+        /// <summary>"Missing: Front 1381 · Back 1387 · Icon 1383 ..." for the whole list.</summary>
+        void UpdateLegend()
+        {
+            var all = Items.Cast<GameRecord>().ToList();
+            var parts = _images.Kinds.Select(k => new { k.Label, Count = all.Count(r => !_images.Has(r, k)) }).ToList();
+            if (parts.All(p => p.Count == 0)) { _legend.Text = "Nothing missing: every entry has all its images."; _legend.ForeColor = Color.SeaGreen; return; }
+            _legend.ForeColor = Color.IndianRed;
+            if (parts.Count == 1) { _legend.Text = "Missing " + parts[0].Label.ToLowerInvariant() + " image: " + parts[0].Count; return; }
+            // "Missing images:" then the counts, three then two per line so it fits under the search bar
+            var lines = new List<string> { "Missing images (" + all.Count(r => _images.MissingAny(r)) + " entries):" };
+            lines.Add(string.Join("  ·  ", parts.Take(3).Select(p => p.Label + " " + p.Count)));
+            if (parts.Count > 3) lines.Add(string.Join("  ·  ", parts.Skip(3).Select(p => p.Label + " " + p.Count)));
+            _legend.Text = string.Join("\n", lines);
+        }
+
         void DrawItem(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0 || e.Index >= _view.Count) return;
             var r = _view[e.Index];
             bool selected = (e.State & DrawItemState.Selected) != 0;
-            bool missing = !_images.HasMain(r);
+            bool missing = _images.MissingAny(r);
             bool dark = Theme.Dark;
             Color back = selected ? SystemColors.Highlight : missing ? (dark ? Color.FromArgb(92, 38, 40) : Color.FromArgb(255, 222, 222)) : _list.BackColor;
             Color fore = selected ? SystemColors.HighlightText : missing ? (dark ? Color.FromArgb(255, 190, 190) : Color.FromArgb(150, 20, 20)) : _list.ForeColor;
@@ -159,7 +183,7 @@ namespace PokeCreator.Studio.Controls
             {
                 using (var small = new Font(_list.Font.FontFamily, _list.Font.Size - 1.5f))
                 {
-                    var tag = "no image";
+                    var tag = "missing details";
                     var sz = TextRenderer.MeasureText(tag, small);
                     TextRenderer.DrawText(e.Graphics, tag, small, new Rectangle(e.Bounds.Right - sz.Width - 4, e.Bounds.Y, sz.Width + 2, e.Bounds.Height), selected ? fore : Color.IndianRed, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
                     textRect.Width -= sz.Width + 4;
