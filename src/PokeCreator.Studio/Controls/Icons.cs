@@ -121,10 +121,65 @@ namespace PokeCreator.Studio.Controls
             Circle(g, Color.White, x + d / 2 - d * 0.17f, y + d / 2 - d * 0.17f, d * 0.34f);
         }
 
+        /// <summary>Three stacked map layers (diamonds); the given one (0 ground, 1 middle, 2 top) is filled in and drawn on top.</summary>
+        static void Layers(Graphics g, int active)
+        {
+            Func<int, PointF[]> diamond = i => { float y = 12.5f - i * 4.5f; return new[] { new PointF(9, y - 3.6f), new PointF(16.5f, y), new PointF(9, y + 3.6f), new PointF(1.5f, y) }; };
+            using (var pen = new Pen(C(120, 126, 140), 1.1f))
+            using (var faint = new SolidBrush(Color.FromArgb(70, 200, 205, 215)))
+                for (int i = 0; i < 3; i++) if (i != active) { g.FillPolygon(faint, diamond(i)); g.DrawPolygon(pen, diamond(i)); }
+            Fill(g, active == 0 ? C(96, 176, 80) : active == 1 ? C(232, 170, 60) : C(80, 150, 230), diamond(active));
+        }
+
         static void Draw(Graphics g, string key)
         {
             switch (key)
             {
+                // ---- map editor toolbar
+                case "layer-ground": Layers(g, 0); break;
+                case "layer-middle": Layers(g, 1); break;
+                case "layer-top": Layers(g, 2); break;
+                case "layer-events":
+                    // Little NPC with a speech bubble
+                    Circle(g, C(250, 214, 170), 3.5f, 5, 5.5f);
+                    Fill(g, C(220, 70, 60), new PointF(2, 16.5f), new PointF(3, 11), new PointF(9, 11), new PointF(10, 16.5f));
+                    Round(g, Color.White, 9.5f, 1.5f, 7.5f, 6, 2);
+                    Fill(g, Color.White, new PointF(11, 7), new PointF(10, 9.5f), new PointF(13, 7));
+                    Line(g, C(220, 60, 60), 1.4f, 13.25f, 2.8f, 13.25f, 4.6f);
+                    Circle(g, C(220, 60, 60), 12.6f, 5.4f, 1.3f, false);
+                    break;
+                case "tool-pencil":
+                    // Diagonal pencil: pink eraser, yellow body, wooden tip, graphite point
+                    using (var m = new Matrix()) { m.RotateAt(45, new PointF(9, 9)); g.Transform = m; }
+                    Box(g, C(240, 150, 170), 7, -1.5f, 4, 3);
+                    Box(g, C(190, 190, 200), 7, 1.5f, 4, 1.5f);
+                    Box(g, C(250, 200, 60), 7, 3, 4, 9);
+                    Fill(g, C(236, 200, 150), new PointF(7, 12), new PointF(11, 12), new PointF(9, 17));
+                    Fill(g, C(60, 60, 70), new PointF(8.3f, 15.2f), new PointF(9.7f, 15.2f), new PointF(9, 17));
+                    g.ResetTransform();
+                    break;
+                case "tool-rect":
+                    Box(g, C(150, 200, 255), 2.5f, 4.5f, 13, 9, false);
+                    using (var p = new Pen(C(40, 100, 200), 1.6f)) g.DrawRectangle(p, 2.5f, 4.5f, 13, 9);
+                    foreach (var pt in new[] { new PointF(2.5f, 4.5f), new PointF(15.5f, 4.5f), new PointF(2.5f, 13.5f), new PointF(15.5f, 13.5f) })
+                        Box(g, Color.White, pt.X - 1.5f, pt.Y - 1.5f, 3, 3);
+                    break;
+                case "tool-fill":
+                    // Paint bucket tipping, with a drop
+                    using (var m = new Matrix()) { m.RotateAt(-30, new PointF(8, 9)); g.Transform = m; }
+                    Fill(g, C(170, 180, 196), new PointF(3, 6), new PointF(13, 6), new PointF(12, 15), new PointF(4, 15));
+                    Box(g, C(70, 150, 240), 3, 4.5f, 10, 2.5f);
+                    using (var p = new Pen(Outline, 1.2f)) g.DrawArc(p, 4, 0.5f, 8, 8, 180, 180);
+                    g.ResetTransform();
+                    Fill(g, C(70, 150, 240), new PointF(15, 9), new PointF(17, 13), new PointF(15, 15.5f), new PointF(13, 13));
+                    break;
+                case "tool-eraser":
+                    using (var m = new Matrix()) { m.RotateAt(-35, new PointF(9, 9)); g.Transform = m; }
+                    Box(g, C(245, 140, 160), 2, 6, 7, 6.5f);
+                    Box(g, C(240, 240, 246), 9, 6, 7, 6.5f);
+                    g.ResetTransform();
+                    Line(g, C(150, 150, 160), 1.2f, 3, 16.5f, 15, 16.5f);
+                    break;
                 // ---- maps
                 case "town": House(g, C(220, 70, 60), C(250, 236, 200)); break;
                 case "home": House(g, C(70, 120, 210), C(240, 240, 248)); break;

@@ -73,13 +73,15 @@ namespace PokeCreator.Studio.Editors
 
         ToolStrip BuildToolbar()
         {
-            var t = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(4, 2, 4, 2) };
+            var t = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(4, 2, 4, 2), ImageScalingSize = new Size(Icons.Size, Icons.Size), ShowItemToolTips = true };
             t.Items.Add(new ToolStripLabel("Layer:"));
-            string[] names = { "1 Ground", "2 Middle", "3 Top", "Events" };
+            // Layer and tool buttons are icons; hovering shows the name
+            string[] names = { "Ground", "Middle", "Top", "Events" };
+            string[] layerIcons = { "layer-ground", "layer-middle", "layer-top", "layer-events" };
             for (int i = 0; i < 4; i++)
             {
                 int layer = i;
-                var b = new ToolStripButton(names[i]) { CheckOnClick = false, ToolTipText = i < 3 ? "Edit tile layer " + (i + 1) : "Place and edit events (NPCs, doors, items)" };
+                var b = new ToolStripButton(names[i], Icons.Get(layerIcons[i])) { DisplayStyle = ToolStripItemDisplayStyle.Image, ToolTipText = names[i], AutoToolTip = false, Padding = new Padding(3) };
                 b.Click += (s, e) => SetLayer(layer);
                 _layerButtons.Add(b); t.Items.Add(b);
             }
@@ -87,7 +89,8 @@ namespace PokeCreator.Studio.Editors
             foreach (MapTool tool in Enum.GetValues(typeof(MapTool)))
             {
                 var tl = tool;
-                var b = new ToolStripButton(tool.ToString()) { ToolTipText = tool == MapTool.Fill ? "Flood fill" : tool.ToString() };
+                string icon = tool == MapTool.Pencil ? "tool-pencil" : tool == MapTool.Rectangle ? "tool-rect" : tool == MapTool.Fill ? "tool-fill" : "tool-eraser";
+                var b = new ToolStripButton(tool.ToString(), Icons.Get(icon)) { DisplayStyle = ToolStripItemDisplayStyle.Image, ToolTipText = tool.ToString(), AutoToolTip = false, Padding = new Padding(3) };
                 b.Click += (s, e) => SetTool(tl);
                 _toolButtons.Add(b); t.Items.Add(b);
             }
