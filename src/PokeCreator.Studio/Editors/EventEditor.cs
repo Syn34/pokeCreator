@@ -213,7 +213,7 @@ namespace PokeCreator.Studio.Editors
 
             left.Controls.Add(Head("Behaviour", ref y));
             var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => pg.Trigger = i, ref y);
-            var routeButton = new Button { Text = "Edit Route…", Left = 230, Top = y + 24, Width = 92, Height = 24, Enabled = pg.MoveType == 3 };
+            var routeButton = new Button { Text = "Edit Custom Route…", Left = 100, Width = 180, Height = 24, Enabled = pg.MoveType == 3 };
             Combo(left, "Movement", new[] { "Stays still", "Walks randomly", "Approaches player", "Custom route" }, pg.MoveType, i => { pg.MoveType = i; routeButton.Enabled = i == 3; }, ref y);
             routeButton.Click += (s, e) =>
             {
@@ -222,7 +222,8 @@ namespace PokeCreator.Studio.Editors
                 MoveRouteDialog.Ask(FindForm(), _p, _map, false, ref who, pg.MoveRoute, out wait);
                 if (pg.MoveRoute.List.Count == 0 || pg.MoveRoute.List[pg.MoveRoute.List.Count - 1].Code != 0) pg.MoveRoute.List.Add(new EventCommand(0, 0));
             };
-            left.Controls.Add(routeButton); routeButton.BringToFront();
+            routeButton.Top = y; y += 28;
+            left.Controls.Add(routeButton);
             Combo(left, "Speed", new[] { "1: Slowest", "2: Slower", "3: Slow", "4: Normal", "5: Fast", "6: Fastest" }, pg.MoveSpeed - 1, i => pg.MoveSpeed = i + 1, ref y);
             Combo(left, "Frequency", new[] { "1: Lowest", "2: Lower", "3: Low", "4: Normal", "5: High", "6: Highest" }, pg.MoveFrequency - 1, i => pg.MoveFrequency = i + 1, ref y);
             Check(left, "Walking animation", pg.WalkAnime, v => pg.WalkAnime = v, ref y);

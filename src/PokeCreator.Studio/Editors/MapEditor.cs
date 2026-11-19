@@ -313,6 +313,14 @@ namespace PokeCreator.Studio.Editors
             _canvas.Invalidate();
         }
 
+        /// <summary>Selects the event layer and opens an event's editor (used by the Problems list).</summary>
+        public void EditEventById(int id)
+        {
+            var ev = _map.Events.FirstOrDefault(e => e.Id == id);
+            if (ev == null) return;
+            EditEvent(ev);
+        }
+
         public void EditEvent(MapEvent ev)
         {
             bool pushed = Snapshot();

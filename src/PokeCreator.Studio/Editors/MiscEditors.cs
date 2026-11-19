@@ -447,6 +447,16 @@ namespace PokeCreator.Studio.Editors
         public bool Dirty { get; private set; }
         public event Action DirtyChanged;
 
+        /// <summary>Moves the caret to a line (1-based) and scrolls it into view.</summary>
+        public void GoToLine(int line)
+        {
+            int start = _code.GetFirstCharIndexFromLine(Math.Max(0, line - 1));
+            if (start < 0) return;
+            _code.Select(start, 0);
+            _code.ScrollToCaret();
+            _code.Focus();
+        }
+
         public TextEditor(string path)
         {
             _path = path; Dock = DockStyle.Fill;

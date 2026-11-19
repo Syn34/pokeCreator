@@ -39,6 +39,12 @@ namespace PokeCreator.Studio.Editors
             Fill(null);
         }
 
+        public void SelectId(int id)
+        {
+            var ce = _p.CommonEvents.FirstOrDefault(c => c.Id == id);
+            if (ce != null) _list.SelectedItem = ce;
+        }
+
         void Mark() { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } }
         CommonEventData Current { get { return _list.SelectedItem as CommonEventData; } }
 

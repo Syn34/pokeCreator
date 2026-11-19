@@ -23,6 +23,9 @@ namespace PokeCreator.Studio
         readonly ToolStripStatusLabel _statusText = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
         readonly Panel _welcome = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
         readonly Settings _settings = Settings.Load();
+        readonly ProblemsPanel _problems = new ProblemsPanel { Visible = false };
+        readonly Splitter _problemsSplit = new Splitter { Dock = DockStyle.Bottom, Height = 4, Visible = false };
+        ToolStripButton _problemsButton;
 
         public MainForm(string openPath)
         {
@@ -44,6 +47,16 @@ namespace PokeCreator.Studio
             var center = new Panel { Dock = DockStyle.Fill };
             center.Controls.Add(_tabs);
             center.Controls.Add(_welcome);
+            center.Controls.Add(_problemsSplit);
+            center.Controls.Add(_problems);
+            _problems.Navigate += GoToProblem;
+            _problems.CloseRequested += () => ShowProblems(false);
+            _problems.CountsChanged += (errors, warnings) =>
+            {
+                if (_problemsButton == null) return;
+                _problemsButton.Text = errors > 0 ? "⛔ Problems (" + errors + ")" : warnings > 0 ? "⚠ Problems (" + warnings + ")" : "✓ Problems";
+                _problemsButton.ForeColor = errors > 0 ? Color.FromArgb(220, 70, 70) : Theme.Text;
+            };
 
             Controls.Add(center);
             Controls.Add(new Splitter { Dock = DockStyle.Left, BackColor = Color.Gainsboro, Width = 3 });
@@ -133,6 +146,7 @@ namespace PokeCreator.Studio
 
             var view = new ToolStripMenuItem("&View");
             view.DropDownItems.Add(new ToolStripMenuItem("&Appearance…", null, (s, e) => OpenAppearance()));
+            view.DropDownItems.Add(new ToolStripMenuItem("&Problems", null, (s, e) => ShowProblems(!_problems.Visible)) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.P });
             var darkItem = new ToolStripMenuItem("&Dark Mode", null, (s, e) => { _settings.DarkMode = !_settings.DarkMode; ApplyAppearance(_settings, true); }) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.D };
             view.DropDownOpening += (s, e) => darkItem.Checked = _settings.DarkMode;
             view.DropDownItems.Add(darkItem);
@@ -157,6 +171,8 @@ namespace PokeCreator.Studio
             t.Items.Add(new ToolStripButton("▶ Playtest", null, (s, e) => Playtest(null)) { ToolTipText = "Run the game (F5)", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Color.DarkGreen });
             t.Items.Add(new ToolStripButton("▶ From This Map", null, (s, e) => PlaytestHere()) { ToolTipText = "Start the game on the map you're editing (Shift+F5)" });
             t.Items.Add(new ToolStripSeparator());
+            _problemsButton = new ToolStripButton("Problems", null, (s, e) => ShowProblems(!_problems.Visible)) { ToolTipText = "Missing graphics and audio, broken warps and references, script errors (Ctrl+Shift+P)" };
+            t.Items.Add(_problemsButton);
             t.Items.Add(new ToolStripButton("Settings", null, (s, e) => OpenSettings()));
             t.Items.Add(new ToolStripButton("Project Folder", null, (s, e) => { if (Project != null) OpenInShell(Project.Root); }));
             return t;
@@ -216,6 +232,9 @@ namespace PokeCreator.Studio
                 SetStatus("Opened " + p.Root + "  •  " + p.Species.Count + " Pokémon, " + p.Moves.Count + " moves, " + p.Items.Count + " items, " + p.MapInfos.Count + " maps");
                 var first = p.MapInfos.FirstOrDefault(mi => mi.Id == p.Settings.StartMap) ?? p.MapInfos.FirstOrDefault();
                 if (first != null) OpenMap(first.Id);
+                Action check = () => { if (Project == p) _problems.Run(p); };
+                if (IsHandleCreated) BeginInvoke(check);
+                else { EventHandler once = null; once = (s, e) => { Shown -= once; check(); }; Shown += once; }
             }
             catch (Exception ex) { MessageBox.Show(this, "Could not open the project:\n\n" + ex.Message, "Open project", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             finally { Cursor = Cursors.Default; }
@@ -264,6 +283,7 @@ namespace PokeCreator.Studio
                 Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections);
                 SetStatus("Saved at " + DateTime.Now.ToShortTimeString());
                 RefreshTabTitles();
+                _problems.Run(Project);
             }
             catch (Exception ex) { MessageBox.Show(this, "Save failed:\n" + ex.Message, "Save", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
@@ -572,7 +592,54 @@ namespace PokeCreator.Studio
             OpenDocument("sys:world", () => new WorldEditor(this, Project));
         }
 
-        void OpenTable(DatabaseTable t) { OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)); }
+        DatabaseEditor OpenTable(DatabaseTable t) { return OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)) as DatabaseEditor; }
+
+        // ------------------------------------------------------------------ problems
+        public void ShowProblems(bool show)
+        {
+            if (show && Project == null) return;
+            _problems.Visible = show; _problemsSplit.Visible = show;
+            if (show) _problems.Run(Project);
+        }
+
+        /// <summary>Opens whatever a problem is about: the map, the event, the database record, the script line...</summary>
+        void GoToProblem(Problem pr)
+        {
+            string t = pr.Target ?? "";
+            var parts = t.Split(':');
+            int n;
+            if (t.StartsWith("map:") && int.TryParse(parts[1], out n))
+            {
+                if (Project.GetMapInfo(n) == null) return;
+                var ed = OpenMap(n);
+                int ev;
+                if (ed != null && parts.Length >= 4 && parts[2] == "event" && int.TryParse(parts[3], out ev)) BeginInvoke(new Action(() => ed.EditEventById(ev)));
+            }
+            else if (t.StartsWith("commonevent:") && int.TryParse(parts[1], out n))
+            {
+                var ce = OpenDocument("sys:commonevents", () => new CommonEventsEditor(this, Project)) as CommonEventsEditor;
+                if (ce != null) ce.SelectId(n);
+            }
+            else if (t.StartsWith("db:"))
+            {
+                var table = Project.Table(parts[1]);
+                if (table == null) return;
+                var ed = OpenTable(table);
+                if (ed != null && parts.Length >= 3) ed.SelectById(t.Substring(4 + parts[1].Length));
+            }
+            else if (t == "settings") OpenSettings();
+            else if (t == "players") OpenPlayers();
+            else if (t == "connections") OpenWorld();
+            else if (t.StartsWith("file:"))
+            {
+                int bar = t.LastIndexOf('|');
+                string path = bar > 0 ? t.Substring(5, bar - 5) : t.Substring(5);
+                int line; int.TryParse(bar > 0 ? t.Substring(bar + 1) : "1", out line);
+                if (!File.Exists(path)) return;
+                var ed = OpenDocument("file:" + path, () => new TextEditor(path)) as TextEditor;
+                if (ed != null) ed.GoToLine(line);
+            }
+        }
 
         void OpenSettings()
         {
