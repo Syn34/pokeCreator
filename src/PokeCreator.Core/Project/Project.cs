@@ -73,6 +73,7 @@ namespace PokeCreator.Projects
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
         public List<MapConnection> Connections = new List<MapConnection>();
+        public List<CommonEventData> CommonEvents = new List<CommonEventData>();
 
         readonly Dictionary<int, MapData> _maps = new Dictionary<int, MapData>();
         public readonly List<DatabaseTable> Tables = new List<DatabaseTable>();
@@ -176,6 +177,7 @@ namespace PokeCreator.Projects
             p.MapInfos = LoadOr(p.DataFile("mapinfos.json"), p.MapInfos);
             p.Tilesets = LoadOr(p.DataFile("tilesets.json"), p.Tilesets);
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);
+            p.CommonEvents = LoadOr(p.DataFile("common_events.json"), p.CommonEvents);
             return p;
         }
 
@@ -207,7 +209,10 @@ namespace PokeCreator.Projects
             Json.Json.ToFile(DataFile("mapinfos.json"), MapInfos);
             Json.Json.ToFile(DataFile("tilesets.json"), Tilesets);
             Json.Json.ToFile(DataFile("map_connections.json"), Connections);
+            Json.Json.ToFile(DataFile("common_events.json"), CommonEvents);
         }
+
+        public CommonEventData GetCommonEvent(int id) { return CommonEvents.FirstOrDefault(c => c.Id == id); }
 
         /// <summary>Changes the project folder (used by importers before the first Save).</summary>
         public void SetRoot(string root) { Root = Path.GetFullPath(root); }

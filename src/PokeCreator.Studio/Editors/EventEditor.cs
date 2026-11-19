@@ -38,7 +38,8 @@ namespace PokeCreator.Studio.Editors
                 case 113: return "◆ Break Loop";
                 case 115: return "◆ Exit Event Processing";
                 case 116: return "◆ Erase Event";
-                case 117: return "◆ Call Common Event: " + c.IntParam(0);
+                case 117: { var ce = p.GetCommonEvent(c.IntParam(0)); return "◆ Call Common Event: " + c.IntParam(0).ToString("000") + (ce != null ? " " + ce.Name : " (missing)"); }
+                case 103: return "◆ Input Number: Variable [" + c.IntParam(0).ToString("0000") + ": " + p.VariableName(c.IntParam(0)) + "], " + c.IntParam(1) + " digit(s)";
                 case 118: return "◆ Label: " + c.StrParam(0);
                 case 119: return "◆ Jump to Label: " + c.StrParam(0);
                 case 121:
@@ -170,7 +171,6 @@ namespace PokeCreator.Studio.Editors
         readonly Project _p;
         readonly MapData _map;
         readonly EventPage _pg;
-        readonly ListBox _cmds = new ListBox { Dock = DockStyle.Fill, Font = new Font(FontFamily.GenericMonospace, 9.5f), IntegralHeight = false, HorizontalScrollbar = true };
         readonly PictureBox _sprite = new PictureBox { Width = 96, Height = 96, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
 
         public PageEditor(Project p, MapData map, EventPage pg)
@@ -213,7 +213,16 @@ namespace PokeCreator.Studio.Editors
 
             left.Controls.Add(Head("Behaviour", ref y));
             var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => pg.Trigger = i, ref y);
-            Combo(left, "Movement", new[] { "Stays still", "Walks randomly", "Approaches player", "Custom route" }, pg.MoveType, i => pg.MoveType = i, ref y);
+            var routeButton = new Button { Text = "Edit Route…", Left = 230, Top = y + 24, Width = 92, Height = 24, Enabled = pg.MoveType == 3 };
+            Combo(left, "Movement", new[] { "Stays still", "Walks randomly", "Approaches player", "Custom route" }, pg.MoveType, i => { pg.MoveType = i; routeButton.Enabled = i == 3; }, ref y);
+            routeButton.Click += (s, e) =>
+            {
+                if (pg.MoveRoute == null) pg.MoveRoute = new MoveRoute();
+                int who = 0; bool wait;
+                MoveRouteDialog.Ask(FindForm(), _p, _map, false, ref who, pg.MoveRoute, out wait);
+                if (pg.MoveRoute.List.Count == 0 || pg.MoveRoute.List[pg.MoveRoute.List.Count - 1].Code != 0) pg.MoveRoute.List.Add(new EventCommand(0, 0));
+            };
+            left.Controls.Add(routeButton); routeButton.BringToFront();
             Combo(left, "Speed", new[] { "1: Slowest", "2: Slower", "3: Slow", "4: Normal", "5: Fast", "6: Fastest" }, pg.MoveSpeed - 1, i => pg.MoveSpeed = i + 1, ref y);
             Combo(left, "Frequency", new[] { "1: Lowest", "2: Lower", "3: Low", "4: Normal", "5: High", "6: Highest" }, pg.MoveFrequency - 1, i => pg.MoveFrequency = i + 1, ref y);
             Check(left, "Walking animation", pg.WalkAnime, v => pg.WalkAnime = v, ref y);
@@ -222,36 +231,8 @@ namespace PokeCreator.Studio.Editors
             Check(left, "Through (walk through it)", pg.Through, v => pg.Through = v, ref y);
             Check(left, "Always on top", pg.AlwaysOnTop, v => pg.AlwaysOnTop = v, ref y);
 
-            var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) };
-            var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 66 };
-            AddCmdButton(bar, "Text", AddText);
-            AddCmdButton(bar, "Choices", AddChoices);
-            AddCmdButton(bar, "If (branch)", AddConditional);
-            AddCmdButton(bar, "Switch", AddSwitch);
-            AddCmdButton(bar, "Self Switch", AddSelfSwitch);
-            AddCmdButton(bar, "Variable", AddVariable);
-            AddCmdButton(bar, "Warp", AddTransfer);
-            AddCmdButton(bar, "Sound", AddSound);
-            AddCmdButton(bar, "Music", AddMusic);
-            AddCmdButton(bar, "Wait", AddWait);
-            AddCmdButton(bar, "Give Item", AddGiveItem);
-            AddCmdButton(bar, "Script", AddScript);
-            AddCmdButton(bar, "Erase Event", () => Insert(new EventCommand(116, 0)));
-            var edits = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 34 };
-            AddCmdButton(edits, "Edit…", EditSelected);
-            AddCmdButton(edits, "Delete", DeleteSelected);
-            AddCmdButton(edits, "▲", () => MoveSelected(-1));
-            AddCmdButton(edits, "▼", () => MoveSelected(1));
-            AddCmdButton(edits, "Edit as JSON…", EditJson);
-            right.Controls.Add(_cmds);
-            right.Controls.Add(new Label { Text = "Commands (run top to bottom). Select a line, then add: new commands go above it.", Dock = DockStyle.Top, Height = 20, ForeColor = Color.DimGray });
-            right.Controls.Add(bar);
-            right.Controls.Add(edits);
-            _cmds.DoubleClick += (s, e) => EditSelected();
-            _cmds.KeyDown += (s, e) => { if (e.KeyCode == Keys.Delete) DeleteSelected(); };
-
+            var right = new CommandListEditor(p, pg.List, map);
             Controls.Add(right); Controls.Add(left);
-            RefreshList(0);
             UpdateSprite();
         }
 
@@ -284,7 +265,6 @@ namespace PokeCreator.Studio.Editors
             host.Controls.Add(cb); y += 24;
         }
 
-        static void AddCmdButton(FlowLayoutPanel bar, string text, Action a) { var b = new Button { Text = text, AutoSize = true, Height = 28 }; b.Click += (s, e) => a(); bar.Controls.Add(b); }
 
         void UpdateSprite()
         {
@@ -305,202 +285,6 @@ namespace PokeCreator.Studio.Editors
             if (old != null) old.Dispose();
         }
 
-        // ------------------------------------------------------------------ list
-        List<EventCommand> L { get { return _pg.List; } }
-
-        void RefreshList(int select)
-        {
-            if (L.Count == 0 || L[L.Count - 1].Code != 0) L.Add(new EventCommand(0, 0));
-            _cmds.BeginUpdate();
-            _cmds.Items.Clear();
-            foreach (var c in L) _cmds.Items.Add(new string(' ', c.Indent * 3) + CommandText.Describe(c, _p));
-            _cmds.EndUpdate();
-            _cmds.SelectedIndex = Math.Max(0, Math.Min(select, L.Count - 1));
-        }
-
-        int Sel { get { return Math.Max(0, _cmds.SelectedIndex); } }
-
-        void Insert(params EventCommand[] cmds)
-        {
-            int at = Sel, indent = L[at].Indent;
-            foreach (var c in cmds) c.Indent += indent;
-            L.InsertRange(at, cmds);
-            RefreshList(at + cmds.Length);
-        }
-
-        static readonly HashSet<int> BlockStarts = new HashSet<int> { 111, 102, 112 };
-        static readonly HashSet<int> Structural = new HashSet<int> { 0, 401, 402, 403, 404, 411, 412, 413, 408, 655, 509 };
-
-        void DeleteSelected()
-        {
-            int i = Sel;
-            var c = L[i];
-            if (Structural.Contains(c.Code)) return;
-            int end = i;
-            if (BlockStarts.Contains(c.Code))
-            {
-                int endCode = c.Code == 111 ? 412 : c.Code == 102 ? 404 : 413;
-                while (end + 1 < L.Count && !(L[end + 1].Indent == c.Indent && L[end + 1].Code == endCode)) end++;
-                end++;
-            }
-            else
-            {
-                int cont = c.Code == 101 ? 401 : c.Code == 108 ? 408 : c.Code == 355 ? 655 : c.Code == 209 ? 509 : -1;
-                while (cont > 0 && end + 1 < L.Count && L[end + 1].Code == cont) end++;
-            }
-            L.RemoveRange(i, Math.Min(L.Count - 1, end) - i + 1);
-            RefreshList(i);
-        }
-
-        void MoveSelected(int d)
-        {
-            int i = Sel, j = i + d;
-            if (j < 0 || j >= L.Count - 1 || Structural.Contains(L[i].Code) || BlockStarts.Contains(L[i].Code) || Structural.Contains(L[j].Code) || BlockStarts.Contains(L[j].Code) || L[i].Indent != L[j].Indent) return;
-            var t = L[i]; L[i] = L[j]; L[j] = t;
-            RefreshList(j);
-        }
-
-        void EditSelected()
-        {
-            int i = Sel; var c = L[i];
-            switch (c.Code)
-            {
-                case 101:
-                    {
-                        string full = c.StrParam(0); int k = i + 1;
-                        while (k < L.Count && L[k].Code == 401) { full += " " + L[k].StrParam(0); k++; }
-                        string t = TextDialog.Ask(FindForm(), "Edit text", full, true);
-                        if (t == null) return;
-                        L.RemoveRange(i + 1, k - i - 1);
-                        c.Params = new List<object> { t };
-                        RefreshList(i); return;
-                    }
-                case 355:
-                    {
-                        string full = c.StrParam(0); int k = i + 1;
-                        while (k < L.Count && L[k].Code == 655) { full += "\n" + L[k].StrParam(0); k++; }
-                        string t = TextDialog.Ask(FindForm(), "Edit script", full, true);
-                        if (t == null) return;
-                        L.RemoveRange(i + 1, k - i - 1);
-                        var lines = t.Replace("\r", "").Split('\n');
-                        c.Params = new List<object> { lines[0] };
-                        for (int n = lines.Length - 1; n >= 1; n--) L.Insert(i + 1, new EventCommand(655, c.Indent, lines[n]));
-                        RefreshList(i); return;
-                    }
-                case 201: { var r = TransferDialog.Ask(FindForm(), _p, c); if (r != null) { c.Params = r.Params; RefreshList(i); } return; }
-                case 0: return;
-                default: EditJson(); return;
-            }
-        }
-
-        void EditJson()
-        {
-            int i = Sel; var c = L[i];
-            string json = Json.Json.Write(c);
-            string t = TextDialog.Ask(FindForm(), "Edit command " + c.Code + " (JSON)", json, true);
-            if (t == null) return;
-            try { var nc = Json.Json.Deserialize<EventCommand>(t); L[i] = nc; RefreshList(i); }
-            catch (Exception ex) { MessageBox.Show(this, "Invalid JSON: " + ex.Message); }
-        }
-
-        // ------------------------------------------------------------------ add commands
-        void AddText()
-        {
-            string t = TextDialog.Ask(FindForm(), "Show text", "", true, "Tip: \\PN inserts the player's name; \\n starts a new line.");
-            if (!string.IsNullOrEmpty(t)) Insert(new EventCommand(101, 0, t));
-        }
-
-        void AddChoices()
-        {
-            string t = TextDialog.Ask(FindForm(), "Show choices (one per line, up to 4)", "Yes\nNo", true);
-            if (t == null) return;
-            var choices = t.Replace("\r", "").Split('\n').Select(x => x.Trim()).Where(x => x.Length > 0).Take(4).ToList();
-            if (choices.Count == 0) return;
-            var cmds = new List<EventCommand> { new EventCommand(102, 0, choices.Cast<object>().ToList(), choices.Count) };
-            for (int k = 0; k < choices.Count; k++) { cmds.Add(new EventCommand(402, 0, k, choices[k])); cmds.Add(new EventCommand(0, 1)); }
-            cmds.Add(new EventCommand(404, 0));
-            Insert(cmds.ToArray());
-        }
-
-        void AddConditional()
-        {
-            var kinds = new[] { "Switch is ON", "Switch is OFF", "Self switch A is ON", "Variable >= value", "Script condition" };
-            int k = ChoiceDialog.Ask(FindForm(), "Conditional branch", kinds);
-            if (k < 0) return;
-            EventCommand cond;
-            switch (k)
-            {
-                case 0: case 1: { int id = NumberDialog.Ask(FindForm(), "Switch ID", 1); if (id < 1) return; cond = new EventCommand(111, 0, 0, id, k == 0 ? 0 : 1); break; }
-                case 2: cond = new EventCommand(111, 0, 2, "A", 0); break;
-                case 3: { int id = NumberDialog.Ask(FindForm(), "Variable ID", 1); if (id < 1) return; int v = NumberDialog.Ask(FindForm(), "At least", 1); cond = new EventCommand(111, 0, 1, id, 0, v, 1); break; }
-                default: { string s = TextDialog.Ask(FindForm(), "Script condition", "$game_switches[1]", false); if (s == null) return; cond = new EventCommand(111, 0, 12, s); break; }
-            }
-            Insert(cond, new EventCommand(0, 1), new EventCommand(411, 0), new EventCommand(0, 1), new EventCommand(412, 0));
-        }
-
-        void AddSwitch()
-        {
-            int id = NumberDialog.Ask(FindForm(), "Switch ID", 1); if (id < 1) return;
-            int on = ChoiceDialog.Ask(FindForm(), "Set switch " + id + " to", new[] { "ON", "OFF" }); if (on < 0) return;
-            Insert(new EventCommand(121, 0, id, id, on));
-        }
-
-        void AddSelfSwitch()
-        {
-            int ch = ChoiceDialog.Ask(FindForm(), "Self switch", new[] { "A = ON", "A = OFF", "B = ON", "B = OFF", "C = ON", "C = OFF", "D = ON", "D = OFF" }); if (ch < 0) return;
-            Insert(new EventCommand(123, 0, "ABCD"[ch / 2].ToString(), ch % 2));
-        }
-
-        void AddVariable()
-        {
-            int id = NumberDialog.Ask(FindForm(), "Variable ID", 1); if (id < 1) return;
-            int op = ChoiceDialog.Ask(FindForm(), "Operation", new[] { "Set to", "Add", "Subtract" }); if (op < 0) return;
-            int v = NumberDialog.Ask(FindForm(), "Value", 0, -99999);
-            Insert(new EventCommand(122, 0, id, id, op, 0, v));
-        }
-
-        void AddTransfer() { var c = TransferDialog.Ask(FindForm(), _p, null); if (c != null) Insert(c); }
-
-        void AddSound()
-        {
-            string n = AssetPick("Audio/SE", "Sound effect"); if (n == null) return;
-            Insert(new EventCommand(250, 0, AudioObj(n)));
-        }
-
-        void AddMusic()
-        {
-            string n = AssetPick("Audio/BGM", "Background music"); if (n == null) return;
-            Insert(new EventCommand(241, 0, AudioObj(n)));
-        }
-
-        void AddWait() { int f = NumberDialog.Ask(FindForm(), "Wait (1/20 second units, 20 = 1 second)", 20); if (f > 0) Insert(new EventCommand(106, 0, f)); }
-
-        void AddGiveItem()
-        {
-            var ids = _p.Items.Select(it => it.Id).ToArray();
-            int k = ChoiceDialog.Ask(FindForm(), "Give item", ids, true); if (k < 0) return;
-            Insert(new EventCommand(355, 0, "pbReceiveItem(:" + ids[k] + ")"));
-        }
-
-        void AddScript()
-        {
-            string s = TextDialog.Ask(FindForm(), "Script", "", true, "Calls a script command, e.g. pbReceiveItem(:POTION) or one defined in your Scripts folder.");
-            if (string.IsNullOrEmpty(s)) return;
-            var lines = s.Replace("\r", "").Split('\n');
-            var cmds = new List<EventCommand> { new EventCommand(355, 0, lines[0]) };
-            for (int i = 1; i < lines.Length; i++) cmds.Add(new EventCommand(655, 0, lines[i]));
-            Insert(cmds.ToArray());
-        }
-
-        string AssetPick(string folder, string title)
-        {
-            string dir = Path.Combine(_p.Root, folder.Replace('/', Path.DirectorySeparatorChar));
-            var files = Directory.Exists(dir) ? Directory.GetFiles(dir).Select(Path.GetFileNameWithoutExtension).Distinct().OrderBy(x => x).ToArray() : new string[0];
-            int k = ChoiceDialog.Ask(FindForm(), title, files, true);
-            return k < 0 ? null : files[k];
-        }
-
-        static JsonObject AudioObj(string name) { var a = new JsonObject(); a["Name"] = name; a["Volume"] = 100; a["Pitch"] = 100; return a; }
     }
 
     // ------------------------------------------------------------------ small dialogs

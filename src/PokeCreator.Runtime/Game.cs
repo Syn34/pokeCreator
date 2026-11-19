@@ -287,12 +287,35 @@ namespace PokeCreator.Runtime
                     if (starter.Trigger <= Triggers.EventTouch) starter.Lock();
                     Interpreter.Setup(starter.List, starter.Id);
                 }
+                else
+                {
+                    // Autorun common events: run while their switch is on, after map events get their turn
+                    var auto = Project.CommonEvents.FirstOrDefault(ce => ce.Trigger == 1 && ce.List.Count > 1 && State.GetSwitch(ce.SwitchId));
+                    if (auto != null) Interpreter.Setup(auto.List, 0);
+                }
             }
+            UpdateParallelCommonEvents();
             Interpreter.Update();
             // Autorun events restart after finishing while their page stays active
             if (!Interpreter.Running) foreach (var e in Map.Events) if (e.Trigger == Triggers.Autorun && !e.Erased && !e.Starting) e.Start();
             Message.Update();
             UpdateCamera();
+        }
+
+        // Parallel common events: one interpreter each, alive while the switch is on
+        readonly Dictionary<int, Interpreter> _commonParallel = new Dictionary<int, Interpreter>();
+
+        void UpdateParallelCommonEvents()
+        {
+            foreach (var ce in Project.CommonEvents)
+            {
+                if (ce.Trigger != 2 || ce.List.Count <= 1) continue;
+                Interpreter it;
+                bool on = State.GetSwitch(ce.SwitchId);
+                if (!on) { _commonParallel.Remove(ce.Id); continue; }
+                if (!_commonParallel.TryGetValue(ce.Id, out it)) _commonParallel[ce.Id] = it = Interpreter.ForCommonEvent(this, ce);
+                if (!Transferring) it.Update();
+            }
         }
 
         void CenterCamera()

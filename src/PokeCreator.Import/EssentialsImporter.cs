@@ -58,6 +58,7 @@ namespace PokeCreator.Import
             Step("map_connections", ImportConnections);
 
             ImportSystem();
+            ImportCommonEvents();
             ImportTilesets();
             ImportMaps();
 
@@ -455,6 +456,24 @@ namespace PokeCreator.Import
             if (sys.Str("windowskin_name").Length > 0) _p.Settings.Windowskin = sys.Str("windowskin_name");
             var titleBgm = sys.Obj("title_bgm");
             if (titleBgm != null) _p.Settings.TitleBGM = titleBgm.Str("name");
+        }
+
+        void ImportCommonEvents()
+        {
+            string f = RxPath("CommonEvents.rxdata");
+            if (!File.Exists(f)) { Warn("Data/CommonEvents.rxdata not found"); return; }
+            Log("Reading Data/CommonEvents.rxdata");
+            var list = (List<object>)MarshalReader.Load(f);
+            foreach (var o in list)
+            {
+                var c = o as RObject;
+                if (c == null) continue;
+                var ce = new CommonEventData { Id = c.Int("id"), Name = c.Str("name"), Trigger = c.Int("trigger"), SwitchId = c.Int("switch_id") };
+                foreach (RObject cmd in c.List("list"))
+                    ce.List.Add(new EventCommand { Code = cmd.Int("code"), Indent = cmd.Int("indent"), Params = cmd.List("parameters").Select(ToPlain).ToList() });
+                _p.CommonEvents.Add(ce);
+            }
+            Log("  " + _p.CommonEvents.Count(x => x.List.Count > 1 || x.Name.Length > 0) + " common events");
         }
 
         void ImportTilesets()

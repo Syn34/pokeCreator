@@ -125,6 +125,7 @@ namespace PokeCreator.Studio
                 db.DropDownItems.Clear();
                 if (Project == null) return;
                 foreach (var t in Project.Tables) { var table = t; db.DropDownItems.Add(t.Label, null, (a, b) => OpenTable(table)); }
+                db.DropDownItems.Add("Common Events", null, (a, b) => OpenDocument("sys:commonevents", () => new CommonEventsEditor(this, Project)));
                 db.DropDownItems.Add(new ToolStripSeparator());
                 db.DropDownItems.Add("Add Missing Pokémon && Data…", null, (a, b) => MergeBaseData());
             };
@@ -312,6 +313,7 @@ namespace PokeCreator.Studio
 
             var db = Node(_tree.Nodes, "Database", "database", null);
             foreach (var t in p.Tables) Node(db.Nodes, t.Label + " (" + t.Items.Count + ")", t.Key, t);
+            Node(db.Nodes, "Common Events (" + p.CommonEvents.Count + ")", "commonevents", "sys:commonevents");
             db.Expand();
 
             var maps = Node(_tree.Nodes, "Maps (" + p.MapInfos.Count + ")", "maps", "maps");
@@ -492,6 +494,7 @@ namespace PokeCreator.Studio
             else if (s == "sys:switches") OpenDocument(s, () => new SwitchesDocument(Project));
             else if (s == "sys:tilesets") OpenDocument(s, () => new TilesetEditor(Project));
             else if (s == "sys:world") OpenWorld();
+            else if (s == "sys:commonevents") OpenDocument(s, () => new CommonEventsEditor(this, Project));
             else if (s == "sys:connections") { var w = FindTab("sys:world"); if (w != null) CloseTab(w); if (FindTab("sys:world") == null) OpenDocument(s, () => new ObjectDocument("Map Connections", Project.Connections, () => Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections), "Maps that join seamlessly at their edges. Edge is North/South/East/West; offsets line the maps up.")); }
             else if (s.StartsWith("assets:")) { string dir = s.Substring(7); OpenDocument(s, () => new AssetBrowser(Project, dir)); }
             else if (s.StartsWith("file:")) OpenFile(s.Substring(5));

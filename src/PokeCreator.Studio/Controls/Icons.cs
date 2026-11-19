@@ -301,6 +301,12 @@ namespace PokeCreator.Studio.Controls
                     using (var p = new Pen(C(40, 110, 50), 1)) g.DrawLine(p, 1, 16.5f, 17, 16.5f); break;
                 case "town_maps": goto case "map";
                 case "regional_dexes": Round(g, C(220, 50, 50), 3, 1.5f, 12, 15, 2); Circle(g, C(120, 200, 250), 6, 4, 4.5f); Box(g, C(250, 250, 250), 5.5f, 11, 7, 2.5f, false); break;
+                case "commonevents":
+                    // A list of commands with a shared/link mark
+                    Round(g, C(120, 100, 200), 2, 2, 14, 14, 3);
+                    for (int i = 0; i < 3; i++) Line(g, Color.White, 1.4f, 5, 6 + i * 3, 13, 6 + i * 3);
+                    Circle(g, C(250, 200, 70), 11f, 11f, 6.5f);
+                    break;
                 case "switches": Round(g, C(80, 190, 100), 1, 5, 16, 8, 4); Circle(g, Color.White, 9, 5.5f, 7); break;
                 case "tilesets":
                     Box(g, C(90, 180, 90), 1.5f, 1.5f, 7, 7); Box(g, C(200, 170, 120), 9.5f, 1.5f, 7, 7);

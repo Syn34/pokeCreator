@@ -23,6 +23,9 @@ namespace PokeCreator.Runtime.Script
         readonly Dictionary<int, int> _branch = new Dictionary<int, int>();
         readonly bool _parallel;
         List<EventCommand> _parallelSource;
+        Interpreter _child;          // a called common event runs here until it finishes
+        bool _isChild;
+        int _depth;
         static readonly HashSet<int> _warned = new HashSet<int>();
 
         public Interpreter(Game g) { _game = g; }
@@ -33,6 +36,20 @@ namespace PokeCreator.Runtime.Script
 
         public bool Running { get { return _list != null; } }
 
+        /// <summary>Parallel interpreter for a common event: runs on every map while its switch is on.</summary>
+        public static Interpreter ForCommonEvent(Game g, CommonEventData ce) { return new Interpreter(g, -1, 0, ce.List); }
+
+        /// <summary>Runs a common event inside this one (Call Common Event); this event waits until it ends.</summary>
+        public bool CallCommonEvent(int id)
+        {
+            var ce = _game.Project.GetCommonEvent(id);
+            if (ce == null || ce.List == null || ce.List.Count == 0) { Warn(117, "Call Common Event: common event " + id + " doesn't exist"); return false; }
+            if (_depth > 50) { Warn(117, "Call Common Event: common events call each other too deeply"); return false; }
+            _child = new Interpreter(_game) { _isChild = true, _depth = _depth + 1 };
+            _child.Setup(ce.List, EventId);
+            return true;
+        }
+
         public void Setup(List<EventCommand> list, int eventId)
         {
             _list = list; _index = 0; EventId = eventId; MapId = _game.Map.Id;
@@ -41,7 +58,8 @@ namespace PokeCreator.Runtime.Script
 
         void Finish()
         {
-            if (!_parallel && EventId > 0)
+            _child = null;
+            if (!_parallel && !_isChild && EventId > 0)
             {
                 var ev = GetEvent(EventId);
                 if (ev != null) ev.Unlock();
@@ -66,8 +84,15 @@ namespace PokeCreator.Runtime.Script
             {
                 if (_list == null)
                 {
-                    if (_parallel && _parallelSource != null && _game.Map.Id == MapId) { _list = _parallelSource; _index = 0; _branch.Clear(); }
+                    if (_parallel && _parallelSource != null && (MapId < 0 || _game.Map.Id == MapId)) { _list = _parallelSource; _index = 0; _branch.Clear(); }
                     else return;
+                }
+                if (_child != null)
+                {
+                    _child.Update();
+                    if (_child.Running) return;
+                    _child = null;
+                    continue;
                 }
                 if (_wait > 0) { _wait--; return; }
                 if (_game.MessageBusy || _game.Transferring) return;
@@ -149,7 +174,7 @@ namespace PokeCreator.Runtime.Script
                     }
                 case 115: _index = _list.Count; return false;
                 case 116: { var e = GetEvent(EventId); if (e != null) e.Erase(); return true; }
-                case 117: Warn(117, "Call Common Event"); return true;
+                case 117: CallCommonEvent(c.IntParam(0)); return true;
                 case 119:
                     {
                         string label = c.StrParam(0);

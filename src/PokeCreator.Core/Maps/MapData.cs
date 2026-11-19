@@ -130,6 +130,24 @@ namespace PokeCreator.Maps
         }
     }
 
+    /// <summary>
+    /// An event that isn't on a map: called from other events (Call Common Event), or run by itself
+    /// while a switch is on (Autorun stops the player; Parallel runs alongside play).
+    /// </summary>
+    public class CommonEventData
+    {
+        public static readonly string[] TriggerNames = { "None (only when called)", "Autorun (while switch is ON)", "Parallel (while switch is ON)" };
+        public int Id { get; set; }
+        public string Name { get; set; }
+        /// <summary>0 = only when called, 1 = autorun, 2 = parallel.</summary>
+        public int Trigger { get; set; }
+        /// <summary>Switch that must be ON for autorun/parallel common events.</summary>
+        public int SwitchId { get; set; }
+        public List<EventCommand> List { get; set; }
+        public CommonEventData() { Name = ""; SwitchId = 1; List = new List<EventCommand>(); }
+        public override string ToString() { return Id.ToString("000") + ": " + Name; }
+    }
+
     public class MapEvent
     {
         public int Id { get; set; }

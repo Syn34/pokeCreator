@@ -198,9 +198,10 @@ namespace PokeCreator.Runtime.Script
                                       "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
                                       "pbMoveRoute", "pbPhoneRegisterBattle", "pbPhoneRegister", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
-                                      "pbCommonEvent", "pbChangePlayer", "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
+                                      "pbChangePlayer", "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
                 Register(n, noop);
 
+            Register("pbCommonEvent", (c, a) => c != null && c.CallCommonEvent(ToInt(Arg(a, 0))));
             Register("pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
             Register("Kernel.pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
             Register("pbConfirmMessage", (c, a) =>
