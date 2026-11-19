@@ -202,7 +202,7 @@ namespace PokeCreator.Studio.Controls
             RecordImages.Kind kind = _images.Main;
             if (_images.Kinds.Length > 1)
             {
-                int k = ChoiceDialog.Ask(FindForm(), "Which sprites are you importing?", _images.Kinds.Select(x => x.Label + "  (" + x.Folder + ")").ToArray());
+                int k = ChoiceDialog.Ask(FindForm(), "Which images are you importing?", _images.Kinds.Select(x => x.Label + "  (" + x.Folder + "/" + x.Prefix + "<ID>)").ToArray());
                 if (k < 0) return;
                 kind = _images.Kinds[k];
             }
@@ -221,10 +221,12 @@ namespace PokeCreator.Studio.Controls
             var skipped = new List<string>();
             foreach (var f in files)
             {
-                string id = RecordImages.IdFromFileName(f);
+                string id = RecordImages.IdFromFileName(f, kind);
                 if (id.Length == 0) { skipped.Add(Path.GetFileName(f) + " (no usable name)"); continue; }
                 GameRecord r;
-                if (byKey.TryGetValue(id, out r) || byKey.TryGetValue(Path.GetFileNameWithoutExtension(f), out r)) plan.Add(new KeyValuePair<string, GameRecord>(f, r));
+                string raw = Path.GetFileNameWithoutExtension(f);
+                if (kind.Prefix.Length > 0 && raw.StartsWith(kind.Prefix, StringComparison.OrdinalIgnoreCase)) raw = raw.Substring(kind.Prefix.Length);
+                if (byKey.TryGetValue(id, out r) || byKey.TryGetValue(raw, out r)) plan.Add(new KeyValuePair<string, GameRecord>(f, r));
                 else if (create.Any(c => c.Value == id)) skipped.Add(Path.GetFileName(f) + " (same ID as another file)");
                 else create.Add(new KeyValuePair<string, string>(f, id));
             }
