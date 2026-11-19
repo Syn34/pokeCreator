@@ -14,7 +14,7 @@ PokeCreator does what Pokémon Essentials does, built to be easier to use:
 
 Already have an Essentials game? **File → Import Pokémon Essentials Project** converts it: PBS data, maps, events, tilesets, switch/variable names, graphics and audio. Your Essentials folder isn't changed.
 
-## What works today (v0.2)
+## What works today (v0.3)
 
 **Studio (editor)**
 - **New Project** asks for a project name and a location (paste a path or click Browse). The project is created in a new folder with the project's name inside that location, e.g. `Documents\PokeCreator Projects\My Game`
@@ -23,7 +23,12 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Database editors generated from the data model: dropdowns for types/moves/abilities/items, grids for level-up moves, evolutions, EVs, trainer parties and encounter slots, sprite previews
 - **Pokémon, trainer type and item images**: entries missing any image are highlighted and tagged "missing details"; under the search bar is a count of what's missing (front, back, front shiny, back shiny, icon) and a Show filter. The details pane shows the item icon, trainer picture, or the Pokémon's front, back, shiny and icon sprites, marking missing ones. **Import** (next to New / Duplicate / Delete) takes images named after IDs (`YOUNGSTER.png`, `CHARIZARD_1.png`): a matching entry gets the image, any other name becomes a new entry (a new form is copied from its species)
 - Map editor: tileset palette, 3 tile layers + events layer, pencil / rectangle / flood fill / eraser, right-click eyedropper, automatic autotile shapes, dim-other-layers, grid, passability overlay, undo/redo, zoom, map properties (size, tileset, music, Pokémon settings)
-- Event editor: pages, conditions, sprite picker with preview, triggers and movement, readable command list, one-click Text / Choices / If / Switch / Self Switch / Variable / Warp / Sound / Music / Wait / Give Item / Script, plus quick templates for NPCs, doors and item balls
+- Event editor: pages, conditions, sprite picker with preview, triggers and movement, readable command list, quick buttons for the common commands, plus quick templates for NPCs, doors and item balls
+- **Add Command…** palette grouped like RPG Maker's: messages (text, choices, input number, comments), flow (conditional branch, loop, break, exit, labels and jumps, call common event, wait, erase), switches and variables, player and party (give Pokémon, give item, money, heal), map and movement (warp, set event location, move route, wait for moves, transparency), screen (tone presets, flash) and audio (BGM, fade out, ME, SE)
+- **Move route editor**: who moves (player, this event, any event on the map), buttons for every move, turn and setting step (jump, wait, speed, frequency, switches, opacity, graphic, sound, script), repeat / skip if blocked / wait until done. Also used for an event page's **custom movement** (Edit Custom Route…)
+- **Common events** (Database → Common Events): events that aren't on a map. Call them from any event with Call Common Event, or set them to run on their own while a switch is ON (autorun or parallel). Imported from Essentials' CommonEvents.rxdata
+- **Problems panel** (toolbar button or Ctrl+Shift+P) lists what would break or look wrong in the game: missing graphics and audio, warps to maps that don't exist or outside the map, calls to missing common events or labels, unknown Pokémon / items / moves / trainers in the database and in event scripts, and script compile errors with file and line. Double-click one to go straight to the map event, record or script line. The toolbar shows the error count
+- **Build Game** (Ctrl+B): makes a folder players can run without the Studio (the game program named after your game, your data, graphics, audio, fonts and scripts, library licenses, a How to play.txt) plus a .zip to send them. It checks for problems first
 - **Nested maps**: drag a map onto another map to put it inside, onto the top or bottom edge of a row to reorder, or onto "Maps" for the top level (or use Move Up / Move Down / Move Inside Another Map… / Move to Top Level on the right-click menu). The tree draws ├ └ │ lines for each level
 - **World Map** (Ctrl+M): every outdoor map laid out by its connections as live thumbnails. Drag maps so their edges touch to connect them, pull them apart to disconnect, nudge with the arrow keys, drop unplaced maps in from the side list, and right-click empty space to create a new connected map. Writes the same `map_connections.json` the game uses
 - **Tileset folders**: a tileset is a folder of images, one per area (Outdoor, Cave, Poké Center, Mart...). Maps using it can paint from every area, picked from a list above the palette. **Game → Tilesets**: New Tileset Folder (import a whole folder), Add Area Image, Replace Image, Refresh Folder (picks up images you drop in), autotiles, and per-area passability, priority, terrain tags, bush and counter flags. 16×16 images are doubled and wide images re-arranged to 8 tiles across automatically. Existing single-image tilesets keep working
@@ -39,6 +44,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Seamless walking between connected maps (Essentials-style map connections)
 - Events: pages and conditions, action/touch/autorun/parallel triggers, move routes, NPC wandering
 - RMXP-compatible event commands: text with Essentials text codes, choices, conditional branches, loops, labels, switches, variables, self switches, money, transfers with fades, audio, screen tone/flash
+- Common events: Call Common Event (and `pbCommonEvent`), autorun and parallel common events while their switch is ON
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
 - C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands
 - Location signs, day/night tint on outdoor maps, BGM/SE/ME through SDL_mixer

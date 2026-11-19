@@ -22,6 +22,7 @@ MyGame/
     tilesets.json           tilesets: folder of area images, autotiles, per-tile passability / priority / terrain tag
     mapinfos.json           map tree (names, parents, order)
     map_connections.json    maps that join at their edges (edited in the World Map)
+    common_events.json      events that aren't on a map: Id, Name, Trigger (0 called only, 1 autorun, 2 parallel), SwitchId, List
     world.json              Studio only: where each map sits on the World Map ({"5": [x, y]} in tiles)
     Maps/
       Map001.json …         one file per map: size, tileset, music, Pokémon settings,
@@ -63,7 +64,13 @@ Each page has `Condition`, `Graphic`, movement settings, `Trigger` (0 action but
 { "Code": 201, "Params": [0, 3, 7, 5, 8, 0] }
 ```
 
-Codes follow RPG Maker XP (101 text, 102 choices, 111 conditional branch, 121 switches, 122 variables, 123 self switch, 201 transfer, 209 move route, 241/250 audio, 355 script, ...). The Studio's event editor shows them as readable text.
+Codes follow RPG Maker XP (101 text, 102 choices, 111 conditional branch, 117 call common event, 121 switches, 122 variables, 123 self switch, 201 transfer, 209 move route, 241/250 audio, 355 script, ...). The Studio's event editor shows them as readable text.
+
+A move route (209, or a page's `MoveRoute` when `MoveType` is 3) is `{ "Repeat": false, "Skippable": false, "List": [ {"Code": 1}, {"Code": 14, "Params": [0, -1]}, {} ] }`; step codes follow RPG Maker XP (1-4 move down/left/right/up, 14 jump, 15 wait, 16-19 face, 29 speed, 41 graphic, 45 script...). The 509 lines after a 209 only repeat its steps for display. Screen tone (223) takes `[{"_class": "Tone", "Values": [r, g, b, gray]}, frames]`.
+
+## Built games
+
+**Game → Build Game** copies the game program (renamed after the game, with its `.config`), `PokeCreator.Core.dll`, the SDL libraries, `licenses/`, `project.json` and the `Data`, `Graphics`, `Audio`, `Fonts` and `Scripts` folders. The game program finds `project.json` next to itself, so the folder runs as it is. Saves go to `%AppData%\PokeCreator\Saves\<game title>`.
 
 ## Scripts
 

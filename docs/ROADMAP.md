@@ -40,11 +40,12 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 
 ## v0.5: Studio power features
 - [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves
-- [ ] Move-route editor and full command palette in the event editor
-- [ ] Validation panel: missing graphics, broken references (e.g. a move that doesn't exist)
-- [ ] Common events, troops/battle setup screens
+- [x] Move-route editor and full command palette in the event editor
+- [x] Problems panel: missing graphics and audio, broken references, script errors
+- [x] Common events
+- [ ] Troops/battle setup screens
 - [ ] Animation editor for battle animations
-- [ ] Export/distribute: one-click "Build game" to a folder players can run
+- [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 
 ## Later
 - Plugin system for sharing scripts between projects
