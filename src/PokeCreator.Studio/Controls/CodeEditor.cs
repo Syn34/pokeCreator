@@ -21,10 +21,11 @@ namespace PokeCreator.Studio.Controls
         string _language = "";
         bool _busy;              // true while we change colours or text ourselves
         int[] _lineHashes;       // per line: hash of text + colours currently shown
-        List<string> _undo = new List<string>(), _redo = new List<string>();
-        List<int> _undoSel = new List<int>(), _redoSel = new List<int>();
+        /// <summary>One undo step: what was replaced where. Only the change is kept, not the whole file.</summary>
+        class Edit { public int Start; public string Removed, Inserted; public int CaretBefore; }
+        readonly List<Edit> _undo = new List<Edit>(), _redo = new List<Edit>();
         string _lastText = ""; int _lastSel; DateTime _lastEdit; char _lastKind;
-        public const int MaxHighlight = 400000;
+        public const int MaxHighlight = 1000000;
         public event EventHandler TextEdited;
 
         static readonly bool Native = !(Type.GetType("Mono.Runtime") != null && Environment.OSVersion.Platform == PlatformID.Unix);
@@ -42,7 +43,7 @@ namespace PokeCreator.Studio.Controls
             Box.SelectionChanged += (s, e) => { if (!_busy) _gutter.Invalidate(); };
             Box.Resize += (s, e) => _gutter.Invalidate();
             // Creating the window can drop formatting that was applied before it existed
-            Box.HandleCreated += (s, e) => { _lineHashes = null; BeginInvokeSafe(() => Recolor(true)); };
+            Box.HandleCreated += (s, e) => { _lineHashes = null; BeginInvokeSafe(() => { if (_lineHashes == null) Recolor(true); }); };
             VisibleChanged += (s, e) => { if (Visible && _lineHashes == null) Recolor(true); };
             _timer.Tick += (s, e) => { _timer.Stop(); Recolor(false); };
             Action themed = () => { if (!IsDisposed) ApplyTheme(); };
@@ -71,12 +72,22 @@ namespace PokeCreator.Studio.Controls
 
         public void LoadText(string text)
         {
+            text = (text ?? "").Replace("\r\n", "\n");
             _busy = true;
-            Box.Text = (text ?? "").Replace("\r\n", "\n");
+            // With the language known and the window ready, load the text already coloured (one step);
+            // otherwise load plain text and let HandleCreated colour it once
+            if (_language != "" && text.Length <= MaxHighlight && Box.IsHandleCreated)
+            {
+                _lineHashes = null;
+                Box.Text = "";
+                ApplyRtf(text, CodeLexer.Lex(text, _language), Theme.Dark);
+                if (Box.TextLength != text.Length) Box.Text = text;
+                _hashOnly = true; try { Recolor(false); } finally { _hashOnly = false; } // remember lines for later edits
+            }
+            else { Box.Text = text; Recolor(true); }
             _busy = false;
-            _undo.Clear(); _redo.Clear(); _undoSel.Clear(); _redoSel.Clear();
+            _undo.Clear(); _redo.Clear();
             _lastText = Box.Text; _lastSel = 0;
-            Recolor(true);
             Box.Select(0, 0);
         }
 
@@ -111,12 +122,29 @@ namespace PokeCreator.Studio.Controls
             string now = Box.Text;
             char kind = now.Length > _lastText.Length ? KindAt(now, Box.SelectionStart - 1) : 'd';
             bool newStep = (DateTime.Now - _lastEdit).TotalMilliseconds > 900 || kind != _lastKind || kind == '\n' || Math.Abs(now.Length - _lastText.Length) > 1;
-            if (newStep || _undo.Count == 0)
+            // What changed: the part between the common start and the common end
+            string old = _lastText;
+            int pre = 0, max = Math.Min(old.Length, now.Length);
+            while (pre < max && old[pre] == now[pre]) pre++;
+            int suf = 0;
+            while (suf < max - pre && old[old.Length - 1 - suf] == now[now.Length - 1 - suf]) suf++;
+            var edit = new Edit { Start = pre, Removed = old.Substring(pre, old.Length - pre - suf), Inserted = now.Substring(pre, now.Length - pre - suf), CaretBefore = _lastSel };
+            if (edit.Removed.Length > 0 || edit.Inserted.Length > 0)
             {
-                _undo.Add(_lastText); _undoSel.Add(_lastSel);
-                if (_undo.Count > 500) { _undo.RemoveAt(0); _undoSel.RemoveAt(0); }
+                var last = _undo.Count > 0 ? _undo[_undo.Count - 1] : null;
+                if (!newStep && last != null && edit.Removed == "" && last.Removed == "" && last.Start + last.Inserted.Length == edit.Start)
+                    last.Inserted += edit.Inserted;                                   // typing on
+                else if (!newStep && last != null && edit.Inserted == "" && last.Inserted == "" && edit.Start + edit.Removed.Length == last.Start)
+                { last.Start = edit.Start; last.Removed = edit.Removed + last.Removed; } // backspacing on
+                else if (!newStep && last != null && edit.Inserted == "" && last.Inserted == "" && edit.Start == last.Start)
+                    last.Removed += edit.Removed;                                     // deleting forwards
+                else
+                {
+                    _undo.Add(edit);
+                    if (_undo.Count > 1000) _undo.RemoveAt(0);
+                }
             }
-            _redo.Clear(); _redoSel.Clear();
+            _redo.Clear();
             _lastText = now; _lastSel = Box.SelectionStart; _lastEdit = DateTime.Now; _lastKind = kind;
             _gutter.UpdateWidth();
             _gutter.Invalidate();
@@ -132,32 +160,26 @@ namespace PokeCreator.Studio.Controls
         }
 
         public bool CanUndo { get { return _undo.Count > 0; } }
-        public void Undo() { Step(_undo, _undoSel, _redo, _redoSel); }
-        public void Redo() { Step(_redo, _redoSel, _undo, _undoSel); }
+        public void Undo() { Step(_undo, _redo, true); }
+        public void Redo() { Step(_redo, _undo, false); }
 
-        void Step(List<string> from, List<int> fromSel, List<string> to, List<int> toSel)
+        /// <summary>Applies one step backwards (undo) or forwards (redo) by replacing just that part of the text.</summary>
+        void Step(List<Edit> from, List<Edit> to, bool undo)
         {
             if (from.Count == 0) return;
-            string text = from[from.Count - 1]; int sel = fromSel[fromSel.Count - 1];
-            from.RemoveAt(from.Count - 1); fromSel.RemoveAt(fromSel.Count - 1);
-            to.Add(Box.Text); toSel.Add(Box.SelectionStart);
-            ReplaceAll(text, sel);
-        }
-
-        /// <summary>Replaces the whole text (undo/redo), keeping the scroll position.</summary>
-        void ReplaceAll(string text, int caret)
-        {
-            var scroll = GetScroll();
+            var e = from[from.Count - 1];
+            from.RemoveAt(from.Count - 1);
+            to.Add(e);
+            string remove = undo ? e.Inserted : e.Removed, insert = undo ? e.Removed : e.Inserted;
             _busy = true;
             BeginUpdate();
-            Box.Text = text;
-            _lineHashes = null;
-            Recolor(true, false);
-            Box.Select(Math.Min(caret, Box.TextLength), 0);
-            SetScroll(scroll);
+            Box.Select(e.Start, remove.Length);
+            Box.SelectedText = insert;
+            Box.Select(undo ? Math.Min(e.CaretBefore, Box.TextLength) : e.Start + insert.Length, 0);
             EndUpdate();
             _busy = false;
-            _lastText = Box.Text; _lastSel = Box.SelectionStart; _lastKind = 'o';
+            _lastText = Box.Text; _lastSel = Box.SelectionStart; _lastKind = 'o'; _lastEdit = DateTime.MinValue;
+            Recolor(false);
             _gutter.UpdateWidth(); _gutter.Invalidate();
             Box.ScrollToCaretIfHidden();
             if (TextEdited != null) TextEdited(this, EventArgs.Empty);
@@ -275,9 +297,13 @@ namespace PokeCreator.Studio.Controls
         // ------------------------------------------------------------------ colouring
         public void Recolor(bool full) { Recolor(full, true); }
 
+        bool _hashOnly;
+
         void Recolor(bool full, bool freeze)
         {
             if (Box.IsDisposed) return;
+            // Before the window exists, colours would be lost; HandleCreated colours everything once it does
+            if (!Box.IsHandleCreated) { _lineHashes = null; return; }
             string text = Box.Text;
             bool dark = Theme.Dark;
             if (_language == "" || text.Length > MaxHighlight)
@@ -300,7 +326,8 @@ namespace PokeCreator.Studio.Controls
                 int h = 17;
                 for (int i = a; i < b - 1 && i < text.Length; i++) h = h * 31 + text[i];
                 while (si < spans.Count && spans[si].Start + spans[si].Length <= a) si++;
-                for (int k = si; k < spans.Count && spans[k].Start < b; k++) h = h * 131 + (Math.Max(spans[k].Start, a) - a) * 7 + Math.Min(spans[k].Start + spans[k].Length, b) * 3 + (int)spans[k].Kind;
+                // Positions relative to the line start, so typing on one line doesn't change the lines below it
+                for (int k = si; k < spans.Count && spans[k].Start < b; k++) h = h * 131 + (Math.Max(spans[k].Start, a) - a) * 7 + (Math.Min(spans[k].Start + spans[k].Length, b) - a) * 3 + (int)spans[k].Kind;
                 hashes[l] = h;
             }
 
@@ -314,10 +341,83 @@ namespace PokeCreator.Studio.Controls
                 to = endNew;
             }
             _lineHashes = hashes;
+            if (_hashOnly) return; // just loaded already coloured: remember the lines, don't repaint
             if (from >= to) return;
+            // Many lines to repaint (opening a file, switching theme, a big paste): rebuild it in one go
+            if (to - from > 200) { ApplyRtf(text, spans, dark); return; }
             int start = starts[from], end = to < lines ? starts[to] - 1 : text.Length;
             if (end < start) end = start;
             ApplyColors(start, end, spans, text, dark, freeze);
+        }
+
+        /// <summary>
+        /// Colours the whole text at once by handing the text box one formatted (RTF) document. Setting
+        /// colours piece by piece costs a round trip per token, which took minutes on big JSON files.
+        /// </summary>
+        void ApplyRtf(string text, List<CodeSpan> spans, bool dark)
+        {
+            string rtf;
+            try { rtf = BuildRtf(text, spans, dark); }
+            catch { ApplyColors(0, text.Length, spans, text, dark, true); return; }
+            bool wasBusy = _busy; _busy = true;
+            int selStart = Box.SelectionStart, selLen = Box.SelectionLength;
+            var scroll = GetScroll();
+            BeginUpdate();
+            try
+            {
+                Box.Rtf = rtf;
+                // Some text boxes read RTF line breaks back differently; if the text changed, fall back
+                if (Box.TextLength != text.Length) { Box.Text = text; ApplyColors(0, text.Length, spans, text, dark, false); }
+                Box.Select(Math.Min(selStart, Box.TextLength), selLen);
+            }
+            finally { SetScroll(scroll); EndUpdate(); _busy = wasBusy; }
+        }
+
+        string BuildRtf(string text, List<CodeSpan> spans, bool dark)
+        {
+            var kinds = (CodeKind[])Enum.GetValues(typeof(CodeKind));
+            var sb = new StringBuilder(text.Length * 2 + 1024);
+            int twips = TextRenderer.MeasureText("0000", Box.Font).Width * 1440 / 96;
+            sb.Append(@"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fmodern\fcharset0 ").Append(Box.Font.Name).Append(@";}}{\colortbl ;");
+            foreach (var k in kinds) { var c = CodeColors.Of(k, dark); sb.Append(@"\red").Append(c.R).Append(@"\green").Append(c.G).Append(@"\blue").Append(c.B).Append(';'); }
+            sb.Append(@"}\uc1\pard\deftab").Append(twips).Append(@"\f0\fs").Append((int)Math.Round(Box.Font.SizeInPoints * 2)).Append(@"\cf").Append((int)CodeKind.Plain + 1).Append(' ');
+            var sorted = spans.Where(x => x.Kind != CodeKind.Plain && x.Length > 0).OrderBy(x => x.Start).ToList();
+            int pos = 0, si = 0;
+            while (pos < text.Length)
+            {
+                while (si < sorted.Count && sorted[si].Start + sorted[si].Length <= pos) si++;
+                int next = si < sorted.Count ? Math.Max(sorted[si].Start, pos) : text.Length;
+                if (next > pos) { AppendRtfText(sb, text, pos, next); pos = next; continue; }
+                var sp = sorted[si];
+                int end = Math.Min(text.Length, sp.Start + sp.Length);
+                sb.Append(@"\cf").Append((int)sp.Kind + 1).Append(' ');
+                AppendRtfText(sb, text, pos, end);
+                sb.Append(@"\cf").Append((int)CodeKind.Plain + 1).Append(' ');
+                pos = end; si++;
+            }
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        static void AppendRtfText(StringBuilder sb, string text, int from, int to)
+        {
+            for (int i = from; i < to; i++)
+            {
+                char c = text[i];
+                switch (c)
+                {
+                    case '\\': sb.Append(@"\\"); break;
+                    case '{': sb.Append(@"\{"); break;
+                    case '}': sb.Append(@"\}"); break;
+                    case '\n': sb.Append(@"\par").Append('\n'); break;
+                    case '\r': break;
+                    case '\t': sb.Append(@"\tab "); break;
+                    default:
+                        if (c < 128) sb.Append(c);
+                        else sb.Append(@"\u").Append((int)(short)c).Append('?');
+                        break;
+                }
+            }
         }
 
         void ApplyColors(int start, int end, List<CodeSpan> spans, string text, bool dark, bool freeze)
@@ -411,8 +511,7 @@ namespace PokeCreator.Studio.Controls
 
             public void UpdateWidth()
             {
-                string t = _ed.Box.Text;
-                int lines = 1; foreach (char c in t) if (c == '\n') lines++;
+                int lines = _ed.Box.GetLineFromCharIndex(_ed.Box.TextLength) + 1;
                 int digits = Math.Max(3, lines.ToString().Length);
                 int w = TextRenderer.MeasureText(new string('9', digits), _ed.Box.Font).Width + 18;
                 if (Math.Abs(w - Width) > 2) Width = w;

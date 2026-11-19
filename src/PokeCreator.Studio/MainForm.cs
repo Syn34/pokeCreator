@@ -63,6 +63,13 @@ namespace PokeCreator.Studio
             };
             _tree.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter && _tree.SelectedNode != null) OpenNode(_tree.SelectedNode); };
             _tree.NodeMouseClick += (s, e) => { if (e.Button == MouseButtons.Right) { _tree.SelectedNode = e.Node; ShowTreeMenu(e.Node, e.Location); } };
+            // Maps can be dragged onto other maps (nest), between maps (reorder) or onto "Maps" (top level)
+            _tree.ItemDrag += (s, e) => { var n = e.Item as TreeNode; if (n != null && n.Tag is MapInfo && e.Button == MouseButtons.Left) _tree.DoDragDrop(n, DragDropEffects.Move); };
+            _tree.DragOver += (s, e) => TreeDragOver(e);
+            _tree.DragLeave += (s, e) => _tree.SetDropTarget(null, ProjectTree.DropPlace.None);
+            _tree.DragDrop += (s, e) => TreeDragDrop(e);
+            _tree.AfterExpand += (s, e) => RememberExpanded(e.Node, true);
+            _tree.AfterCollapse += (s, e) => RememberExpanded(e.Node, false);
             _tabs.CloseRequested += CloseTab;
             FormClosing += (s, e) => { if (!ConfirmDiscard()) e.Cancel = true; else _settings.Save(); };
 
@@ -261,8 +268,36 @@ namespace PokeCreator.Studio
         }
 
         // ------------------------------------------------------------------ project tree
+        /// <summary>Key identifying a non-map tree item across rebuilds (its tag, or its path of names).</summary>
+        static string NodeKey(TreeNode n) { return n.Tag is string ? "t:" + n.Tag : n.Tag is DatabaseTable ? "d:" + ((DatabaseTable)n.Tag).Key : "p:" + n.FullPath; }
+
+        void CollectExpanded(TreeNodeCollection nodes, Dictionary<string, bool> into)
+        {
+            foreach (TreeNode n in nodes)
+            {
+                if (n.Tag is MapInfo) continue; // maps remember this in mapinfos.json
+                if (n.Nodes.Count > 0) into[NodeKey(n)] = n.IsExpanded;
+                if (n.IsExpanded) CollectExpanded(n.Nodes, into);
+            }
+        }
+
+        void RestoreExpanded(TreeNodeCollection nodes, Dictionary<string, bool> from)
+        {
+            foreach (TreeNode n in nodes)
+            {
+                if (n.Tag is MapInfo) { RestoreExpanded(n.Nodes, from); continue; }
+                bool open;
+                if (from.TryGetValue(NodeKey(n), out open)) { if (open && !n.IsExpanded) n.Expand(); else if (!open && n.IsExpanded) n.Collapse(); }
+                if (n.IsExpanded) RestoreExpanded(n.Nodes, from);
+            }
+        }
+
         void RebuildTree()
         {
+            // Keep groups open or closed as they were (maps keep theirs in mapinfos.json)
+            var wasExpanded = new Dictionary<string, bool>();
+            CollectExpanded(_tree.Nodes, wasExpanded);
+            var topKey = _tree.TopNode != null ? NodeKey(_tree.TopNode) : null;
             _tree.BeginUpdate();
             _tree.Nodes.Clear();
             var p = Project;
@@ -300,7 +335,9 @@ namespace PokeCreator.Studio
             var files = Node(_tree.Nodes, "All Project Files", "files", "dir:" + p.Root);
             files.Nodes.Add("(loading…)");
             _tree.BeforeExpand -= LazyFiles; _tree.BeforeExpand += LazyFiles;
+            RestoreExpanded(_tree.Nodes, wasExpanded);
             _tree.EndUpdate();
+            if (topKey != null) { var t = FindNode(_tree.Nodes, n => !(n.Tag is MapInfo) && NodeKey(n) == topKey); if (t != null) _tree.TopNode = t; }
         }
 
         static TreeNode Node(TreeNodeCollection parent, string text, string icon, object tag)
@@ -409,6 +446,13 @@ namespace PokeCreator.Studio
                     menu.Items.Add("Change Icon…", null, (s, e) => ChangeMapIcon(mi));
                     menu.Items.Add("Map Properties…", null, (s, e) => { var ed = OpenMap(mi.Id); if (ed != null) ed.ShowProperties(); });
                     menu.Items.Add("Playtest from Here", null, (s, e) => { var m = Project.LoadMap(mi.Id); Playtest(new[] { "--map", mi.Id.ToString(), "--x", (m.Width / 2).ToString(), "--y", (m.Height / 2).ToString() }); });
+                    menu.Items.Add(new ToolStripSeparator());
+                    var siblings = Project.MapInfos.Where(x => x.ParentId == mi.ParentId).OrderBy(x => x.Order).ToList();
+                    int si = siblings.IndexOf(mi);
+                    menu.Items.Add(new ToolStripMenuItem("Move Up", null, (s, e) => MoveMap(mi, siblings[si - 1], ProjectTree.DropPlace.Before)) { Enabled = si > 0 });
+                    menu.Items.Add(new ToolStripMenuItem("Move Down", null, (s, e) => MoveMap(mi, siblings[si + 1], ProjectTree.DropPlace.After)) { Enabled = si >= 0 && si < siblings.Count - 1 });
+                    menu.Items.Add("Move Inside Another Map…", null, (s, e) => PickNewParent(mi));
+                    menu.Items.Add(new ToolStripMenuItem("Move to Top Level", null, (s, e) => MoveMap(mi, null, ProjectTree.DropPlace.Into)) { Enabled = mi.ParentId != 0 });
                     menu.Items.Add(new ToolStripSeparator());
                     menu.Items.Add("Delete Map", null, (s, e) => DeleteMap(mi));
                 }
@@ -561,6 +605,120 @@ namespace PokeCreator.Studio
             Json.Json.ToFile(Project.DataFile("mapinfos.json"), Project.MapInfos);
             RebuildTree();
             OpenMap(m.Id);
+        }
+
+        // ------------------------------------------------------------------ nesting and ordering maps
+        bool IsInside(int mapId, int ancestorId)
+        {
+            var seen = new HashSet<int>();
+            for (var m = Project.GetMapInfo(mapId); m != null && m.ParentId != 0 && seen.Add(m.Id); m = Project.GetMapInfo(m.ParentId))
+                if (m.ParentId == ancestorId) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Moves a map: Into = last child of target (null target = top level); Before/After = next to target.
+        /// Orders are renumbered top to bottom, the way RPG Maker numbers its map tree.
+        /// </summary>
+        void MoveMap(MapInfo mi, MapInfo target, ProjectTree.DropPlace place)
+        {
+            if (mi == null || place == ProjectTree.DropPlace.None) return;
+            if (target != null && (target.Id == mi.Id || IsInside(target.Id, mi.Id))) return; // can't go inside itself
+            int newParent = place == ProjectTree.DropPlace.Into ? (target == null ? 0 : target.Id) : target.ParentId;
+            var kids = new Dictionary<int, List<MapInfo>>();
+            foreach (var m in Project.MapInfos.Where(x => x != mi).OrderBy(x => x.Order))
+            {
+                List<MapInfo> l; if (!kids.TryGetValue(m.ParentId, out l)) kids[m.ParentId] = l = new List<MapInfo>();
+                l.Add(m);
+            }
+            List<MapInfo> list; if (!kids.TryGetValue(newParent, out list)) kids[newParent] = list = new List<MapInfo>();
+            int at = list.Count;
+            if (place != ProjectTree.DropPlace.Into) { at = list.IndexOf(target); if (at < 0) at = list.Count; else if (place == ProjectTree.DropPlace.After) at++; }
+            list.Insert(at, mi);
+            mi.ParentId = newParent;
+            // Number every map in tree order (parents before children)
+            int order = 1;
+            var seen = new HashSet<int>();
+            Action<int> number = null;
+            number = parent => { List<MapInfo> l; if (!kids.TryGetValue(parent, out l)) return; foreach (var m in l) { if (!seen.Add(m.Id)) continue; m.Order = order++; number(m.Id); } };
+            number(0);
+            foreach (var m in Project.MapInfos) if (!seen.Contains(m.Id)) m.Order = order++; // anything orphaned keeps a place
+            if (place == ProjectTree.DropPlace.Into && target != null) target.Expanded = true;
+            Json.Json.ToFile(Project.DataFile("mapinfos.json"), Project.MapInfos);
+            RebuildTree();
+            var node = FindNode(_tree.Nodes, n => n.Tag == mi);
+            if (node != null) { node.EnsureVisible(); _tree.SelectedNode = node; }
+        }
+
+        static TreeNode FindNode(TreeNodeCollection nodes, Func<TreeNode, bool> match)
+        {
+            foreach (TreeNode n in nodes) { if (match(n)) return n; var f = FindNode(n.Nodes, match); if (f != null) return f; }
+            return null;
+        }
+
+        void PickNewParent(MapInfo mi)
+        {
+            // Every map except this one and the maps inside it, indented like the tree
+            var choices = new List<MapInfo>();
+            var labels = new List<string>();
+            Action<int, int> add = null;
+            add = (parent, depth) =>
+            {
+                foreach (var m in Project.MapInfos.Where(x => x.ParentId == parent).OrderBy(x => x.Order))
+                {
+                    if (m.Id == mi.Id) continue;
+                    choices.Add(m); labels.Add(new string(' ', depth * 4) + m.Id.ToString("000") + "  " + m.Name);
+                    add(m.Id, depth + 1);
+                }
+            };
+            add(0, 0);
+            if (choices.Count == 0) return;
+            int k = ChoiceDialog.Ask(this, "Put \"" + mi.Name + "\" inside which map?", labels.ToArray());
+            if (k >= 0) MoveMap(mi, choices[k], ProjectTree.DropPlace.Into);
+        }
+
+        void TreeDragOver(DragEventArgs e)
+        {
+            var dragged = e.Data.GetData(typeof(TreeNode)) as TreeNode;
+            var mi = dragged == null ? null : dragged.Tag as MapInfo;
+            var pt = _tree.PointToClient(new Point(e.X, e.Y));
+            // Scroll when dragging near the top or bottom edge
+            if (_tree.TopNode != null)
+            {
+                if (pt.Y < 14 && _tree.TopNode.PrevVisibleNode != null) _tree.TopNode = _tree.TopNode.PrevVisibleNode;
+                else if (pt.Y > _tree.ClientSize.Height - 14 && _tree.TopNode.NextVisibleNode != null) _tree.TopNode = _tree.TopNode.NextVisibleNode;
+            }
+            var target = _tree.GetNodeAt(pt);
+            var place = ProjectTree.DropPlace.None;
+            if (mi != null && target != null)
+            {
+                var tmi = target.Tag as MapInfo;
+                if ((target.Tag as string) == "maps") place = ProjectTree.DropPlace.Into;
+                else if (tmi != null && tmi != mi && !IsInside(tmi.Id, mi.Id)) place = _tree.PlaceAt(target, pt);
+            }
+            e.Effect = place == ProjectTree.DropPlace.None ? DragDropEffects.None : DragDropEffects.Move;
+            _tree.SetDropTarget(place == ProjectTree.DropPlace.None ? null : target, place);
+        }
+
+        void TreeDragDrop(DragEventArgs e)
+        {
+            _tree.SetDropTarget(null, ProjectTree.DropPlace.None);
+            var dragged = e.Data.GetData(typeof(TreeNode)) as TreeNode;
+            var mi = dragged == null ? null : dragged.Tag as MapInfo;
+            var pt = _tree.PointToClient(new Point(e.X, e.Y));
+            var target = _tree.GetNodeAt(pt);
+            if (mi == null || target == null) return;
+            if ((target.Tag as string) == "maps") { MoveMap(mi, null, ProjectTree.DropPlace.Into); return; }
+            var tmi = target.Tag as MapInfo;
+            if (tmi != null) MoveMap(mi, tmi, _tree.PlaceAt(target, pt));
+        }
+
+        void RememberExpanded(TreeNode n, bool expanded)
+        {
+            var mi = n.Tag as MapInfo;
+            if (mi == null || mi.Expanded == expanded || Project == null) return;
+            mi.Expanded = expanded;
+            try { Json.Json.ToFile(Project.DataFile("mapinfos.json"), Project.MapInfos); } catch { }
         }
 
         /// <summary>Rebuilds the project tree after another document added or renamed things.</summary>

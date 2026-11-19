@@ -21,6 +21,7 @@ namespace PokeCreator.Studio.Controls
             ShowLines = false; ShowPlusMinus = false; ShowRootLines = false;
             FullRowSelect = true; HideSelection = false;
             Indent = 16; ItemHeight = 24;
+            AllowDrop = true;
             BorderStyle = BorderStyle.None;
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
             Theme.Changed += () => { BackColor = Theme.Sidebar; ForeColor = Theme.Text; Invalidate(); };
@@ -44,18 +45,27 @@ namespace PokeCreator.Studio.Controls
             var root = n; while (root.Parent != null) root = root.Parent;
             int section = root.Index;
 
-            // Indent guides: one vertical line per ancestor level
+            // Tree lines: ├ for an item with more items below it, └ for the last one, and │ for each
+            // ancestor level that still has items further down. Lines stop where their group ends.
             g.SmoothingMode = SmoothingMode.None;
-            for (int level = 0; level < n.Level; level++)
+            float width = Theme.Guides == GuideStyle.Plain ? 1f : 1.6f;
+            int mid = row.Y + row.Height / 2;
+            for (int level = 0; level < n.Level - 1; level++)
             {
+                // The ancestor one level deeper than 'level' decides whether this column continues
+                var a = n; while (a.Level > level + 1) a = a.Parent;
+                if (a.NextNode == null) continue;
                 int x = Pad + level * Indent + Chevron / 2;
-                using (var p = new Pen(Theme.GuideColor(level, section), Theme.Guides == GuideStyle.Plain ? 1f : 1.6f)) g.DrawLine(p, x, row.Y, x, row.Bottom);
+                using (var p = new Pen(Theme.GuideColor(level, section), width)) g.DrawLine(p, x, row.Y, x, row.Bottom);
             }
-            // Short connector into this node
             if (n.Level > 0)
             {
                 int x = Pad + (n.Level - 1) * Indent + Chevron / 2;
-                using (var p = new Pen(Theme.GuideColor(n.Level - 1, section), Theme.Guides == GuideStyle.Plain ? 1f : 1.6f)) g.DrawLine(p, x, row.Y + row.Height / 2, ChevronX(n) - 1, row.Y + row.Height / 2);
+                using (var p = new Pen(Theme.GuideColor(n.Level - 1, section), width))
+                {
+                    g.DrawLine(p, x, row.Y, x, n.NextNode != null ? row.Bottom : mid);
+                    g.DrawLine(p, x, mid, ChevronX(n) - 1, mid);
+                }
             }
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -91,6 +101,7 @@ namespace PokeCreator.Studio.Controls
                 TextRenderer.DrawText(g, count, Font, new Rectangle(x0 + w + 2, row.Y, Math.Max(0, row.Right - x0 - w - 6), row.Height), Theme.SubText, flags);
             }
             if (n.Level == 0) font.Dispose();
+            DrawDropFeedback(g, n, row);
         }
 
         /// <summary>Raised when an item is clicked once with the left button (not on its expand arrow).</summary>
@@ -142,6 +153,43 @@ namespace PokeCreator.Studio.Controls
         }
 
         protected override void OnAfterSelect(TreeViewEventArgs e) { base.OnAfterSelect(e); Invalidate(); }
+        public enum DropPlace { None, Before, Into, After }
+        TreeNode _dropNode; DropPlace _dropPlace;
+
+        /// <summary>Shows where a dragged item will go: a line before/after a row, or a box around it.</summary>
+        public void SetDropTarget(TreeNode n, DropPlace place)
+        {
+            if (n == _dropNode && place == _dropPlace) return;
+            _dropNode = n; _dropPlace = place;
+            Invalidate();
+        }
+
+        /// <summary>Which part of a row a point is over: top quarter = before, bottom quarter = after, else into.</summary>
+        public DropPlace PlaceAt(TreeNode n, Point client)
+        {
+            if (n == null) return DropPlace.None;
+            int y = client.Y - n.Bounds.Top;
+            if (y < ItemHeight / 4) return DropPlace.Before;
+            if (y > ItemHeight * 3 / 4 && !(n.IsExpanded && n.Nodes.Count > 0)) return DropPlace.After;
+            return DropPlace.Into;
+        }
+
+        void DrawDropFeedback(Graphics g, TreeNode n, Rectangle row)
+        {
+            if (n != _dropNode || _dropPlace == DropPlace.None) return;
+            int x = ChevronX(n);
+            using (var p = new Pen(Theme.Accent, 2f))
+            {
+                if (_dropPlace == DropPlace.Into) g.DrawRectangle(p, x, row.Y + 1, row.Width - x - 3, row.Height - 3);
+                else
+                {
+                    int y = _dropPlace == DropPlace.Before ? row.Y + 1 : row.Bottom - 2;
+                    g.DrawLine(p, x, y, row.Width - 4, y);
+                    g.FillEllipse(Brushes.White, x - 3, y - 3, 6, 6); g.DrawEllipse(p, x - 3, y - 3, 6, 6);
+                }
+            }
+        }
+
         protected override void OnAfterExpand(TreeViewEventArgs e) { base.OnAfterExpand(e); Invalidate(); }
         protected override void OnAfterCollapse(TreeViewEventArgs e) { base.OnAfterCollapse(e); Invalidate(); }
     }

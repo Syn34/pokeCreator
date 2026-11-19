@@ -457,8 +457,8 @@ namespace PokeCreator.Studio.Editors
             bar.Controls.AddRange(new Control[] { save, new Label { Text = "Find:", AutoSize = true, Margin = new Padding(12, 8, 2, 0) }, _find, findBtn, ext, _pos, new Label { Text = path, AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 0, 0) } });
             Controls.Add(_code); Controls.Add(bar);
             string ext2 = Path.GetExtension(path).ToLowerInvariant();
-            _code.LoadText(File.ReadAllText(path, Encoding.UTF8));
             _code.Language = ext2 == ".cs" ? "cs" : ext2 == ".json" ? "json" : "";
+            _code.LoadText(File.ReadAllText(path, Encoding.UTF8));
             _code.TextEdited += (s, e) => { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } };
             _code.Box.SelectionChanged += (s, e) => ShowPosition();
             _find.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { FindNext(); e.SuppressKeyPress = true; } };
