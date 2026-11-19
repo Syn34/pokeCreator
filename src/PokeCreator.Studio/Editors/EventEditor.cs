@@ -171,6 +171,7 @@ namespace PokeCreator.Studio.Editors
         readonly Project _p;
         readonly MapData _map;
         readonly EventPage _pg;
+        Action _updateHint = () => { };
         readonly PictureBox _sprite = new PictureBox { Width = 96, Height = 96, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
 
         public PageEditor(Project p, MapData map, EventPage pg)
@@ -207,12 +208,22 @@ namespace PokeCreator.Studio.Editors
             dirCombo.Items.AddRange(new object[] { "Facing down", "Facing left", "Facing right", "Facing up" });
             dirCombo.SelectedIndex = g.Direction == 4 ? 1 : g.Direction == 6 ? 2 : g.Direction == 8 ? 3 : 0;
             left.Controls.Add(dirCombo);
-            charCombo.TextChanged += (s, e) => { g.CharacterName = charCombo.Text == "(none)" ? "" : charCombo.Text; g.TileId = 0; UpdateSprite(); };
+            // Without a graphic, Action Button events are stood on (RPG Maker's rule); say so, since it surprises people
+            var hint = new Label { Left = 8, Top = y + 56, Width = 206, Height = 46, ForeColor = Color.FromArgb(200, 140, 30), Font = new Font("Segoe UI", 8f) };
+            left.Controls.Add(hint);
+            _updateHint = () =>
+            {
+                bool noGraphic = string.IsNullOrEmpty(g.CharacterName) && g.TileId <= 0;
+                hint.Text = noGraphic && pg.Trigger == 0 ? "No graphic, so the player stands on it to press the button (or faces it on a blocked tile). Pick a graphic to talk to it."
+                          : noGraphic && pg.Trigger == 1 ? "No graphic: runs when the player steps onto this tile." : "";
+            };
+            _updateHint();
+            charCombo.TextChanged += (s, e) => { g.CharacterName = charCombo.Text == "(none)" ? "" : charCombo.Text; g.TileId = 0; UpdateSprite(); _updateHint(); };
             dirCombo.SelectedIndexChanged += (s, e) => { g.Direction = new[] { 2, 4, 6, 8 }[dirCombo.SelectedIndex]; UpdateSprite(); };
             y += 104;
 
             left.Controls.Add(Head("Behaviour", ref y));
-            var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => pg.Trigger = i, ref y);
+            var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => { pg.Trigger = i; _updateHint(); }, ref y);
             var routeButton = new Button { Text = "Edit Custom Route…", Left = 100, Width = 180, Height = 24, Enabled = pg.MoveType == 3 };
             Combo(left, "Movement", new[] { "Stays still", "Walks randomly", "Approaches player", "Custom route" }, pg.MoveType, i => { pg.MoveType = i; routeButton.Enabled = i == 3; }, ref y);
             routeButton.Click += (s, e) =>

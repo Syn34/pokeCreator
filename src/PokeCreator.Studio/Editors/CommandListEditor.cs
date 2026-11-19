@@ -56,8 +56,13 @@ namespace PokeCreator.Studio.Editors
                 else return;
                 e.Handled = true;
             };
+            _cmds.Resize += (s, e) => ClampTop();
             RefreshList(0);
         }
+
+        // Mono's ListBox can scroll past the end when a row is selected before it has been laid out (it's 1×1
+        // then), and its next paint throws for short lists such as a brand-new event's. Keep the scroll in range.
+        void ClampTop() { if (_cmds.Items.Count > 0 && _cmds.TopIndex >= _cmds.Items.Count) _cmds.TopIndex = 0; }
 
         static void AddCmdButton(FlowLayoutPanel bar, string text, Action a) { var b = new Button { Text = text, AutoSize = true, Height = 28 }; b.Click += (s, e) => a(); bar.Controls.Add(b); }
 
@@ -69,11 +74,12 @@ namespace PokeCreator.Studio.Editors
         void RefreshList(int select)
         {
             if (L.Count == 0 || L[L.Count - 1].Code != 0 || L[L.Count - 1].Indent != 0) L.Add(new EventCommand(0, 0));
-            _cmds.BeginUpdate();
+            // AddRange instead of BeginUpdate/EndUpdate: Mono's ListBox can paint a stale item count after EndUpdate
+            var lines = L.Select(c => (object)(new string(' ', c.Indent * 3) + CommandText.Describe(c, _p))).ToArray();
             _cmds.Items.Clear();
-            foreach (var c in L) _cmds.Items.Add(new string(' ', c.Indent * 3) + CommandText.Describe(c, _p));
-            _cmds.EndUpdate();
+            _cmds.Items.AddRange(lines);
             _cmds.SelectedIndex = Math.Max(0, Math.Min(select, L.Count - 1));
+            ClampTop();
         }
 
         int Sel { get { return Math.Max(0, Math.Min(_cmds.SelectedIndex, L.Count - 1)); } }
@@ -614,6 +620,7 @@ namespace PokeCreator.Studio.Editors
             _steps.Items.Add("◆");
             _steps.EndUpdate();
             _steps.SelectedIndex = Math.Max(0, Math.Min(select, _steps.Items.Count - 1));
+            if (_steps.TopIndex >= _steps.Items.Count) _steps.TopIndex = 0; // Mono: see CommandListEditor.ClampTop
         }
 
         static string Describe(EventCommand m)

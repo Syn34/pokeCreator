@@ -77,8 +77,11 @@ namespace PokeCreator.Runtime.World
 
         public void Erase() { Erased = true; Refresh(); }
 
-        /// <summary>Events with no sprite (or Through) are stepped on rather than bumped into.</summary>
-        public bool OverTrigger { get { return CharacterName.Length == 0 || Through; } }
+        /// <summary>
+        /// Events with no sprite (or Through) are stepped on rather than bumped into, unless their tile is
+        /// blocked (a sign on a wall, a bookshelf...): then the player triggers them from in front, as in RPG Maker XP.
+        /// </summary>
+        public bool OverTrigger { get { return (CharacterName.Length == 0 || Through) && Owner.TilePassable(X, Y, 0, this); } }
 
         public void Lock()
         {
