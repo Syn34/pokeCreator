@@ -44,6 +44,8 @@ namespace PokeCreator.Studio.Controls
                     new Kind("Icon", "Graphics/Pokemon/Icons") });
             if (recordType == typeof(TrainerTypeData))
                 return new RecordImages(p, recordType, new[] { new Kind("Trainer", "Graphics/Trainers") });
+            if (recordType == typeof(ItemData))
+                return new RecordImages(p, recordType, new[] { new Kind("Icon", "Graphics/Items") });
             return null;
         }
 

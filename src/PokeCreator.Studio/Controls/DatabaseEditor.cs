@@ -66,7 +66,7 @@ namespace PokeCreator.Studio.Controls
                 _showRow.Controls.Add(_show);
                 _showRow.Controls.Add(new Label { Text = "Show:", Dock = DockStyle.Left, Width = 44, TextAlign = ContentAlignment.MiddleLeft });
                 _show.Items.Add("All entries");
-                _show.Items.Add(_images.Kinds.Length > 1 ? "Entries missing any image" : "Entries missing the " + _images.Main.Label.ToLowerInvariant() + " image");
+                _show.Items.Add(_images.Kinds.Length > 1 ? "Entries missing any image" : "Entries missing an image");
                 if (_images.Kinds.Length > 1) foreach (var k in _images.Kinds) _show.Items.Add("Missing " + k.Label.ToLowerInvariant());
                 _show.SelectedIndex = 0;
                 left.Controls.Add(_showRow); left.Controls.Add(_legend);
@@ -160,7 +160,7 @@ namespace PokeCreator.Studio.Controls
             var parts = _images.Kinds.Select(k => new { k.Label, Count = all.Count(r => !_images.Has(r, k)) }).ToList();
             if (parts.All(p => p.Count == 0)) { _legend.Text = "Nothing missing: every entry has all its images."; _legend.ForeColor = Color.SeaGreen; return; }
             _legend.ForeColor = Color.IndianRed;
-            if (parts.Count == 1) { _legend.Text = "Missing " + parts[0].Label.ToLowerInvariant() + " image: " + parts[0].Count; return; }
+            if (parts.Count == 1) { _legend.Text = "Missing images: " + parts[0].Count + " of " + all.Count; return; }
             // "Missing images:" then the counts, three then two per line so it fits under the search bar
             var lines = new List<string> { "Missing images (" + all.Count(r => _images.MissingAny(r)) + " entries):" };
             lines.Add(string.Join("  ·  ", parts.Take(3).Select(p => p.Label + " " + p.Count)));
@@ -232,7 +232,7 @@ namespace PokeCreator.Studio.Controls
             bool replace = true;
             if (replacing > 0)
             {
-                var ans = MessageBox.Show(this, replacing + " of these entries already have a " + kind.Label.ToLowerInvariant() + " image. Replace them?\n\nYes = replace, No = keep the old images", "Import", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                var ans = MessageBox.Show(this, replacing + " of these entries already have " + A(kind.Label) + " image. Replace them?\n\nYes = replace, No = keep the old images", "Import", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (ans == DialogResult.Cancel) return;
                 replace = ans == DialogResult.Yes;
             }
@@ -303,8 +303,14 @@ namespace PokeCreator.Studio.Controls
             var r = (GameRecord)Activator.CreateInstance(_table.RecordType);
             r.Id = id;
             SetName(r, RecordImages.NameFromId(id));
+            // Items also have a plural name ("Potions")
+            var plural = r.GetType().GetProperty("NamePlural");
+            if (plural != null && plural.PropertyType == typeof(string) && plural.CanWrite) plural.SetValue(r, RecordImages.NameFromId(id) + "s", null);
             return r;
         }
+
+        /// <summary>"a front", "an icon".</summary>
+        static string A(string label) { string l = label.ToLowerInvariant(); return ("aeiou".IndexOf(l[0]) >= 0 ? "an " : "a ") + l; }
 
         static void SetName(GameRecord r, string name)
         {
@@ -319,7 +325,7 @@ namespace PokeCreator.Studio.Controls
             using (var dlg = new OpenFileDialog { Title = "Import " + kind.Label + " Image for " + r.DisplayName, Filter = "Images|*.png;*.gif;*.bmp;*.jpg" })
             {
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                if (_images.Has(r, kind) && MessageBox.Show(this, r.DisplayName + " already has a " + kind.Label.ToLowerInvariant() + " image. Replace it?", "Import Image", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+                if (_images.Has(r, kind) && MessageBox.Show(this, r.DisplayName + " already has " + A(kind.Label) + " image. Replace it?", "Import Image", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
                 try { _images.SaveImage(dlg.FileName, r, kind); }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import Image", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             }
