@@ -460,14 +460,14 @@ namespace PokeCreator.Studio.Editors
             _code.Language = ext2 == ".cs" ? "cs" : ext2 == ".json" ? "json" : "";
             _code.LoadText(File.ReadAllText(path, Encoding.UTF8));
             _code.TextEdited += (s, e) => { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } };
-            _code.Box.SelectionChanged += (s, e) => ShowPosition();
+            _code.SelectionChanged += (s, e) => ShowPosition();
             _find.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { FindNext(); e.SuppressKeyPress = true; } };
             ShowPosition();
         }
 
         void ShowPosition()
         {
-            var b = _code.Box;
+            var b = _code;
             int line = b.GetLineFromCharIndex(b.SelectionStart);
             int col = b.SelectionStart - b.GetFirstCharIndexFromLine(line);
             _pos.Text = "Ln " + (line + 1) + "   Ch " + (col + 1);
@@ -475,17 +475,18 @@ namespace PokeCreator.Studio.Editors
 
         void FindNext()
         {
-            var box = _code.Box;
+            var box = _code;
             if (_find.Text.Length == 0) return;
             int start = box.SelectionStart + box.SelectionLength;
-            int i = box.Text.IndexOf(_find.Text, start, StringComparison.OrdinalIgnoreCase);
-            if (i < 0) i = box.Text.IndexOf(_find.Text, 0, StringComparison.OrdinalIgnoreCase);
+            string all = box.Text;
+            int i = all.IndexOf(_find.Text, Math.Min(start, all.Length), StringComparison.OrdinalIgnoreCase);
+            if (i < 0) i = all.IndexOf(_find.Text, 0, StringComparison.OrdinalIgnoreCase);
             if (i >= 0) { box.Select(i, _find.Text.Length); box.ScrollToCaret(); box.Focus(); }
         }
 
         public void Save()
         {
-            string text = _code.Box.Text;
+            string text = _code.Text;
             if (_path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
                 try { Json.Json.Parse(text); }
