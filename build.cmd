@@ -17,8 +17,9 @@ echo == Import tool
 echo == Game runtime
 "%CSC%" %OPTS% /target:winexe /platform:x64 /unsafe /out:bin\Game.exe /recurse:src\PokeCreator.Runtime\*.cs /r:bin\PokeCreator.Core.dll /r:System.Core.dll || goto :fail
 echo == Studio
-"%CSC%" %OPTS% /target:winexe /out:bin\PokeCreatorStudio.exe /recurse:src\PokeCreator.Studio\*.cs /r:bin\PokeCreator.Core.dll /r:bin\PokeCreator.Import.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Data.dll || goto :fail
+"%CSC%" %OPTS% /target:winexe /out:bin\PokeCreatorStudio.exe /recurse:src\PokeCreator.Studio\*.cs /r:bin\PokeCreator.Core.dll /r:bin\PokeCreator.Import.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Data.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll || goto :fail
 copy /y lib\win-x64\*.dll bin\ >nul
+if exist lib\win-x64\licenses xcopy /e /i /y /q lib\win-x64\licenses bin\licenses >nul
 if not exist bin\BaseData mkdir bin\BaseData
 copy /y data\base\*.json bin\BaseData\ >nul
 if not exist bin\BaseData\Tilesets mkdir bin\BaseData\Tilesets

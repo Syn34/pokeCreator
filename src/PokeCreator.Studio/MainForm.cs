@@ -125,6 +125,8 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add(new ToolStripMenuItem("&Playtest", null, (s, e) => Playtest(null)) { ShortcutKeys = Keys.F5 });
             game.DropDownItems.Add(new ToolStripMenuItem("Playtest from Current Map", null, (s, e) => PlaytestHere()) { ShortcutKeys = Keys.Shift | Keys.F5 });
             game.DropDownItems.Add(new ToolStripSeparator());
+            game.DropDownItems.Add(new ToolStripMenuItem("&Build Game…", null, (s, e) => BuildGame()) { ShortcutKeys = Keys.Control | Keys.B });
+            game.DropDownItems.Add(new ToolStripSeparator());
             game.DropDownItems.Add(new ToolStripMenuItem("&World Map", null, (s, e) => OpenWorld()) { ShortcutKeys = Keys.Control | Keys.M });
             game.DropDownItems.Add("Tilesets", null, (s, e) => { if (Project != null) OpenDocument("sys:tilesets", () => new TilesetEditor(Project)); });
             game.DropDownItems.Add(new ToolStripSeparator());
@@ -173,6 +175,7 @@ namespace PokeCreator.Studio
             t.Items.Add(new ToolStripSeparator());
             _problemsButton = new ToolStripButton("Problems", null, (s, e) => ShowProblems(!_problems.Visible)) { ToolTipText = "Missing graphics and audio, broken warps and references, script errors (Ctrl+Shift+P)" };
             t.Items.Add(_problemsButton);
+            t.Items.Add(new ToolStripButton("Build Game", null, (s, e) => BuildGame()) { ToolTipText = "Make a folder and .zip players can run (Ctrl+B)" });
             t.Items.Add(new ToolStripButton("Settings", null, (s, e) => OpenSettings()));
             t.Items.Add(new ToolStripButton("Project Folder", null, (s, e) => { if (Project != null) OpenInShell(Project.Root); }));
             return t;
@@ -594,6 +597,29 @@ namespace PokeCreator.Studio
 
         DatabaseEditor OpenTable(DatabaseTable t) { return OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)) as DatabaseEditor; }
 
+        // ------------------------------------------------------------------ build
+        void BuildGame()
+        {
+            if (Project == null) return;
+            SaveAll();
+            int errors, warnings;
+            Cursor = Cursors.WaitCursor;
+            try
+            {
+                var found = ProjectCheck.Run(Project);
+                found.AddRange(ProblemsPanel.CompileScripts(Project.ScriptsDir)); // a script error stops the game starting at all
+                errors = found.Count(x => x.Severity == ProblemSeverity.Error);
+                warnings = found.Count(x => x.Severity == ProblemSeverity.Warning);
+            }
+            finally { Cursor = Cursors.Default; }
+            using (var d = new Tools.BuildGameDialog(Project, _settings.LastBuildFolder, errors, warnings))
+            {
+                d.ShowDialog(this);
+                if (d.OutputFolder.Length > 0 && d.OutputFolder != _settings.LastBuildFolder) { _settings.LastBuildFolder = d.OutputFolder; _settings.Save(); }
+                if (d.WantsProblems) ShowProblems(true);
+            }
+        }
+
         // ------------------------------------------------------------------ problems
         public void ShowProblems(bool show)
         {
@@ -892,6 +918,7 @@ namespace PokeCreator.Studio
         public int FontSize { get; set; }
         /// <summary>Where the last new project was stored; the New Project dialog starts there.</summary>
         public string LastProjectLocation { get; set; }
+        public string LastBuildFolder { get; set; }
         public Settings() { Recent = new List<string>(); Accent = "200,48,48"; Guides = "Rainbow"; ShowIcons = true; FontSize = 9; }
         static string FilePath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PokeCreator", "studio.json"); } }
         public static Settings Load() { try { return File.Exists(FilePath) ? Json.Json.FromFile<Settings>(FilePath) : new Settings(); } catch { return new Settings(); } }

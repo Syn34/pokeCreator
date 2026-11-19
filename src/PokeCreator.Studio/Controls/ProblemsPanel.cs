@@ -124,7 +124,7 @@ namespace PokeCreator.Studio.Controls
         protected override void OnParentChanged(EventArgs e) { base.OnParentChanged(e); _form = FindForm(); }
 
         /// <summary>Compiles Scripts/*.cs the same way the game does, so script errors show up before you playtest.</summary>
-        static List<Problem> CompileScripts(string dir)
+        public static List<Problem> CompileScripts(string dir)
         {
             var result = new List<Problem>();
             try
