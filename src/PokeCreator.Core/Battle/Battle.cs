@@ -68,6 +68,8 @@ namespace PokeCreator.Battles
         public int Slot;                // position on the field
         public bool FaintShown;         // "X fainted!" already shown
         public bool BatonPassing;       // switching out with Baton Pass
+        public bool BoosterEnergy, TruantSkip, DisguiseBroken;
+        public string StartItem, ConsumedBerry;
         // Effects from moves (cleared when the Pokémon leaves the field, as a new Battler is made)
         public int TauntTurns, EncoreTurns, DisableTurns, PerishCount = -1, LockTurns, RolloutCount, FuryCutterCount, StockpileCount, LockOnTurns, AirborneTurns, SubstituteHP;
         public string EncoreMove, DisableMove, LockedMove, LastMoveUsed, PlannedMove, AbilityOverride;
@@ -304,7 +306,7 @@ namespace PokeCreator.Battles
 
             // Moves: priority, then speed (ties at random)
             var tie = orders.ToDictionary(o => o.Key, o => Rng.Next(1000));
-            orders = orders.OrderByDescending(o => { var md = MoveFor(o.Key, o.Value.Index); return md != null ? md.Priority : 0; })
+            orders = orders.OrderByDescending(o => EffectivePriority(o.Key, MoveFor(o.Key, o.Value.Index)))
                            .ThenByDescending(o => TrickRoom > 0 ? -Speed(o.Key) : Speed(o.Key)).ThenBy(o => tie[o.Key]).ToList();
             for (int i = 0; i < orders.Count; i++)
             {
@@ -482,6 +484,11 @@ namespace PokeCreator.Battles
             user.DestinyBond = false;
             user.ActedThisTurn = true;
             if (user.MustRecharge) { user.MustRecharge = false; Say(n + " must recharge!"); return; }
+            if (HasAbility(user, "TRUANT"))
+            {
+                if (user.TruantSkip) { user.TruantSkip = false; Splash(user); Say(n + " is loafing around!"); return; }
+                user.TruantSkip = true;
+            }
             if (status == "SLEEP")
             {
                 if (user.SleepTurns <= 0) user.SleepTurns = 1 + Rng.Next(3);
@@ -497,7 +504,12 @@ namespace PokeCreator.Battles
                 if (Rng.Next(5) != 0) { CommonAnim("Frozen", user); Say(n + " is frozen solid!"); return; }
                 user.Pk.Status = ""; StatusEvent(user); Say(n + " thawed out!");
             }
-            if (user.Flinched) { Say(n + " flinched and couldn't move!"); user.Charging = null; return; }
+            if (user.Flinched)
+            {
+                Say(n + " flinched and couldn't move!"); user.Charging = null;
+                if (HasAbility(user, "STEADFAST")) { Splash(user); ChangeStat(user, PokeCreator.Pkmn.Stat.Speed, 1); }
+                return;
+            }
             if (user.Confusion > 0)
             {
                 user.Confusion--;
@@ -624,8 +636,10 @@ namespace PokeCreator.Battles
                 if (t.Invulnerable && md.Accuracy > 0 && !HitsInvulnerable(t, code) && user.LockOnTurns == 0) { Say(Name(user) + "'s attack missed!"); user.LastMoveFailed = true; continue; }
                 if (t.SubstituteHP > 0 && md.Category == "Status" && t.Side != user.Side && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR")) { Say("But it failed!"); user.LastMoveFailed = true; continue; }
                 if (AbilityAbsorbs(user, t, md, MoveType(user, md, code))) continue;
+                if (AbilityStopsMove(user, t, md, code)) { user.LastMoveFailed = true; continue; }
                 if (!Hits(user, t, md, code)) { user.LastMoveFailed = true; Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
                 if (!animShown) { MoveAnim(user, t, md); animShown = true; }
+                if (MagicBounce(user, t, md, code)) continue;
                 if (md.Category == "Status") StatusMove(user, t, md, code);
                 else DamagingMove(user, t, md, code);
             }
@@ -706,13 +720,15 @@ namespace PokeCreator.Battles
             if (stab) dmg = Math.Floor(dmg * (HasAbility(user, "ADAPTABILITY") ? 2 : 1.5));
             dmg = Math.Floor(dmg * typeMod);
             if (physical && (user.Pk.Status ?? "").ToUpperInvariant() == "BURN" && !HasAbility(user, "GUTS")) dmg = Math.Floor(dmg / 2);
-            if (md != null) dmg = Math.Floor(dmg * FinalMod(user, target, type, typeMod, crit) * FieldDamageMod(user, target, md, type, crit) * _spread);
+            if (md != null) dmg = Math.Floor(dmg * FinalMod(user, target, type, typeMod, crit) * FieldDamageMod(user, target, md, type, crit) * MoreFinalMod(user, target, md, type, typeMod) * _spread);
             return Math.Max(typeMod > 0 ? 1 : 0, (int)dmg);
         }
 
         void DamagingMove(Battler user, Battler target, MoveData md, string code)
         {
             if (MoveFails(user, target, md, code)) { user.LastMoveFailed = true; Say("But it failed!"); return; }
+            if (DampBlocks(user, code)) { user.LastMoveFailed = true; return; }
+            int hpStart = target.Pk.HP;
             BeforeDamage(user, target, md, code);
             string mtype = MoveType(user, md, code);
             double typeMod = md.Id == "STRUGGLE" ? 1 : Effectiveness(mtype, target.Pk);
@@ -739,6 +755,8 @@ namespace PokeCreator.Battles
             if (code.StartsWith("HitTwoToFiveTimes")) { int r = Rng.Next(100); hits = HasAbility(user, "SKILLLINK") ? 5 : r < 35 ? 2 : r < 70 ? 3 : r < 85 ? 4 : 5; }
             else if (code.StartsWith("HitTwoTimes")) hits = 2;
             else if (code.StartsWith("HitThreeTimes")) hits = 3;
+            bool parental = hits == 1 && HasAbility(user, "PARENTALBOND") && _spread == 1 && FixedDamage(user, target, md, code) < 0 && !code.StartsWith("TwoTurn") && !code.StartsWith("UserFaints");
+            if (parental) hits = 2;
             int total = 0, done = 0;
             bool anyCrit = false;
             string enduredBy = null;
@@ -757,12 +775,23 @@ namespace PokeCreator.Battles
                     if (code == "HitThreeTimesPowersUpWithEachHit") power = md.Power * (h + 1);
                     int stage = user.CritStage + (md.Flags.Contains("HighCriticalHitRate") ? 1 : 0) + (HasAbility(user, "SUPERLUCK") ? 1 : 0)
                               + (user.Pk.Item == "SCOPELENS" || user.Pk.Item == "RAZORCLAW" ? 1 : 0);
-                    crit = code == "AlwaysCriticalHit" || stage >= 3 || Rng.Next(stage == 0 ? 24 : stage == 1 ? 8 : 2) == 0;
+                    crit = code == "AlwaysCriticalHit" || stage >= 3 || Rng.Next(stage == 0 ? 24 : stage == 1 ? 8 : 2) == 0
+                        || (HasAbility(user, "MERCILESS") && (target.Pk.Status ?? "").ToUpperInvariant() == "POISON");
                     if (TargetHas(user, target, "BATTLEARMOR") || TargetHas(user, target, "SHELLARMOR")) crit = false;
                     bool physical = md.Category == "Physical";
                     dmg = DamageFormula(user, target, power, physical, mtype, crit, typeMod, user.Pk.Types(P).Contains(mtype), md, code);
                 }
+                if (parental && h == 1) dmg = Math.Max(1, dmg / 4);
                 if (code == "CannotMakeTargetFaint" && dmg >= target.Pk.HP) dmg = target.Pk.HP - 1;
+                // Disguise takes the first hit
+                if (dmg > 0 && !target.DisguiseBroken && TargetHas(user, target, "DISGUISE") && target != user)
+                {
+                    target.DisguiseBroken = true; done++;
+                    Splash(target); Say("Its disguise served it as a decoy!");
+                    int fd = target.Pk.HP; target.Pk.HP = Math.Max(1, target.Pk.HP - target.Pk.TotalHP(P) / 8); Hp(target, fd);
+                    Say(Name(target) + "'s disguise was busted!");
+                    continue;
+                }
                 // A substitute takes the hit instead
                 if (target.SubstituteHP > 0 && target != user && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR"))
                 {
@@ -811,6 +840,7 @@ namespace PokeCreator.Battles
                 return;
             }
             if (total > 0) ContactAbilities(user, target, md);
+            if (total > 0) DamagedAbilities(user, target, md, mtype, anyCrit, hpStart);
             DamagingAfterEffects(user, target, md, code, total);
             if ((code.StartsWith("Recoil") && !HasAbility(user, "ROCKHEAD") && !HasAbility(user, "MAGICGUARD")) || md.Id == "STRUGGLE")
             {
@@ -1031,7 +1061,7 @@ namespace PokeCreator.Battles
             var types = b.Pk.Types(P);
             string have = (b.Pk.Status ?? "").ToUpperInvariant();
             if (have.Length > 0) { if (showFail) Say(have == status ? Name(b) + AlreadyText(status) : "But it failed!"); return false; }
-            bool immune = (status == "POISON" || status == "TOXIC") && (types.Contains("POISON") || types.Contains("STEEL"))
+            bool immune = (status == "POISON" || status == "TOXIC") && (types.Contains("POISON") || types.Contains("STEEL")) && !(source != null && HasAbility(source, "CORROSION"))
                        || status == "BURN" && types.Contains("FIRE")
                        || status == "PARALYSIS" && types.Contains("ELECTRIC")
                        || status == "FROZEN" && types.Contains("ICE");
@@ -1070,6 +1100,7 @@ namespace PokeCreator.Battles
                 case "PARALYSIS": Say(Name(b) + " is paralyzed! It may be unable to move!"); break;
                 case "FROZEN": Say(Name(b) + " was frozen solid!"); break;
             }
+            SynchronizeStatus(b, status, source);
             return true;
         }
 
@@ -1178,6 +1209,7 @@ namespace PokeCreator.Battles
             {
                 if (b.Pk.Fainted) continue;
                 EndOfTurnAbilities(b);
+                MoreEndOfTurnAbilities(b);
                 if (b.Pk.Fainted) continue;
                 int max = b.Pk.TotalHP(P);
                 string st = (b.Pk.Status ?? "").ToUpperInvariant();
@@ -1210,7 +1242,9 @@ namespace PokeCreator.Battles
                     int f = b.Pk.HP; b.Pk.HP = Math.Min(max, b.Pk.HP + (b.Pk.Item == "ORANBERRY" ? 10 : max / 4)); Hp(b, f);
                     var it = P.Items.FirstOrDefault(i => i.Id == b.Pk.Item);
                     Say(Name(b) + " restored its health using its " + (it != null ? it.Name : b.Pk.Item) + "!");
+                    b.ConsumedBerry = b.Pk.Item;
                     b.Pk.Item = null;
+                    if (HasAbility(b, "CHEEKPOUCH") && b.Pk.HP < max) { int fc = b.Pk.HP; b.Pk.HP = Math.Min(max, b.Pk.HP + max / 3); Hp(b, fc); }
                 }
             }
             MoveEffectsEndOfTurn();

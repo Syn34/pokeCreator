@@ -81,6 +81,8 @@ namespace PokeCreator.Battles
         {
             var tw = target.Pk.Data(P); var uw = user.Pk.Data(P);
             double tWeight = tw != null && tw.Weight > 0 ? tw.Weight : 30, uWeight = uw != null && uw.Weight > 0 ? uw.Weight : 30;
+            if (HasAbility(target, "HEAVYMETAL")) tWeight *= 2; if (HasAbility(target, "LIGHTMETAL")) tWeight /= 2;
+            if (HasAbility(user, "HEAVYMETAL")) uWeight *= 2; if (HasAbility(user, "LIGHTMETAL")) uWeight /= 2;
             switch (code)
             {
                 case "PowerHigherWithUserHappiness": return Math.Max(1, user.Pk.Happiness * 2 / 5);
@@ -529,6 +531,7 @@ namespace PokeCreator.Battles
             if (m.Id.StartsWith("MAX") || m.Id.StartsWith("GMAX") || m.Id.EndsWith("Z")) return false;
             string c = m.FunctionCode ?? "";
             if (c.StartsWith("UseRandom") || c.StartsWith("UseLastMove") || c == "UseMoveDependingOnEnvironment" || c.StartsWith("ProtectUser") || c == "UserEnduresFaintingThisTurn" || c == "TransformUserIntoTarget") return false;
+            if (m.Flags != null && m.Flags.Contains("CannotMetronome")) return false;
             return true;
         }
 

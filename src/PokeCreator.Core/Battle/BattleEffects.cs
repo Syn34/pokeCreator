@@ -149,6 +149,7 @@ namespace PokeCreator.Battles
                     ChangeStat(b, Stat(foe, PokeCreator.Pkmn.Stat.Defense) < Stat(foe, PokeCreator.Pkmn.Stat.SpDef) ? PokeCreator.Pkmn.Stat.Attack : PokeCreator.Pkmn.Stat.SpAtk, 1);
                     break;
             }
+            MoreSwitchInAbilities(b);
         }
 
         /// <summary>Natural Cure and Regenerator when a Pokémon is withdrawn.</summary>
@@ -161,6 +162,16 @@ namespace PokeCreator.Battles
 
         /// <summary>Speed multipliers from abilities and weather.</summary>
         double AbilitySpeed(Battler b)
+        {
+            double extra = 1;
+            if (HasAbility(b, "SLOWSTART") && b.TurnsOut < 5) extra *= 0.5;
+            if (HasAbility(b, "UNBURDEN") && !string.IsNullOrEmpty(b.StartItem) && string.IsNullOrEmpty(b.Pk.Item)) extra *= 2;
+            if (HasAbility(b, "SURGESURFER") && Terrain == "Electric") extra *= 2;
+            if (BoostedStat(b) == PokeCreator.Pkmn.Stat.Speed) extra *= 1.5;
+            return extra * BaseAbilitySpeed(b);
+        }
+
+        double BaseAbilitySpeed(Battler b)
         {
             string w = EffWeather;
             if (HasAbility(b, "SWIFTSWIM") && w == Rain) return 2;
@@ -182,7 +193,7 @@ namespace PokeCreator.Battles
             var special = SpecialType(user, md, code);
             if (special != null) return special;
             if (HasAbility(user, "NORMALIZE")) return "NORMAL";
-            return md.Type;
+            return AbilityMoveType(user, md, md.Type);
         }
 
         /// <summary>
@@ -243,7 +254,7 @@ namespace PokeCreator.Battles
             // Type-boosting held items (Charcoal, Mystic Water...) and plates
             string boost = TypeBoostItem(user.Pk.Item);
             if (boost != null && boost == type) m *= 1.2;
-            return m;
+            return m * MorePowerMod(user, target, md, type, code);
         }
 
         static string TypeBoostItem(string item)
@@ -274,7 +285,7 @@ namespace PokeCreator.Battles
             if (physical && user.Pk.Item == "CHOICEBAND") m *= 1.5;
             if (!physical && user.Pk.Item == "CHOICESPECS") m *= 1.5;
             if (TargetHas(user, target, "THICKFAT") && (type == "FIRE" || type == "ICE")) m *= 0.5;
-            return m;
+            return m * MoreAttackMod(user, target, physical, type);
         }
 
         /// <summary>Defense stat multiplier (Marvel Scale, Rock types in a sandstorm...).</summary>
@@ -290,7 +301,7 @@ namespace PokeCreator.Battles
                 var d = target.Pk.Data(P);
                 if (d != null && d.Evolutions != null && d.Evolutions.Count > 0) m *= 1.5;
             }
-            return m;
+            return m * MoreDefenseMod(user, target, physical);
         }
 
         /// <summary>Final damage multiplier: weather, Filter/Solid Rock, Tinted Lens, Sniper, Multiscale, Life Orb...</summary>
@@ -333,6 +344,11 @@ namespace PokeCreator.Battles
         bool AbilityPreventsStatus(Battler b, string status, Battler source)
         {
             Func<string, bool> has = id => source != null && source != b ? TargetHas(source, b, id) : HasAbility(b, id);
+            if (has("PURIFYINGSALT") || has("COMATOSE") || (has("LEAFGUARD") && EffWeather == Sun)) return true;
+            if (b.Pk.Types(P).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
+            if ((status == "POISON" || status == "TOXIC") && (has("PASTELVEIL") || (Ally(b) != null && HasAbility(Ally(b), "PASTELVEIL")))) return true;
+            if (status == "BURN" && has("THERMALEXCHANGE")) return true;
+            if (status == "SLEEP" && Ally(b) != null && HasAbility(Ally(b), "SWEETVEIL")) return true;
             switch (status)
             {
                 case "PARALYSIS": return has("LIMBER");
@@ -350,6 +366,7 @@ namespace PokeCreator.Battles
             if (source == null || source == b) return false;
             Func<string, bool> has = id => TargetHas(source, b, id);
             if (has("CLEARBODY") || has("WHITESMOKE") || has("FULLMETALBODY")) return true;
+            if (b.Pk.Types(P).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
             if (stat == PokeCreator.Pkmn.Stat.Attack && has("HYPERCUTTER")) return true;
             if (stat == 6 && has("KEENEYE")) return true;
             if (stat == PokeCreator.Pkmn.Stat.Defense && has("BIGPECKS")) return true;
