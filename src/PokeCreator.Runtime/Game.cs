@@ -356,6 +356,7 @@ namespace PokeCreator.Runtime
             RollMapWeather(true);
             Planes.FromTileset(Map.Tileset);
             World.Roaming.OnMapChanged(this);
+            World.Followers.Rebuild(this);
             Script.GameEvents.RaiseMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
@@ -379,6 +380,7 @@ namespace PokeCreator.Runtime
             RollMapWeather(false);
             Planes.FromTileset(Map.Tileset);
             World.Roaming.OnMapChanged(this);
+            World.Followers.Rebuild(this);
             Script.GameEvents.RaiseMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
@@ -782,6 +784,7 @@ namespace PokeCreator.Runtime
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
+            World.Followers.Update();
 
             if (!Interpreter.Running && !Transferring)
             {
@@ -856,6 +859,7 @@ namespace PokeCreator.Runtime
             if (Map != null && firstOpaque < 0)
             {
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
+                chars.InsertRange(chars.Count - 1, World.Followers.Visible);
                 Planes.DrawPanorama(this, DisplayX - (int)_shake, DisplayY);
                 _renderer.Draw(Map, DisplayX - (int)_shake, DisplayY, chars, FrameCount);
                 Planes.DrawFog(this, DisplayX - (int)_shake, DisplayY);
@@ -1025,6 +1029,7 @@ namespace PokeCreator.Runtime
                 case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
                 case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
                 case "held": _g.State.Party[int.Parse(p[1])].Item = p[2]; break;
+                case "followers": Console.WriteLine("[autotest] followers: " + string.Join(", ", World.Followers.Characters.Select(f => f.Info.Name + "@" + f.X + "," + f.Y + (f.Hidden ? " hidden" : "")))); break;
                 case "roamtest": // roamtest METHOD: tries roamer encounters until one starts (or 200 tries)
                     for (int k = 0; k < 200 && !World.Roaming.TryEncounter(_g, p[1]); k++) { }
                     Console.WriteLine("[autotest] roamers: " + string.Join(", ", (_g.State.Extras.Roamers ?? new List<World.RoamerState>()).Select(r => "map " + r.Map + (r.Pokemon != null ? " " + r.Pokemon.Species + " " + r.Pokemon.HP + "HP" : "") + (r.Done ? " done" : ""))));

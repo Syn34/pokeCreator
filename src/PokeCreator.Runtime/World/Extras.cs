@@ -29,6 +29,8 @@ namespace PokeCreator.Runtime.World
         public string LastLinkAddress { get; set; }
         /// <summary>$PokemonGlobal.encounter_version: which version of a map's encounter tables is used (0 = the normal one).</summary>
         public int EncounterVersion { get; set; }
+        /// <summary>NPCs following the player.</summary>
+        public List<FollowerInfo> Followers { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
         public int PokerusDay { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>

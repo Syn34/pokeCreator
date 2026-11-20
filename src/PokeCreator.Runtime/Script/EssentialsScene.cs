@@ -203,6 +203,18 @@ namespace PokeCreator.Runtime.Script
             Register("pbLinkHost", (c, a) => { LinkPlay.Host(_game, a.Count > 0 ? Str(a, 0) : "battle", false); return true; });
             Register("pbLinkJoin", (c, a) => { LinkPlay.Join(_game, a.Count > 0 ? Str(a, 0) : "battle", a.Count > 1 ? Str(a, 1) : (_game.State.Extras.LastLinkAddress ?? "127.0.0.1")); return true; });
 
+            // NPCs following the player
+            Register("Followers.add", (c, a) => { Followers.Add(_game, CharArg(c, Arg(a, 0)) as GameEvent, Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0); return true; });
+            Register("pbAddDependency2", (c, a) => { Followers.Add(_game, CharArg(c, Arg(a, 0)) as GameEvent, Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0); return true; });
+            Register("Followers.remove", (c, a) => { Followers.Remove(_game, Str(a, 0)); return true; });
+            Register("pbRemoveDependency2", (c, a) => { Followers.Remove(_game, Str(a, 0)); return true; });
+            Register("Followers.clear", (c, a) => { Followers.Clear(_game); return true; });
+            Register("pbRemoveDependencies", (c, a) => { Followers.Clear(_game); return true; });
+            Register("Followers.get", (c, a) => Followers.Characters.Any(f => f.Info.Name == Str(a, 0)));
+            Register("Followers.follow_into_door", (c, a) => { Followers.IntoDoor(_game); if (c != null && Followers.Characters.Count > 0) c.Wait(8); return true; });
+            Register("Followers.hide_followers", (c, a) => { Followers.Hide(); return true; });
+            Register("Followers.put_followers_on_player", (c, a) => { Followers.PutOnPlayer(_game); return true; });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

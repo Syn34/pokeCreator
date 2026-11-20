@@ -253,7 +253,7 @@ namespace PokeCreator.Runtime.World
             int nx = X + Dx(d), ny = Y + Dy(d);
             var map = Game.Map;
 
-            if (Through) { X = nx; Y = ny; return true; }
+            if (Through) { Followers.PlayerMoved(Game, X, Y); X = nx; Y = ny; return true; }
 
             int lx, ly;
             var target = TargetMap(nx, ny, out lx, out ly);
@@ -297,6 +297,7 @@ namespace PokeCreator.Runtime.World
                 Game.Audio.PlaySe("Player bump");
                 return false;
             }
+            Followers.PlayerMoved(Game, X, Y);
             X = nx; Y = ny;
             if (target != map)
             {
@@ -338,6 +339,7 @@ namespace PokeCreator.Runtime.World
 
         void CheckActionTrigger()
         {
+            if (Followers.TalkAt(Game, X + Dx(Direction), Y + Dy(Direction))) return;
             var map = Game.Map;
             foreach (var e in map.EventsAt(X, Y))
                 if (e.Trigger == Triggers.Action && e.OverTrigger) { e.Start(); return; }

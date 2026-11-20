@@ -486,7 +486,7 @@ namespace PokeCreator.Runtime.Script
             Register("GameData::Item.exists?", (c, a) => _game.Project.Items.Any(i => i.Id == Str(a, 0)));
             Register("GameData::Species.exists?", (c, a) => _game.Project.Species.Any(s => s.Id == Str(a, 0)));
             Register("get_self.onEvent?", (c, a) => { var ev = c == null || _game.Map == null ? null : _game.Map.Events.FirstOrDefault(x => x.Id == c.EventId); return ev != null && ev.X == _game.Player.X && ev.Y == _game.Player.Y; });
-            foreach (var f in new[] { "Followers.hide_followers", "Followers.put_followers_on_player", "Followers.follow_into_door", "Followers.add", "Followers.remove", "Followers.clear", "Followers.toggle", "Followers.update", "Followers.move_followers", "Followers.turn_followers" })
+            foreach (var f in new[] { "Followers.toggle", "Followers.update", "Followers.move_followers", "Followers.turn_followers" })
                 Register(f, (c, a) => true);
             Register("pbPokerus?", (c, a) => World.Pokerus.AnyInfected(_game));
             Register("Pokemon::MAX_NAME_SIZE", (c, a) => 10);
