@@ -164,6 +164,10 @@ namespace PokeCreator.Runtime.World
         }
 
         /// <summary>RMXP passability rules: can something leave/enter tile (x,y) in direction d?</summary>
+        /// <summary>Bridge height (pbBridgeOn / pbBridgeOff): while above 0, Bridge-tagged tiles carry the player over what's below.</summary>
+        public static int BridgeHeight;
+        public const int BridgeTag = 15;
+
         public bool TilePassable(int x, int y, int d, GameEvent self)
         {
             if (!Valid(x, y)) return false;
@@ -179,6 +183,12 @@ namespace PokeCreator.Runtime.World
             {
                 int id = Tile(x, y, z);
                 if (id <= 0) continue; // empty layer
+                if (Tileset.TerrainTag(id) == BridgeTag)
+                {
+                    if (BridgeHeight <= 0) continue;          // walking under the bridge
+                    int bp = Tileset.Passage(id);
+                    return (bp & bit) == 0 && (bp & 0x0f) != 0x0f; // on the bridge: only the bridge tile counts
+                }
                 int pass = Tileset.Passage(id);
                 if ((pass & bit) != 0 || (pass & 0x0f) == 0x0f) return false;
                 if (Tileset.Priority(id) == 0) return true;

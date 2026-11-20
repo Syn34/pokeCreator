@@ -30,11 +30,12 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Trainer battles from `trainers.json`, AI by skill level, prize money, lose text, blacking out
 - [x] Move effects read from Essentials function code names (stat changes, status, confusion, flinch, multi-hit, recoil, draining, healing, fixed damage, OHKO, two-turn, Protect, binding...)
 - [x] Status conditions and stat stages; Leftovers and healing berries
-- [x] Battle weather, ~90 common abilities, common held items
+- [x] Battle weather, abilities, held items
 - [x] Screens (Reflect, Light Screen, Aurora Veil), Tailwind, Safeguard, Mist, Trick Room, Gravity, terrains, entry hazards (Stealth Rock, Spikes, Toxic Spikes, Sticky Web) with Rapid Spin / Defog
 - [x] Taunt, Encore, Disable, Substitute, Leech Seed, Curse, Perish Song, Destiny Bond, Attract, Wish, Baton Pass, U-turn / Volt Switch, Roar / Dragon Tail in trainer battles, Metronome, Sleep Talk, Outrage / Rollout locks, Counter, Future Sight, Knock Off, variable power and type (Low Kick, Gyro Ball, Hex, Hidden Power...)
 - [x] Rare move effects: type changes (Soak, Reflect Type, Conversion, Burn Up), Transform, Mimic, Sketch, Trick, Heal Block, Torment, Imprison, rooms, sports, Fling, Natural Gift, Beat Up, Present, Retaliate, Echoed Voice, Round, Fusion moves, Instruct, After You, Quash, Ally Switch, Beak Blast, Octolock...
-- [x] About 240 of 316 abilities
+- [x] All 316 abilities, including primal weather, Ruin abilities, Protean/Libero, Dancer, Mirror Armor, Opportunist, Emergency Exit, Tera Shell and the Legends Z-A Mega abilities
+- [x] Held items in battle: every berry (HP, status, pinch, type-resist, Kee/Maranga/Jaboca/Rowap/Enigma/Custap/Micle), herbs, Weakness Policy, Air Balloon, Eject Button/Pack, Red Card, Black Sludge, orbs, gems, Quick Claw, Metronome, Loaded Dice, seeds, Room Service, Booster Energy, Utility Umbrella, Ring Target, Clear Amulet...
 - [x] Form-changing abilities (Zen Mode, Schooling, Shields Down, Forecast, Flower Gift, Stance Change, Hunger Switch, Power Construct, Battle Bond, Disguise)
 - [x] Pledge combinations (sea of fire, swamp, rainbow), Pursuit hitting a switching Pokémon
 - [x] Battle animations for moves: Essentials' PkmnAnimations imported and played (Move / OppMove / Common, extra hits, charging turns, type defaults, sounds, flashes, hue), "Battle Effects" option
@@ -68,10 +69,18 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Animation editor for battle animations (preview, frames, cels, sheet palette, sounds, import from Essentials)
 - [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 
-- [x] Held items in battle: every berry (HP, status, pinch, type-resist, Kee/Maranga/Jaboca/Rowap/Enigma/Custap/Micle), herbs, Weakness Policy, Air Balloon, Eject Button/Pack, Red Card, Black Sludge, orbs, gems, Quick Claw, Metronome, Loaded Dice, seeds, Room Service, Booster Energy, Utility Umbrella, Ring Target, Clear Amulet...
-- [x] Gluttony, Ripen, Cud Chew, Symbiosis, Pickup, Honey Gather, Ball Fetch, Stall, Quick Draw, Mycelium Might order
 
-- [x] Every ability in the data (316): primal weather, Ruin abilities, Protean/Libero, Dancer, Mirror Armor, Opportunist, Emergency Exit, Tera Shell, Legends Z-A megas...
+## v0.6: Essentials extras
+- [ ] Partner trainer (pbRegisterPartner): double battles alongside an NPC
+- [ ] Roaming Pokémon
+- [ ] Safari Zone
+- [ ] Bug-Catching Contest
+- [ ] Pokérus
+- [ ] Poké Radar
+- [ ] Battle Tower / challenges (pbBattleChallenge)
+- [ ] Mystery Gift
+- [ ] Shadow Pokémon and purification
+- [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## Later
 - Plugin system for sharing scripts between projects

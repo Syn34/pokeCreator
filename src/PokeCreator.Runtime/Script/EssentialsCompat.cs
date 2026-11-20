@@ -15,7 +15,7 @@ namespace PokeCreator.Runtime.Script
     /// "Conditional Branch: Script" into engine actions. Unknown calls are logged and ignored,
     /// so a game keeps running while support grows. Register new commands with <see cref="Register"/>.
     /// </summary>
-    public class EssentialsCompat
+    public partial class EssentialsCompat
     {
         public delegate object Handler(Interpreter ctx, List<object> args);
 
@@ -168,6 +168,7 @@ namespace PokeCreator.Runtime.Script
             if (e == "false") return false;
             if (e == "nil") return null;
             int n; if (int.TryParse(e, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) return n;
+            double dbl; if (Regex.IsMatch(e, @"^-?\d+\.\d+$") && double.TryParse(e, NumberStyles.Float, CultureInfo.InvariantCulture, out dbl)) return dbl;
             if (e.StartsWith(":") && Regex.IsMatch(e, @"^:\w+$")) return e.Substring(1);
             if ((e.StartsWith("\"") && e.EndsWith("\"")) || (e.StartsWith("'") && e.EndsWith("'"))) return Unquote(e);
             if (e.StartsWith("[") && MatchingBracket(e, 0) == e.Length - 1)
@@ -323,11 +324,11 @@ namespace PokeCreator.Runtime.Script
         {
             Handler noop = (c, a) => true;
             foreach (var n in new[] { "pbCallBub", "pbFadeOutIn",
-                                      "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
-                                      "pbMoveRoute", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
+                                      "pbUpdateSceneMap", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
-                                      "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
+                                      "pbUnlockWallpaper" })
                 Register(n, noop);
+            RegisterSceneCalls();
 
             Register("pbCommonEvent", (c, a) => c != null && c.CallCommonEvent(ToInt(Arg(a, 0))));
             Register("pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });

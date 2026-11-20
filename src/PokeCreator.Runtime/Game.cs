@@ -338,6 +338,7 @@ namespace PokeCreator.Runtime
             if (State != null) State.Visited.Add(id);
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
+            GameMap.BridgeHeight = 0;
             Map = new GameMap(Project, data, this, true);
             Map.LoadNeighbors(Project, this);
             Player.MoveTo(x, y);
@@ -359,6 +360,7 @@ namespace PokeCreator.Runtime
             int px = Player.X - offX, py = Player.Y - offY;
             int dx = DisplayX - offX * 32, dy = DisplayY - offY * 32;
             var data = neighbor.Data;
+            GameMap.BridgeHeight = 0;
             Map = new GameMap(Project, data, this, true);
             Map.LoadNeighbors(Project, this);
             Player.MoveTo(px, py);
