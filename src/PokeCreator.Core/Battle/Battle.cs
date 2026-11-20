@@ -387,6 +387,7 @@ namespace PokeCreator.Battles
             }
 
             if (Outcome == BattleOutcome.Ongoing && Live(0).Count > 0 && Live(1).Count > 0) EndOfTurn();
+            if (Outcome == BattleOutcome.Ongoing && WildFlees && IsWild) WildTriesToFlee();
             AfterFaints();
             if (Outcome == BattleOutcome.Ongoing) ResolveSwitchOuts();
             foreach (var b in OnField)

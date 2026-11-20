@@ -81,6 +81,8 @@ namespace PokeCreator.Runtime.World
             var slot = m.Slots[0];
             foreach (var s in m.Slots) { if (roll < s.Chance) { slot = s; break; } roll -= s.Chance; }
             int level = g.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1);
+            string kind = m.Type.EndsWith("Rod") ? "Fishing" : m.Type.StartsWith("Water") ? "Water" : m.Type.StartsWith("Cave") ? "Cave" : m.Type.StartsWith("Land") ? "Land" : m.Type;
+            if (Roaming.TryEncounter(g, kind)) return true;
             g.StartWildBattle(slot.Species, level, null);
             return true;
         }

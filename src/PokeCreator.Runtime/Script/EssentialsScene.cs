@@ -128,6 +128,10 @@ namespace PokeCreator.Runtime.Script
             Register("pbDeregisterPartner", (c, a) => { _game.State.Extras.Partner = null; return true; });
             Register("$PokemonGlobal.partner", (c, a) => _game.State.Extras.Partner != null);
 
+            // Roaming Pokémon
+            Register("pbResetAllRoamers", (c, a) => { Roaming.ResetAll(_game); return true; });
+            Register("pbRoamPokemon", (c, a) => { Roaming.OnMapChanged(_game); return true; });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

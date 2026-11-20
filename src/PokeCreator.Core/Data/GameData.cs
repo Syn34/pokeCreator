@@ -328,15 +328,30 @@ namespace PokeCreator.Data
         [Field("Bicycle BGM", Asset = "Audio/BGM", Group = "Music")] public string BicycleBGM { get; set; }
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }
         [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
+        [Field("Roaming Pokémon", Group = "Roaming", Help = "Pokémon that move to another map each time the player changes map; a wild encounter on their map has a 1 in 4 chance of being them. Their HP carries over between meetings; once caught or defeated they're gone.")] public List<RoamerDef> Roamers { get; set; }
         [Field("Credits", Multiline = true, Group = "Ending", Help = "Text that scrolls after the Hall of Fame ($scene = Scene_Credits.new). One line per row; an empty line makes a gap.")] public string Credits { get; set; }
 
         public GameSettings()
         {
             Title = "My Pokémon Game"; StartMap = 1; StartDirection = 2; DefaultPlayerName = "Red"; StartMoney = 3000;
-            StartItemStorage = new List<string>(); Home = new List<int>();
+            StartItemStorage = new List<string>(); Home = new List<int>(); Roamers = new List<RoamerDef>();
             ScreenWidth = 512; ScreenHeight = 384; WindowScale = 1; Font = "power green.ttf"; FontSize = 26; Windowskin = "";
             SpeechFrame = "speech hgss 1"; MenuFrame = "choice 1";
         }
+    }
+
+    /// <summary>A roaming Pokémon (Essentials' ROAMING_SPECIES): moves between maps and can be met in their wild encounters.</summary>
+    public class RoamerDef
+    {
+        [Field("Species", Ref = "species")] public string Species { get; set; }
+        [Field("Level")] public int Level { get; set; }
+        [Field("Game switch", Help = "It roams while this switch is on (0 = always).")] public int Switch { get; set; }
+        [Field("Encounter", Choices = new[] { "Any", "Land", "Surfing", "Fishing", "Water" }, Help = "Which wild encounters it can appear in: Land = grass and caves, Water = surfing or fishing.")] public string Encounter { get; set; }
+        [Field("Battle music", Asset = "Audio/BGM")] public string BattleBGM { get; set; }
+        [Field("Maps", Help = "Map IDs it roams between, e.g. 5,6,7,12. Empty = every map with wild encounters.")] public string Maps { get; set; }
+        [Field("Flees", Help = "Tries to run away at the end of every turn, as in the games.")] public bool Flees { get; set; }
+        public RoamerDef() { Level = 40; Encounter = "Any"; Flees = true; }
+        public override string ToString() { return Species + " Lv. " + Level; }
     }
 
     public class PlayerCharacter

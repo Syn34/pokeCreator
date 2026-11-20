@@ -72,7 +72,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 
 ## v0.6: Essentials extras
 - [x] Partner trainer (pbRegisterPartner / pbDeregisterPartner): every battle becomes a double battle with the partner's Pokémon in the second slot, AI-controlled, healed after each battle
-- [ ] Roaming Pokémon
+- [x] Roaming Pokémon (Game Settings → Roaming: species, level, switch, encounter kind, music, maps; HP carries over, flees each turn, gone once caught or defeated; pbResetAllRoamers)
 - [ ] Safari Zone
 - [ ] Bug-Catching Contest
 - [ ] Pokérus

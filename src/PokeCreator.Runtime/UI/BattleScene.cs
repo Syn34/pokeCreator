@@ -21,6 +21,8 @@ namespace PokeCreator.Runtime.UI
         public string Backdrop = "field";
         public bool CanLose;               // losing doesn't black out (e.g. a rival battle you may lose)
         public Action<BattleOutcome> OnEnd;
+        /// <summary>Battle music instead of the usual wild / trainer music (roaming Pokémon).</summary>
+        public string Bgm;
     }
 
     /// <summary>
@@ -73,7 +75,7 @@ namespace PokeCreator.Runtime.UI
             foreach (var e in battle.Start()) _queue.Enqueue(e);
             // Seen in the Pokédex as soon as it appears
             foreach (var pk in battle.Parties[1]) if (setup.Wild) g.State.Seen.Add(pk.Species);
-            string bgm = setup.Wild ? g.Project.Settings.WildBattleBGM : (setup.TrainerType != null && !string.IsNullOrEmpty(setup.TrainerType.BattleBGM) ? setup.TrainerType.BattleBGM : g.Project.Settings.TrainerBattleBGM);
+            string bgm = !string.IsNullOrEmpty(setup.Bgm) ? setup.Bgm : setup.Wild ? g.Project.Settings.WildBattleBGM : (setup.TrainerType != null && !string.IsNullOrEmpty(setup.TrainerType.BattleBGM) ? setup.TrainerType.BattleBGM : g.Project.Settings.TrainerBattleBGM);
             if (string.IsNullOrEmpty(bgm)) bgm = setup.Wild ? "Battle wild" : "Battle trainer";
             g.Audio.PlayBgm(bgm);
         }

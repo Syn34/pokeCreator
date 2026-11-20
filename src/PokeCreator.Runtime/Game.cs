@@ -349,6 +349,7 @@ namespace PokeCreator.Runtime
             PlayMapMusic();
             RollMapWeather(true);
             Planes.FromTileset(Map.Tileset);
+            World.Roaming.OnMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -370,6 +371,7 @@ namespace PokeCreator.Runtime
             PlayMapMusic();
             RollMapWeather(false);
             Planes.FromTileset(Map.Tileset);
+            World.Roaming.OnMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -462,6 +464,14 @@ namespace PokeCreator.Runtime
             var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { wild }, true, Rng) { PlayerName = State.PlayerName };
             b.AlreadyCaught = sp => State.Caught.Contains(sp);
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
+        }
+
+        /// <summary>A roaming Pokémon: the same Pokémon object each time (its HP and status carry over); it tries to flee every turn.</summary>
+        public void StartRoamerBattle(PokeCreator.Pkmn.Pokemon roamer, PokeCreator.Data.RoamerDef def, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { roamer }, true, Rng) { PlayerName = State.PlayerName, WildFlees = def.Flees };
+            b.AlreadyCaught = sp => State.Caught.Contains(sp);
+            StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd, Bgm = def.BattleBGM });
         }
 
         /// <summary>Double wild battle against two Pokémon (falls back to a single battle if the player has one Pokémon that can fight).</summary>
@@ -950,6 +960,10 @@ namespace PokeCreator.Runtime
                 case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
                 case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
                 case "held": _g.State.Party[int.Parse(p[1])].Item = p[2]; break;
+                case "roamtest": // roamtest METHOD: tries roamer encounters until one starts (or 200 tries)
+                    for (int k = 0; k < 200 && !World.Roaming.TryEncounter(_g, p[1]); k++) { }
+                    Console.WriteLine("[autotest] roamers: " + string.Join(", ", (_g.State.Extras.Roamers ?? new List<World.RoamerState>()).Select(r => "map " + r.Map + (r.Pokemon != null ? " " + r.Pokemon.Species + " " + r.Pokemon.HP + "HP" : "") + (r.Done ? " done" : ""))));
+                    break;
                 case "steps": for (int k = int.Parse(p[1]); k > 0; k--) { World.DayCare.OnStep(_g); World.Phone.OnStep(_g); } break;
                 case "gender": _g.State.Party[int.Parse(p[1])].Gender = p[2]; break;
                 case "surf": _g.Player.Surfing = true; break;

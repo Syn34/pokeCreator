@@ -19,5 +19,8 @@ namespace PokeCreator.Runtime.World
     public class GameExtras
     {
         public PartnerInfo Partner { get; set; }
+        public List<RoamerState> Roamers { get; set; }
+        /// <summary>A roamer was already met since the last map change.</summary>
+        public bool RoamedAlready { get; set; }
     }
 }

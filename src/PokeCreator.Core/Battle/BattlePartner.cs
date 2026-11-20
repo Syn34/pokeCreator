@@ -35,6 +35,21 @@ namespace PokeCreator.Battles
             SlotsPerSide = 2;
         }
 
+        /// <summary>A roaming Pokémon runs away at the end of each turn unless something traps it.</summary>
+        public bool WildFlees;
+
+        void WildTriesToFlee()
+        {
+            var foe = Live(1).FirstOrDefault();
+            if (foe == null || Live(0).Count == 0) return;
+            bool trapped = IsTrapped(foe) || Live(0).Any(b => HasAbility(b, "SHADOWTAG") && !HasAbility(foe, "SHADOWTAG")
+                || (HasAbility(b, "ARENATRAP") && IsGrounded(foe)) || (HasAbility(b, "MAGNETPULL") && TypesOf(foe).Contains("STEEL")));
+            if (trapped || foe.Pk.Item == "SMOKEBALL" && false) return;
+            Outcome = BattleOutcome.Escaped;
+            Say(Name(foe) + " fled!");
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.Flee });
+        }
+
         List<int> PartnerBench() { return Enumerable.Range(0, Parties[0].Count).Where(i => IsPartnerIndex(i) && Able(Parties[0][i]) && !OnFieldParty(0, i)).ToList(); }
 
         string PartnerLabel { get { return (string.IsNullOrEmpty(PartnerTypeName) ? "" : PartnerTypeName + " ") + PartnerName; } }
