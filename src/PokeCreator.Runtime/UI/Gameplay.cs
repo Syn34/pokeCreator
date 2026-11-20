@@ -62,6 +62,12 @@ namespace PokeCreator.Runtime.UI
         public static void UseFromBag(Game g, string itemId, Action refresh)
         {
             var item = Item(g, itemId);
+            switch (itemId)
+            {
+                case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
+                case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
+                case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
+            }
             if (Array.IndexOf(FieldMoves.Rods, itemId) >= 0)
             {
                 // Rods: close the menus and fish

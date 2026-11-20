@@ -19,6 +19,8 @@ namespace PokeCreator.Runtime.World
         public int Direction = 2;
         public int Pattern, OriginalPattern;
         public int MoveSpeed = 4, MoveFrequency = 6;
+        /// <summary>Extra speed multiplier on top of MoveSpeed (the bicycle).</summary>
+        public double SpeedScale = 1;
         public bool WalkAnime = true, StepAnime, DirectionFix, Through, AlwaysOnTop;
         public string CharacterName = "";
         public int TileId;
@@ -80,7 +82,7 @@ namespace PokeCreator.Runtime.World
 
         void UpdateMove()
         {
-            double dist = Math.Pow(2, MoveSpeed) * FpsScale;
+            double dist = Math.Pow(2, MoveSpeed) * FpsScale * SpeedScale;
             if (Y * 128 > RealY) RealY = Math.Min(RealY + dist, Y * 128);
             if (X * 128 < RealX) RealX = Math.Max(RealX - dist, X * 128);
             if (X * 128 > RealX) RealX = Math.Min(RealX + dist, X * 128);

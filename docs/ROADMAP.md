@@ -36,11 +36,13 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 
 ## v0.4: World features
 - [x] Field moves: Surf, Cut, Strength, Rock Smash, Headbutt; berry plants (picking)
-- [ ] Fly, Waterfall, Dive, Flash; berry planting and growth
+- [x] Fly with the Town Map, Teleport, Dig, Sweet Scent; field moves in the party menu
+- [ ] Waterfall, Dive, Flash; berry planting and growth
 - [ ] Pokémon Centers, Poké Marts, PC storage, Day Care
 - [ ] Trainer line-of-sight (`Trainer(n)` events), rematches
 - [x] Fishing (Old/Good/Super Rod), Repel
-- [ ] Bicycle, running shoes toggle, Itemfinder
+- [x] Bicycle, Escape Rope, Town Map
+- [ ] Running shoes toggle, Itemfinder
 - [ ] Weather and fog/panorama effects, flash/darkness maps, Essentials text codes (colours, speed, windowskins)
 
 ## v0.5: Studio power features

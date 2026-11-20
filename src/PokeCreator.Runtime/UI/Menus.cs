@@ -163,6 +163,7 @@ namespace PokeCreator.Runtime.UI
     {
         int _index, _switchFrom = -1;
         CommandList _popup;
+        readonly Dictionary<string, string> _fieldMoves = new Dictionary<string, string>();
         string _help = "Choose a Pokémon.";
         List<Pokemon> Party { get { return Game.State.Party; } }
         // Choose mode (using or giving an item): pick a Pokémon and hand it to the caller
@@ -190,6 +191,7 @@ namespace PokeCreator.Runtime.UI
                 _popup = null;
                 var pk = Party[_index];
                 if (cmd == "Summary") Game.PushScene(new SummaryScene(Game, _index));
+                else if (_fieldMoves.ContainsKey(cmd)) FieldMoves.UseFromParty(Game, pk, _fieldMoves[cmd]);
                 else if (cmd == "Switch") { _switchFrom = _index; _help = "Move to where?"; }
                 else if (cmd == "Item") _popup = new CommandList(new[] { "Give", "Take", "Cancel" });
                 else if (cmd == "Give") Game.PushScene(new BagScene(Game, id => ItemFlow.Give(Game, pk, id, null)));
@@ -219,7 +221,18 @@ namespace PokeCreator.Runtime.UI
                     _switchFrom = -1; _help = "Choose a Pokémon.";
                     return;
                 }
-                _popup = new CommandList(Party[_index].IsEgg ? new[] { "Summary", "Switch", "Cancel" } : new[] { "Summary", "Switch", "Item", "Cancel" });
+                // Summary, the Pokémon's field moves (Cut, Fly, Surf...), Switch, Item
+                var cmds = new List<string> { "Summary" };
+                _fieldMoves.Clear();
+                foreach (var m in FieldMoves.FieldMovesOf(Party[_index]))
+                {
+                    string label = PokeCreator.Pkmn.ItemEffects.MoveName(Game.Project, m);
+                    _fieldMoves[label] = m; cmds.Add(label);
+                }
+                cmds.Add("Switch");
+                if (!Party[_index].IsEgg) cmds.Add("Item");
+                cmds.Add("Cancel");
+                _popup = new CommandList(cmds);
             }
         }
 
@@ -476,7 +489,7 @@ namespace PokeCreator.Runtime.UI
                     Close(); _choose(it.Id); return;
                 }
                 var cmds = new List<string>();
-                if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None || Array.IndexOf(FieldMoves.Rods, it.Id) >= 0) cmds.Add("Use");
+                if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None || Array.IndexOf(FieldMoves.Rods, it.Id) >= 0 || Array.IndexOf(FieldMoves.DirectKeyItems, it.Id) >= 0) cmds.Add("Use");
                 if (it.Pocket != 8 && Game.State.Party.Any(pk => !pk.IsEgg)) cmds.Add("Give");
                 if (it.Pocket != 8) cmds.Add("Toss");
                 cmds.Add("Cancel");

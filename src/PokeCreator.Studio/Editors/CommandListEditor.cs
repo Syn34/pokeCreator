@@ -235,6 +235,10 @@ namespace PokeCreator.Studio.Editors
             cmd(field, "Push This Boulder (Strength)", () => Insert(new EventCommand(355, 0, "pbPushThisBoulder")));
             cmd(field, "Pick Berry", AddPickBerry);
             cmd(field, "Remove This Event (until the map is re-entered)", () => Insert(new EventCommand(355, 0, "pbSmashThisEvent")));
+            cmd(field, "Set Escape Point (put before entering a cave)", () => Insert(new EventCommand(355, 0, "pbSetEscapePoint")));
+            cmd(field, "Clear Escape Point (put when leaving a cave)", () => Insert(new EventCommand(355, 0, "pbEraseEscapePoint")));
+            cmd(field, "Show Town Map", () => Insert(new EventCommand(355, 0, "pbShowMap")));
+            cmd(field, "Get On / Off the Bicycle", () => { int k = ChoiceDialog.Ask(FindForm(), "Bicycle", new[] { "Get on", "Get off" }); if (k >= 0) Insert(new EventCommand(355, 0, k == 0 ? "pbMountBike" : "pbDismountBike")); });
 
             var map = group("Map && Movement");
             cmd(map, "Transfer Player (Warp)", AddTransfer);

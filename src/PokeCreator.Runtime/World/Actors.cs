@@ -147,6 +147,10 @@ namespace PokeCreator.Runtime.World
         public string WalkCharset { get { return Look != null && !string.IsNullOrEmpty(Look.WalkCharset) ? Look.WalkCharset : "trainer_POKEMONTRAINER_Red"; } }
         public string RunCharset { get { return Look != null && !string.IsNullOrEmpty(Look.RunCharset) ? Look.RunCharset : WalkCharset; } }
         public string SurfCharset { get { return Look != null && !string.IsNullOrEmpty(Look.SurfCharset) ? Look.SurfCharset : WalkCharset; } }
+        public string CycleCharset { get { return Look != null && !string.IsNullOrEmpty(Look.CycleCharset) ? Look.CycleCharset : WalkCharset; } }
+
+        /// <summary>On the bicycle (from the Bag, or maps that are "Always on bicycle").</summary>
+        public bool Cycling;
 
         /// <summary>On the water (Surf). Moving onto land ends it.</summary>
         public bool Surfing;
@@ -154,7 +158,7 @@ namespace PokeCreator.Runtime.World
         public void StartSurfing()
         {
             int fx = X + Dx(Direction), fy = Y + Dy(Direction);
-            Surfing = true;
+            Surfing = true; Cycling = false;
             string bgm = Game.Project.Settings.SurfBGM;
             if (!string.IsNullOrEmpty(bgm)) Game.Audio.PlayBgm(bgm);
             Jump(Dx(Direction), Dy(Direction));
@@ -166,12 +170,14 @@ namespace PokeCreator.Runtime.World
             if (canControl && !Moving && !Jumping)
             {
                 int d = Input.Dir4;
-                bool run = Input.Press(Button.Run);
-                MoveSpeed = run ? 5 : 4;
+                bool run = Input.Press(Button.Run) && !Cycling;
+                MoveSpeed = run || Cycling ? 5 : 4;
+                SpeedScale = Cycling ? 1.5 : 1;
                 if (d != 0) Move(d);
             }
-            bool running = MoveSpeed >= 5 && (Moving || Input.Dir4 != 0);
-            if (Surfing) { MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", SurfCharset) != null ? SurfCharset : WalkCharset; }
+            bool running = MoveSpeed >= 5 && !Cycling && (Moving || Input.Dir4 != 0);
+            if (Cycling && !Surfing) CharacterName = Game.Project.FindAsset("Graphics/Characters", CycleCharset) != null ? CycleCharset : WalkCharset;
+            else if (Surfing) { SpeedScale = 1; MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", SurfCharset) != null ? SurfCharset : WalkCharset; }
             else CharacterName = running && Game.Project.FindAsset("Graphics/Characters", RunCharset) != null ? RunCharset : WalkCharset;
 
             base.Update();

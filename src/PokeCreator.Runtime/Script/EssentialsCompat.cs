@@ -270,6 +270,15 @@ namespace PokeCreator.Runtime.Script
             Register("pbPickBerry", (c, a) => { FieldMoves.PickBerry(_game, c, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1); return true; });
             Register("pbBerryPlant", (c, a) => { FieldMoves.BerryPlant(_game, c); return true; });
             Register("pbCanUseHiddenMove?", (c, a) => true);
+            Register("pbShowMap", (c, a) => { _game.PushScene(new UI.TownMapScene(_game, false, null)); return true; });
+            Register("pbTownMap", (c, a) => { _game.PushScene(new UI.TownMapScene(_game, false, null)); return true; });
+            Register("pbSetEscapePoint", (c, a) => { FieldMoves.SetEscapePoint(_game); return true; });
+            Register("pbEraseEscapePoint", (c, a) => { _game.State.EscapePoint = null; return true; });
+            Register("pbMountBike", (c, a) => { if (!_game.Player.Cycling) { _game.Player.Cycling = true; _game.PlayMapMusic(); } return true; });
+            Register("pbDismountBike", (c, a) => { if (_game.Player.Cycling) { _game.Player.Cycling = false; _game.PlayMapMusic(); } return true; });
+            Register("pbCanUseBike?", (c, a) => FieldMoves.CanBike(_game));
+            Register("$PokemonGlobal.bicycle", (c, a) => _game.Player.Cycling);
+            Register("$PokemonGlobal.surfing", (c, a) => _game.Player.Surfing);
             Register("pbNoticePlayer", (c, a) =>
             {
                 if (c == null) return true;

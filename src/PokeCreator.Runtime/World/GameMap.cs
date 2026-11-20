@@ -35,6 +35,10 @@ namespace PokeCreator.Runtime.World
         public int HealMap, HealX, HealY, HealDir;
         /// <summary>Steps left on a Repel.</summary>
         public int RepelSteps;
+        /// <summary>Maps the player has been to (Fly only goes to visited places).</summary>
+        public readonly HashSet<int> Visited = new HashSet<int>();
+        /// <summary>Where Dig / the Escape Rope go back to: map, x, y, direction (set by pbSetEscapePoint).</summary>
+        public List<int> EscapePoint;
 
         public bool HasPokedex { get { return Flags.Contains("has_pokedex"); } }
 

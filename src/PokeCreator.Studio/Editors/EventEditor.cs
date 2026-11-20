@@ -100,6 +100,11 @@ namespace PokeCreator.Studio.Editors
                         if (sc == "pbPushThisBoulder") return "◆ Push This Boulder (after Strength)";
                         if (sc == "pbStrength") return "◆ Offer Strength";
                         if (sc == "pbBerryPlant") return "◆ Berry Soil";
+                        if (sc == "pbSetEscapePoint") return "◆ Set Escape Point (Dig / Escape Rope return here)";
+                        if (sc == "pbEraseEscapePoint") return "◆ Clear Escape Point";
+                        if (sc.StartsWith("pbShowMap") || sc == "pbTownMap") return "◆ Show Town Map";
+                        if (sc == "pbMountBike") return "◆ Get On the Bicycle";
+                        if (sc == "pbDismountBike") return "◆ Get Off the Bicycle";
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbPickBerry\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
                         if (gm.Success) return "◆ Pick Berry: " + gm.Groups[1].Value + " ×" + (gm.Groups[2].Success ? gm.Groups[2].Value : "1");
                         return "◆ Script: " + sc;

@@ -153,6 +153,7 @@ namespace PokeCreator.Runtime
             Player.CharacterName = Player.WalkCharset;
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
             Player.Surfing = d.Surfing;
+            Player.Cycling = d.Cycling && !d.Surfing;
             if (!string.IsNullOrEmpty(d.Bgm) && string.IsNullOrEmpty(Audio.CurrentBgm)) Audio.PlayBgm(d.Bgm);
         }
 
@@ -190,6 +191,24 @@ namespace PokeCreator.Runtime
             if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
         }
 
+        /// <summary>Map music, or the Bicycle / Surf music while riding.</summary>
+        public void PlayMapMusic()
+        {
+            string ride = Player == null ? null : Player.Cycling ? Project.Settings.BicycleBGM : Player.Surfing ? Project.Settings.SurfBGM : null;
+            if (!string.IsNullOrEmpty(ride)) { if (Audio.CurrentBgm != ride) Audio.PlayBgm(ride); return; }
+            var data = Map != null ? Map.Data : null;
+            if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+        }
+
+        /// <summary>Gets off the bike on maps that don't allow it, and on maps where you're always on it.</summary>
+        void UpdateRiding()
+        {
+            if (Player == null || Map == null || Map.Data.Properties == null) return;
+            var pr = Map.Data.Properties;
+            if (pr.BicycleAlways && !Player.Surfing) Player.Cycling = true;
+            else if (Player.Cycling && !World.FieldMoves.CanBike(this)) Player.Cycling = false;
+        }
+
         public void ReturnToTitle()
         {
             _scenes.Clear();
@@ -208,6 +227,7 @@ namespace PokeCreator.Runtime
         public void SetupMap(int id, int x, int y, int dir)
         {
             StrengthActive = false; // Strength lasts until the player leaves the map
+            if (State != null) State.Visited.Add(id);
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
             Map = new GameMap(Project, data, this, true);
@@ -216,7 +236,8 @@ namespace PokeCreator.Runtime
             if (dir != 0) Player.Turn(dir);
             Interpreter.Setup(null, 0);
             CenterCamera();
-            if (data.AutoplayBgm && data.Bgm != null) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            UpdateRiding();
+            PlayMapMusic();
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -232,7 +253,9 @@ namespace PokeCreator.Runtime
             Map.LoadNeighbors(Project, this);
             Player.MoveTo(px, py);
             DisplayX = dx; DisplayY = dy;
-            if (data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            if (State != null) State.Visited.Add(data.Id);
+            UpdateRiding();
+            PlayMapMusic();
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -647,6 +670,8 @@ namespace PokeCreator.Runtime
                         break;
                     }
                 case "fish": World.FieldMoves.Fish(_g, p[1]); break;
+                case "bagitem": UI.ItemFlow.UseFromBag(_g, p[1], null); break;
+                case "visit": foreach (var v in p[1].Split(',')) _g.State.Visited.Add(int.Parse(v)); break;
                 case "party":
                     foreach (var pk in _g.State.Party)
                         Console.WriteLine("[autotest] " + pk.Name(_g.Project) + " (" + pk.Species + ") Lv" + pk.Level + " HP " + pk.HP + "/" + pk.TotalHP(_g.Project) + " item=" + (pk.Item ?? "-") + " moves=" + string.Join(",", pk.Moves.Select(m => m.Id + ":" + m.PP)));

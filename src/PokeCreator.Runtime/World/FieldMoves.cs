@@ -157,6 +157,8 @@ namespace PokeCreator.Runtime.World
 
         // ------------------------------------------------------------------ fishing
         public static readonly string[] Rods = { "OLDROD", "GOODROD", "SUPERROD" };
+        /// <summary>Key items used straight from the Bag (besides rods).</summary>
+        public static readonly string[] DirectKeyItems = { "BICYCLE", "MACHBIKE", "ACROBIKE", "TOWNMAP", "ESCAPEROPE" };
 
         public static void Fish(Game g, string rod)
         {
@@ -172,6 +174,182 @@ namespace PokeCreator.Runtime.World
                 g.Audio.PlaySe("Exclaim");
                 g.Message.Show("Oh! A bite!", null, -1, __ => EncounterFrom(g, new[] { method }));
             });
+        }
+
+        // ------------------------------------------------------------------ Fly, Teleport, Dig, Escape Rope
+        static bool Outdoor(Game g) { return g.Map != null && g.Map.Data.Properties != null && g.Map.Data.Properties.Outdoor; }
+
+        /// <summary>Opens the Town Map to choose where to fly. closeMenus closes the party/pause screens first.</summary>
+        public static void Fly(Game g, Pokemon pk)
+        {
+            if (!Outdoor(g)) { g.Message.Show("Can't use that here."); return; }
+            if (g.Project.TownMaps.Count == 0) { g.Message.Show("There is no Town Map to fly with."); return; }
+            g.PushScene(new UI.TownMapScene(g, true, p =>
+            {
+                g.CloseAllScenes();
+                g.Message.Show(pk.Name(g.Project) + " used Fly!", null, -1, _ =>
+                {
+                    g.Audio.PlaySe("Fly");
+                    StopRiding(g);
+                    g.RequestTransfer(p.FlyMap, p.FlyX, p.FlyY, 2, true);
+                });
+            }));
+        }
+
+        public static void Teleport(Game g, Pokemon pk)
+        {
+            if (!Outdoor(g) || g.State.HealMap <= 0) { g.Message.Show("Can't use that here."); return; }
+            g.CloseAllScenes();
+            g.Message.Show("Want to return to the healing spot used last in " + MapName(g, g.State.HealMap) + "?", new List<string> { "Yes", "No" }, 1, c =>
+            {
+                if (c != 0) return;
+                g.Message.Show(pk.Name(g.Project) + " used Teleport!", null, -1, _ =>
+                {
+                    StopRiding(g);
+                    g.RequestTransfer(g.State.HealMap, g.State.HealX, g.State.HealY, g.State.HealDir > 0 ? g.State.HealDir : 2, true);
+                });
+            });
+        }
+
+        /// <summary>Dig and the Escape Rope: back to the cave entrance recorded by pbSetEscapePoint.</summary>
+        public static bool CanEscape(Game g) { return g.State.EscapePoint != null && g.State.EscapePoint.Count >= 4 && !Outdoor(g); }
+
+        public static void Escape(Game g, string usedText)
+        {
+            if (!CanEscape(g)) { g.Message.Show("Can't use that here."); return; }
+            var e = g.State.EscapePoint;
+            g.CloseAllScenes();
+            g.Message.Show(usedText, null, -1, _ =>
+            {
+                StopRiding(g);
+                g.State.EscapePoint = null;
+                g.RequestTransfer(e[0], e[1], e[2], e[3], true);
+            });
+        }
+
+        /// <summary>pbSetEscapePoint: one step back from where the player stands, facing away (called before entering a cave).</summary>
+        public static void SetEscapePoint(Game g)
+        {
+            var p = g.Player; int x = p.X, y = p.Y, d = 2;
+            switch (p.Direction) { case 2: y--; d = 8; break; case 4: x++; d = 6; break; case 6: x--; d = 4; break; case 8: y++; d = 2; break; }
+            g.State.EscapePoint = new List<int> { g.Map.Id, x, y, d };
+        }
+
+        static string MapName(Game g, int id)
+        {
+            var info = g.Project.MapInfos.FirstOrDefault(m => m.Id == id);
+            try { var md = g.Project.LoadMap(id); if (md != null && md.Properties != null && !string.IsNullOrEmpty(md.Properties.Name)) return md.Properties.Name; } catch { }
+            return info != null ? info.Name : "map " + id;
+        }
+
+        public static void SweetScent(Game g, Pokemon pk)
+        {
+            g.CloseAllScenes();
+            g.Message.Show(pk.Name(g.Project) + " used Sweet Scent!", null, -1, _ =>
+            {
+                bool found = EncounterFrom(g, g.Player.Surfing ? new[] { "Water" } : new[] { "Land", "LandDay", "LandNight", "LandMorning", "Cave" });
+                if (!found) g.Message.Show("There appears to be nothing here...");
+            });
+        }
+
+        // ------------------------------------------------------------------ bicycle
+        public static bool CanBike(Game g)
+        {
+            var pr = g.Map == null ? null : g.Map.Data.Properties;
+            return pr != null && (pr.Bicycle || pr.BicycleAlways || pr.Outdoor);
+        }
+
+        public static void ToggleBike(Game g)
+        {
+            var p = g.Player;
+            if (p.Cycling)
+            {
+                if (g.Map != null && g.Map.Data.Properties != null && g.Map.Data.Properties.BicycleAlways) { g.Message.Show("You can't dismount your Bike here."); return; }
+                g.CloseAllScenes();
+                p.Cycling = false; g.RestoreMapBgm();
+                return;
+            }
+            if (p.Surfing || !CanBike(g)) { g.Message.Show("Can't use that here."); return; }
+            g.CloseAllScenes();
+            p.Cycling = true;
+            string bgm = g.Project.Settings.BicycleBGM;
+            if (!string.IsNullOrEmpty(bgm)) g.Audio.PlayBgm(bgm);
+        }
+
+        /// <summary>Gets off the bike/water before warping somewhere else.</summary>
+        public static void StopRiding(Game g) { g.Player.Cycling = false; g.Player.Surfing = false; }
+
+        // ------------------------------------------------------------------ field moves from the party screen
+        public static readonly string[] PartyMoves = { "CUT", "FLY", "SURF", "STRENGTH", "ROCKSMASH", "HEADBUTT", "TELEPORT", "DIG", "SWEETSCENT" };
+
+        public static List<string> FieldMovesOf(Pokemon pk)
+        {
+            var list = new List<string>();
+            if (pk == null || pk.IsEgg) return list;
+            foreach (var m in pk.Moves) if (Array.IndexOf(PartyMoves, m.Id) >= 0 && !list.Contains(m.Id)) list.Add(m.Id);
+            return list;
+        }
+
+        static GameEvent Facing(Game g, string namePart)
+        {
+            var p = g.Player; int fx = p.X + (p.Direction == 4 ? -1 : p.Direction == 6 ? 1 : 0), fy = p.Y + (p.Direction == 8 ? -1 : p.Direction == 2 ? 1 : 0);
+            return g.Map.EventsAt(fx, fy).FirstOrDefault(e => e.Name != null && e.Name.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0 && e.CharacterName.Length > 0);
+        }
+
+        /// <summary>Using a field move from the party screen (as Essentials' HiddenMoveHandlers).</summary>
+        public static void UseFromParty(Game g, Pokemon pk, string move)
+        {
+            string name = pk.Name(g.Project);
+            switch (move)
+            {
+                case "FLY": Fly(g, pk); return;
+                case "TELEPORT": Teleport(g, pk); return;
+                case "DIG": Escape(g, name + " used Dig!"); return;
+                case "SWEETSCENT": SweetScent(g, pk); return;
+                case "SURF":
+                    {
+                        var p = g.Player; int fx = p.X + (p.Direction == 4 ? -1 : p.Direction == 6 ? 1 : 0), fy = p.Y + (p.Direction == 8 ? -1 : p.Direction == 2 ? 1 : 0);
+                        if (p.Surfing || p.Cycling || !IsWater(g, fx, fy) || !g.Map.SurfPassable(fx, fy, 10 - p.Direction)) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.Message.Show(name + " used Surf!", null, -1, _ => p.StartSurfing());
+                        return;
+                    }
+                case "CUT":
+                    {
+                        var e = Facing(g, "cuttree");
+                        if (e == null) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.Message.Show(name + " used Cut!", null, -1, _ => { g.Audio.PlaySe("Cut"); e.Erase(); });
+                        return;
+                    }
+                case "ROCKSMASH":
+                    {
+                        var e = Facing(g, "smashrock");
+                        if (e == null) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.Message.Show(name + " used Rock Smash!", null, -1, _ => { g.Audio.PlaySe("Rock Smash"); e.Erase(); RockSmashEncounter(g); });
+                        return;
+                    }
+                case "STRENGTH":
+                    {
+                        if (Facing(g, "strengthboulder") == null || g.StrengthActive) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.StrengthActive = true;
+                        g.Message.Show(name + " used Strength!\n" + name + "'s Strength made it possible to move boulders around.");
+                        return;
+                    }
+                case "HEADBUTT":
+                    {
+                        if (Facing(g, "headbutttree") == null) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.Message.Show(name + " did a Headbutt!", null, -1, _ =>
+                        {
+                            g.Audio.PlaySe("Headbutt");
+                            if (!(g.Rng.Next(100) < 50 && EncounterFrom(g, new[] { "HeadbuttHigh", "HeadbuttLow" }))) g.Message.Show("Nope. Nothing...");
+                        });
+                        return;
+                    }
+            }
         }
 
         // ------------------------------------------------------------------ berries
