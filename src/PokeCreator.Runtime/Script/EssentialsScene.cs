@@ -61,7 +61,12 @@ namespace PokeCreator.Runtime.Script
         void RegisterSceneCalls()
         {
             for (int i = 1; i < MoveRouteNames.Length; i++) { int code = i; Register("PBMoveRoute::" + MoveRouteNames[i], (c, a) => code); }
+            RegisterMiscCalls();
             Register("$game_player", (c, a) => _game.Player);
+            Register("$game_player.x", (c, a) => _game.Player.X);
+            Register("$game_player.y", (c, a) => _game.Player.Y);
+            Register("$game_player.direction", (c, a) => _game.Player.Direction);
+            foreach (var t in new[] { "Symbol", "String", "Integer", "Numeric", "Array", "Hash", "Pokemon", "Fixnum" }) { string tn = t; Register(tn, (c, a) => tn); }
 
             // pbWait: seconds in Essentials v21 (a decimal, or a small whole number), frames in older versions
             Register("pbWait", (c, a) =>
@@ -244,5 +249,130 @@ namespace PokeCreator.Runtime.Script
             Name = words.EndsWith("Ribbon") ? words : words + " Ribbon";
             Description = "";
         }
+    }
+}
+
+namespace PokeCreator.Runtime.Script
+{
+    public partial class EssentialsCompat
+    {
+        /// <summary>A bag screen showing only some items; the chosen item ID (or "NONE") goes into a variable.</summary>
+        void ChooseItemInto(int variable, Func<PokeCreator.Data.ItemData, bool> filter)
+        {
+            if (!_game.Project.Items.Any(i => filter(i) && _game.State.ItemCount(i.Id) > 0)) { _game.State.SetStr(variable, "NONE"); return; }
+            _game.PushScene(new UI.BagScene(_game, id => { _game.State.SetStr(variable, id); _game.CloseAllScenes(); }, filter, () => _game.State.SetStr(variable, "NONE")));
+        }
+
+        static bool HasFlag(PokeCreator.Data.ItemData i, string flag) { return i.Flags != null && i.Flags.Any(f => string.Equals(f, flag, StringComparison.OrdinalIgnoreCase)); }
+
+        void RegisterMiscCalls()
+        {
+            Register("pbChooseFossil", (c, a) => { ChooseItemInto(a.Count > 0 ? ToInt(a[0]) : 1, i => HasFlag(i, "Fossil") || i.Id.EndsWith("FOSSIL") || i.Id == "OLDAMBER"); return true; });
+            Register("pbChooseApricorn", (c, a) => { ChooseItemInto(a.Count > 0 ? ToInt(a[0]) : 1, i => HasFlag(i, "Apricorn") || i.Id.EndsWith("APRICORN")); return true; });
+            Register("pbChooseItem", (c, a) => { ChooseItemInto(a.Count > 0 ? ToInt(a[0]) : 1, i => true); return true; });
+            Register("pbChooseBallList", (c, a) => { ChooseItemInto(a.Count > 0 ? ToInt(a[0]) : 1, i => i.Pocket == 3); return true; });
+
+            // pbGenerateEgg(species, owner): an Egg straight into the party
+            Register("pbGenerateEgg", (c, a) =>
+            {
+                if (_game.State.Party.Count >= GameState.MaxParty) return false;
+                var egg = PokeCreator.Pkmn.Pokemon.Create(_game.Project, Str(a, 0), 1, _game.Rng);
+                var data = egg.Data(_game.Project);
+                if (data == null) return false;
+                egg.IsEgg = true;
+                egg.EggSteps = data.HatchSteps > 1 ? data.HatchSteps : 5120;
+                egg.OTName = a.Count > 1 && Str(a, 1).Length > 0 ? Str(a, 1) : _game.State.PlayerName; egg.OTId = _game.State.TrainerId;
+                egg.MetMap = _game.Map != null ? _game.Map.Id : 0; egg.MetLevel = 1;
+                _game.State.Party.Add(egg);
+                return true;
+            });
+
+            // Choosing a Pokémon for an in-game trade
+            Register("pbChoosePokemonForTrade", (c, a) =>
+            {
+                string sp = Str(a, 2);
+                ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && (sp.Length == 0 || pk.Species == sp));
+                return true;
+            });
+            Register("pbChooseTradablePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon); return true; });
+
+            // pbEnterNPCName(prompt, min, max, default, charset): asks, then the script runs again with the name
+            Register("pbEnterNPCName", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                string def = Str(a, 3);
+                int max = a.Count > 2 ? Math.Max(1, ToInt(a[2])) : 10;
+                _game.PromptPending = true;
+                _game.PushScene(new UI.NameEntryScene(_game, Str(a, 0), def, max, n => _game.SetPrompt(c, string.IsNullOrEmpty(n) ? def : n)));
+                return def;
+            });
+            Register("pbEnterText", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                string def = Str(a, 3);
+                _game.PromptPending = true;
+                _game.PushScene(new UI.NameEntryScene(_game, Str(a, 0), def, a.Count > 2 ? Math.Max(1, ToInt(a[2])) : 12, n => _game.SetPrompt(c, n ?? "")));
+                return def;
+            });
+
+            Register("pbCanDoubleBattle?", (c, a) => _game.State.Party.Count(PokeCreator.Battles.Battle.Able) >= 2 || _game.State.Extras.Partner != null);
+            Register("pbCanTripleBattle?", (c, a) => _game.State.Party.Count(PokeCreator.Battles.Battle.Able) >= 3);
+
+            // pbHiddenPower(pkmn) → [type, power]
+            Register("pbHiddenPower", (c, a) =>
+            {
+                var pk = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
+                if (pk == null) return new List<object> { "NORMAL", 60 };
+                string[] types = { "FIGHTING", "FLYING", "POISON", "GROUND", "ROCK", "BUG", "GHOST", "STEEL", "FIRE", "WATER", "GRASS", "ELECTRIC", "PSYCHIC", "ICE", "DRAGON", "DARK" };
+                int[] order = { 0, 1, 2, 3, 4, 5 }; // HP, Atk, Def, Spe, SpA, SpD as stored
+                int t = 0, pw = 0;
+                int[] bit = { 0, 1, 2, 5, 3, 4 }; // game order: HP, Atk, Def, Spe, SpA, SpD -> weights 1,2,4,8,16,32
+                for (int i = 0; i < 6; i++) { t |= (pk.IV[order[i]] & 1) << bit[i]; pw |= ((pk.IV[order[i]] >> 1) & 1) << bit[i]; }
+                return new List<object> { types[t * 15 / 63], 30 + pw * 40 / 63 };
+            });
+            Register("GameData::Type.get", (c, a) => _game.Project.Types.FirstOrDefault(t => t.Id == Str(a, 0)));
+            Register("GameData::Ability.get", (c, a) => _game.Project.Abilities.FirstOrDefault(t => t.Id == Str(a, 0)));
+            Register("GameData::TrainerType.get", (c, a) => _game.Project.TrainerTypes.FirstOrDefault(t => t.Id == Str(a, 0)));
+            Register("Pokemon::EV_LIMIT", (c, a) => PokeCreator.Pkmn.ItemEffects.MaxTotalEV);
+            Register("Pokemon::EV_STAT_LIMIT", (c, a) => PokeCreator.Pkmn.ItemEffects.MaxEV);
+            Register("Pokemon::IV_STAT_LIMIT", (c, a) => 31);
+            Register("Phone.reset_after_win", (c, a) => true);
+            Register("$player.pokedex.owned_shadow_pokemon?", (c, a) => _game.State.Party.Concat(_game.State.Storage).Any(p => p.ShadowPokemon && p.Species == Str(a, 0)));
+
+            // Bug-Catching Contest extras used by Essentials' example events
+            Register("pbBugContestState", (c, a) => new BugContestApi(_game));
+            Register("pbBugContestState.pbContestHeld?", (c, a) => _game.State.Extras.BugContest != null && (_game.State.Extras.BugContest.InProgress || _game.State.Extras.BugContest.Undecided));
+            Register("pbBugContestState.pbGetPlaceInfo", (c, a) => new List<object> { "", "", 0 });
+
+            // pbEvolutionEvent(n): the n-th party Pokémon evolves if it can (by any method that's met now)
+            Register("pbEvolutionEvent", (c, a) =>
+            {
+                // Evolutions with the Event / EventAfterDamageTaken method and this number
+                string n = a.Count > 0 ? Convert.ToString(a[0]) : "";
+                foreach (var pk in _game.State.Party.Where(p => !p.IsEgg))
+                {
+                    var d = pk.Data(_game.Project);
+                    var evo = d == null || d.Evolutions == null ? null : d.Evolutions.FirstOrDefault(e => (e.Method ?? "").StartsWith("Event") && (string.IsNullOrEmpty(e.Parameter) || e.Parameter == n));
+                    if (evo != null) { _game.PushScene(new UI.EvolutionScene(_game, pk, evo.Species, false, null)); return true; }
+                }
+                return false;
+            });
+        }
+    }
+
+    /// <summary>The object pbBugContestState returns in scripts (contest = pbBugContestState; contest.pbStart(20)).</summary>
+    public class BugContestApi
+    {
+        readonly Game _g;
+        public BugContestApi(Game g) { _g = g; }
+        public void pbSetJudgingPoint(int map, int x, int y) { }
+        public void pbSetReception(string name) { }
+        public void pbSetContestMap(string name) { }
+        public void pbSetPokemon(int index) { World.BugContest.SetPokemon(_g, index); }
+        public void pbStart(int balls) { World.BugContest.Start(_g, balls); }
+        public void pbEnd() { World.BugContest.End(_g, false); }
+        public bool inProgress() { return World.BugContest.InProgress(_g); }
     }
 }

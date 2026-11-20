@@ -50,8 +50,12 @@ namespace PokeCreator.Runtime.Script
             return true;
         }
 
+        /// <summary>Ruby local variables of scripts in this event run (they carry from one Script command to the next, as in Essentials).</summary>
+        public readonly Dictionary<string, object> Locals = new Dictionary<string, object>();
+
         public void Setup(List<EventCommand> list, int eventId)
         {
+            Locals.Clear();
             _list = list; _index = 0; EventId = eventId; MapId = _game.Map.Id;
             _branch.Clear(); _wait = 0; _waitForMoves = false; _resumeBattleCondition = false;
         }
@@ -434,9 +438,13 @@ namespace PokeCreator.Runtime.Script
 
         bool RunScript()
         {
+            int start = _index;
             string script = Cur.StrParam(0);
             while (Next != null && Next.Code == 655) { _index++; script += "\n" + Cur.StrParam(0); }
+            _game.PromptPending = false;
             _game.Compat.RunScript(script, this);
+            // A call asked the player something (pbEnterNPCName...): run the script again once it's answered
+            if (_game.PromptPending) { _game.PromptPending = false; _index = start; return false; }
             return true;
         }
     }

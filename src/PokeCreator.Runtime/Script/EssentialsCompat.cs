@@ -37,7 +37,7 @@ namespace PokeCreator.Runtime.Script
 
         public void RunScript(string script, Interpreter ctx)
         {
-            _locals = new Dictionary<string, object>();
+            _locals = ctx != null ? ctx.Locals : new Dictionary<string, object>();
             var stmts = SplitStatements(script).ToList();
             for (int i = 0; i < stmts.Count; i++)
             {
@@ -59,6 +59,7 @@ namespace PokeCreator.Runtime.Script
                 }
                 try { Eval(stmt, ctx); }
                 catch (Exception ex) { WarnOnce("Script error in \"" + stmt + "\": " + ex.Message); }
+                if (_game.PromptPending) break; // waiting for the player; the script runs again afterwards
             }
         }
 
@@ -222,7 +223,50 @@ namespace PokeCreator.Runtime.Script
                 var idx = Eval(m.Groups[2].Value, ctx);
                 var ivs = coll as List<int>;
                 if (ivs != null) { int s = StatIndex(idx); return s >= 0 && s < ivs.Count ? (object)ivs[s] : null; }
+                var dict = coll as Dictionary<string, object>;
+                if (dict != null) { object dv; return dict.TryGetValue(Convert.ToString(idx, CultureInfo.InvariantCulture), out dv) ? dv : null; }
+                var lst = coll as System.Collections.IList;
+                if (lst != null) { int li = ToInt(idx); if (li < 0) li += lst.Count; return li >= 0 && li < lst.Count ? lst[li] : null; }
             }
+
+            // Indexing any value: pbHiddenPower(pkmn)[0], list[1], hash[:key]
+            if (e.EndsWith("]") && !e.StartsWith("[") && !e.StartsWith("$game_"))
+            {
+                int open = -1;
+                for (int i = 0; i < e.Length; i++)
+                {
+                    if (e[i] == '"' || e[i] == '\'') { int close = e.IndexOf(e[i], i + 1); if (close < 0) break; i = close; continue; }
+                    if (e[i] == '[' && i > 0 && MatchingBracket(e, i) == e.Length - 1) { open = i; break; }
+                    if (e[i] == '(' || e[i] == '{') { int close = MatchingBracket(e, i); if (close < 0) break; i = close; }
+                }
+                if (open > 0)
+                {
+                    var coll = Eval(e.Substring(0, open), ctx);
+                    var idx = Eval(e.Substring(open + 1, e.Length - open - 2), ctx);
+                    var dict2 = coll as Dictionary<string, object>;
+                    if (dict2 != null) { object dv; return dict2.TryGetValue(Convert.ToString(idx, CultureInfo.InvariantCulture), out dv) ? dv : null; }
+                    var ivs2 = coll as List<int>;
+                    if (ivs2 != null) { int s = idx is string ? StatIndex(idx) : ToInt(idx); return s >= 0 && s < ivs2.Count ? (object)ivs2[s] : null; }
+                    var lst2 = coll as System.Collections.IList;
+                    if (lst2 != null) { int li = ToInt(idx); if (li < 0) li += lst2.Count; return li >= 0 && li < lst2.Count ? lst2[li] : null; }
+                    var str2 = coll as string;
+                    if (str2 != null) { int si = ToInt(idx); return si >= 0 && si < str2.Length ? str2.Substring(si, 1) : null; }
+                }
+            }
+
+            // Ruby hash literal: { :A => :B, "x" => 1 }
+            if (e.StartsWith("{") && MatchingBracket(e, 0) == e.Length - 1 && FindTopLevel(e.Substring(1, e.Length - 2), "=>") >= 0)
+            {
+                var h = new Dictionary<string, object>();
+                foreach (var pair in SplitTopLevel(e.Substring(1, e.Length - 2), ','))
+                {
+                    int arrow = FindTopLevel(pair, "=>");
+                    if (arrow < 0) continue;
+                    h[Convert.ToString(Eval(pair.Substring(0, arrow), ctx), CultureInfo.InvariantCulture)] = Eval(pair.Substring(arrow + 2), ctx);
+                }
+                return h;
+            }
+            if (e == "{}") return new Dictionary<string, object>();
 
             // proc { |pkmn| ... }  (filters passed to pbChoosePokemon and friends)
             var pm = Regex.Match(e, @"^proc\s*(?:\{\s*\|(\w+)\|(.*)\}|do\s*\|(\w+)\|(.*)end)$", RegexOptions.Singleline);
@@ -1045,7 +1089,66 @@ namespace PokeCreator.Runtime.Script
             if (member == "to_s") return obj == null ? "" : obj is bool ? ((bool)obj ? "true" : "false") : Convert.ToString(obj, CultureInfo.InvariantCulture);
             if (member == "to_i") { if (obj == null) return 0; int iv; return obj is string ? (int.TryParse((string)obj, out iv) ? iv : 0) : ToInt(obj); }
             if (member == "nil?") return obj == null;
+            if (member == "is_a?" || member == "kind_of?")
+            {
+                string t = args.Count > 0 ? Convert.ToString(args[0]) : "";
+                switch (t)
+                {
+                    case "Symbol": case "String": return obj is string;
+                    case "Integer": case "Numeric": case "Fixnum": return obj is int || obj is double;
+                    case "Array": return obj is System.Collections.IList && !(obj is string);
+                    case "Hash": return obj is Dictionary<string, object>;
+                    case "Pokemon": return obj is PokeCreator.Pkmn.Pokemon;
+                    default: return obj != null && obj.GetType().Name == t;
+                }
+            }
             if (obj == null) return null;
+            var hash = obj as Dictionary<string, object>;
+            if (hash != null)
+            {
+                switch (member)
+                {
+                    case "merge!": case "update": { var o = args.Count > 0 ? args[0] as Dictionary<string, object> : null; if (o != null) foreach (var kv in o) hash[kv.Key] = kv.Value; return hash; }
+                    case "merge": { var copy = new Dictionary<string, object>(hash); var o = args.Count > 0 ? args[0] as Dictionary<string, object> : null; if (o != null) foreach (var kv in o) copy[kv.Key] = kv.Value; return copy; }
+                    case "keys": return hash.Keys.Cast<object>().ToList();
+                    case "values": return hash.Values.ToList();
+                    case "has_key?": case "key?": case "include?": return args.Count > 0 && hash.ContainsKey(Convert.ToString(args[0], CultureInfo.InvariantCulture));
+                    case "length": case "size": case "count": return hash.Count;
+                    case "empty?": return hash.Count == 0;
+                    case "delete": { object v = null; if (args.Count > 0) { string k = Convert.ToString(args[0], CultureInfo.InvariantCulture); hash.TryGetValue(k, out v); hash.Remove(k); } return v; }
+                }
+            }
+            var list = obj as System.Collections.IList;
+            if (list != null && !(obj is string))
+            {
+                var items = list.Cast<object>().ToList();
+                switch (member)
+                {
+                    case "length": case "size": case "count": return items.Count;
+                    case "empty?": return items.Count == 0;
+                    case "first": return items.FirstOrDefault();
+                    case "last": return items.LastOrDefault();
+                    case "sample": return items.Count > 0 ? items[_game.Rng.Next(items.Count)] : null;
+                    case "include?": return args.Count > 0 && items.Any(x => Equals(Convert.ToString(x, CultureInfo.InvariantCulture), Convert.ToString(args[0], CultureInfo.InvariantCulture)));
+                    case "push": case "<<": foreach (var x in args) list.Add(x); return list;
+                    case "compact!": case "compact": for (int i = list.Count - 1; i >= 0; i--) if (list[i] == null) list.RemoveAt(i); return list;
+                    case "sum": return items.Sum(x => ToInt(x));
+                    case "max": return items.Count > 0 ? items.Max(x => ToInt(x)) : 0;
+                    case "min": return items.Count > 0 ? items.Min(x => ToInt(x)) : 0;
+                }
+            }
+            if (obj is string)
+            {
+                var s = (string)obj;
+                switch (member)
+                {
+                    case "length": case "size": return s.Length;
+                    case "upcase": return s.ToUpperInvariant();
+                    case "downcase": return s.ToLowerInvariant();
+                    case "empty?": return s.Length == 0;
+                    case "to_sym": return s;
+                }
+            }
             var pk = obj as PokeCreator.Pkmn.Pokemon;
             var P = _game.Project;
             if (pk != null)
@@ -1141,6 +1244,20 @@ namespace PokeCreator.Runtime.Script
             string pascal = string.Concat(member.TrimEnd('?', '!').Split('_').Select(w => w.Length == 0 ? "" : char.ToUpperInvariant(w[0]) + w.Substring(1)));
             var pp = obj.GetType().GetProperty(pascal);
             if (pp != null) return pp.GetValue(obj, null);
+            // Script API objects (pbBugContestState...): public methods by name
+            string bare = member.TrimEnd('?', '!');
+            var mi = obj.GetType().GetMethods().FirstOrDefault(x => (x.Name == bare || x.Name == pascal) && x.GetParameters().Length == args.Count);
+            if (mi != null)
+            {
+                var ps = mi.GetParameters();
+                var conv = new object[ps.Length];
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    var t = ps[i].ParameterType;
+                    conv[i] = t == typeof(int) ? (object)ToInt(args[i]) : t == typeof(string) ? (object)(args[i] == null ? null : Convert.ToString(args[i], CultureInfo.InvariantCulture)) : t == typeof(bool) ? (object)Truthy(args[i]) : args[i];
+                }
+                return mi.Invoke(obj, conv);
+            }
             WarnOnce("Unsupported member: " + obj.GetType().Name + "." + member);
             return null;
         }
