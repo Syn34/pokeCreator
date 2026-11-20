@@ -26,6 +26,8 @@ namespace PokeCreator.Runtime.UI
         public bool BattleStyleSet { get; set; }
         /// <summary>Battle animations off (Essentials' "Battle Effects" option). Stored inverted so older options files keep them on.</summary>
         public bool BattleEffectsOff { get; set; }
+        /// <summary>Translation chosen by the player (a file in the project's Languages folder; "" = original).</summary>
+        public string Language { get; set; }
         [Json.JsonIgnore] public bool BattleEffects { get { return !BattleEffectsOff; } set { BattleEffectsOff = !value; } }
         public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; SpeechFrame = ""; MenuFrame = ""; }
 
@@ -491,14 +493,18 @@ namespace PokeCreator.Runtime.UI
     {
         readonly PlayerOptions _o;
         int _row;
-        static readonly string[] Labels = { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Close" };
-        List<string> _speech, _menu;
+        readonly string[] Labels;
+        List<string> _speech, _menu, _langs;
 
         public OptionsScene(Game g) : base(g)
         {
             Opaque = true; _o = g.Options;
             _speech = PlayerOptions.Frames(g, "speech"); _speech.Insert(0, "");
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
+            _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
+            Labels = _langs.Count > 1
+                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Language", "Close" }
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Close" };
         }
 
         static string Cycle(List<string> list, string cur, int d)
@@ -524,6 +530,7 @@ namespace PokeCreator.Runtime.UI
                 else if (_row == 5) _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d);
                 else if (_row == 6) _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d);
                 else if (_row == 7) _o.RunToggle = !_o.RunToggle;
+                else if (_row == 8 && _langs.Count > 1) { _o.Language = Cycle(_langs, _o.Language, d); PokeCreator.Projects.Localization.Apply(Game.Project, _o.Language); }
                 _o.Apply(Game);
                 if (_row != Labels.Length - 1) Cursor();
             }
@@ -537,10 +544,12 @@ namespace PokeCreator.Runtime.UI
             Ui.Text(g, 22, 14, "Options");
             Ui.Panel(g, 8, 60, g.Width - 16, 234, new Color(248, 248, 248), new Color(32, 48, 96));
             string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶",
-                                "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "" };
+                                "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "◀ " + (string.IsNullOrEmpty(_o.Language) ? "Original" : _o.Language) + " ▶", "" };
+            if (Labels.Length == 9) values = values.Take(8).Concat(new[] { "" }).ToArray();
+            int rowH = Labels.Length > 9 ? 22 : 25;
             for (int i = 0; i < Labels.Length; i++)
             {
-                int y = 66 + i * 25;
+                int y = 66 + i * rowH;
                 if (i == _row) Ui.Arrow(g, 22, y + 8);
                 Ui.Text(g, 44, y, Labels[i]);
                 Ui.TextRight(g, g.Width - 32, y, values[i]);

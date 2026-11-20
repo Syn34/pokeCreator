@@ -123,7 +123,7 @@ namespace PokeCreator.Runtime.World
             get
             {
                 string n = Data.Properties != null && !string.IsNullOrEmpty(Data.Properties.Name) ? Data.Properties.Name : (Info != null ? Info.Name : "Map " + Id);
-                return n;
+                return PokeCreator.Projects.Localization.T(n);
             }
         }
 

@@ -119,6 +119,7 @@ namespace PokeCreator.Runtime
             LoadFrames();
             Options = PlayerOptions.Load(this);
             Options.Apply(this);
+            if (!string.IsNullOrEmpty(Options.Language)) PokeCreator.Projects.Localization.Apply(Project, Options.Language);
             Interpreter = new Interpreter(this);
             Compat = new EssentialsCompat(this);
             Encounters = new EncounterSystem(this) { Enabled = !_opt.NoEncounters };

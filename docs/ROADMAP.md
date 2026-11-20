@@ -82,7 +82,9 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Shadow Pokémon (trainer Pokémon with the Shadow flag, Shadow type and moves, Snag Machine catching from trainers, heart gauge opened by walking, battling and scents, EXP saved until purified at a Relic Stone)
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
+## v0.7: Sharing
+- [x] Translations (Game → Translations…: Languages/<name>.json with every message, choice, script message and database name; grid editor; refresh keeps existing translations; players choose in Options → Language; included in built games)
+
 ## Later
 - Plugin system for sharing scripts between projects
-- Localization (message tables)
 - Online trading/battling hooks

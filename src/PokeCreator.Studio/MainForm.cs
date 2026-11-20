@@ -134,6 +134,7 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add("Game Settings", null, (s, e) => OpenSettings());
             game.DropDownItems.Add("Player Characters", null, (s, e) => OpenPlayers());
             game.DropDownItems.Add("Switches && Variables", null, (s, e) => OpenDocument("sys:switches", () => new SwitchesEditor(this, Project)));
+            game.DropDownItems.Add("Translations…", null, (s, e) => { if (Project != null) using (var dlg = new TranslationsDialog(Project)) dlg.ShowDialog(this); });
 
             var db = new ToolStripMenuItem("&Database");
             db.DropDownOpening += (s, e) =>

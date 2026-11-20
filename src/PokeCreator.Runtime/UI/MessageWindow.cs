@@ -70,7 +70,8 @@ namespace PokeCreator.Runtime.UI
         /// <summary>Shows a message. If choices are given, the result is passed to onChoice (cancel = cancelIndex).</summary>
         public void Show(string text, List<string> choices = null, int cancelIndex = -1, Action<int> onChoice = null)
         {
-            text = text ?? "";
+            text = PokeCreator.Projects.Localization.T(text ?? "");
+            if (choices != null) choices = choices.Select(PokeCreator.Projects.Localization.T).ToList();
             if (Echo) Console.WriteLine("[msg] " + Expand(text).Replace("\n", " / "));
             _linesPerPage = 2; _framesPerChar = 0; _noKeyAtEnd = false; _autoClose = -1; _position = DefaultPosition; _showGold = false; _speaker = null;
             _waitFrames = 0; _waitingKey = false; _charTimer = 0;
