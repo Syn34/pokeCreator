@@ -826,6 +826,10 @@ namespace PokeCreator.Studio.Editors
                 fieldMenu.DropDownItems.Add("Headbutt Tree", null, (s, a) => QuickFieldObject(cell, "HeadbuttTree"));
                 fieldMenu.DropDownItems.Add("Berry Plant…", null, (s, a) => QuickFieldObject(cell, "BerryPlant"));
                 menu.Items.Add(fieldMenu);
+                var dcMenu = new ToolStripMenuItem("New Day Care");
+                dcMenu.DropDownItems.Add("Day Care Lady (takes and returns Pokémon)", null, (s, a) => QuickDayCare(cell, true));
+                dcMenu.DropDownItems.Add("Day Care Man (gives Eggs)", null, (s, a) => QuickDayCare(cell, false));
+                menu.Items.Add(dcMenu);
                 if (_clipboard != null) menu.Items.Add("Paste Event", null, (s, a) => PasteEvent(cell));
             }
             else
@@ -1149,6 +1153,94 @@ namespace PokeCreator.Studio.Editors
                     break;
             }
             _ed.EditEvent(ev);
+        }
+
+        /// <summary>Day Care Lady / Man using Essentials' DayCare calls (variables 1, 3 and 4 are used as scratch).</summary>
+        void QuickDayCare(Point cell, bool lady)
+        {
+            var ev = NewEvent(cell); ev.Name = lady ? "Day Care Lady" : "Day Care Man";
+            var pg = ev.Pages[0];
+            pg.Graphic.CharacterName = TemplateSprite(lady ? "NPC 13" : "NPC 12");
+            pg.Trigger = Triggers.Action;
+            pg.List = DayCareCommands(lady);
+            _ed.EditEvent(ev);
+        }
+
+        public static List<EventCommand> DayCareCommands(bool lady)
+        {
+            var L = new List<EventCommand>();
+            Action<int, string> text = (i, s) => L.Add(new EventCommand(101, i, s));
+            Action<int, string> script = (i, s) => L.Add(new EventCommand(355, i, s));
+            Action<int, string> ifScript = (i, s) => L.Add(new EventCommand(111, i, 12, s));
+            Action<int> end = i => { L.Add(new EventCommand(0, i + 1)); L.Add(new EventCommand(412, i)); };
+            Action<int> exit = i => L.Add(new EventCommand(115, i));
+            Action<int> yesNo = i => { L.Add(new EventCommand(102, i, new List<object> { "Yes", "No" }, 2)); L.Add(new EventCommand(402, i, 0, "Yes")); };
+            Action<int> no = i => { L.Add(new EventCommand(0, i + 1)); L.Add(new EventCommand(402, i, 1, "No")); };
+            Action<int> endChoice = i => { L.Add(new EventCommand(0, i + 1)); L.Add(new EventCommand(404, i)); };
+            if (lady)
+            {
+                ifScript(0, "DayCare.egg_generated?"); text(1, "Ah, there you are! My husband was looking for you."); exit(1); end(0);
+                // Take Pokémon back
+                ifScript(0, "DayCare.count > 0");
+                text(1, "Ah, it's you! Good to see you. Now, about your Pokémon...");
+                ifScript(1, "DayCare.get_level_gain(0, 3, 4) && pbGet(4) > 0"); text(2, "By level, your \\v[3] has grown by about \\v[4]."); end(1);
+                ifScript(1, "DayCare.get_level_gain(1, 3, 4) && pbGet(4) > 0"); text(2, "By level, your \\v[3] has grown by about \\v[4]."); end(1);
+                text(1, "Do you want your Pokémon back?");
+                yesNo(1);
+                ifScript(2, "$player.party_full?"); text(3, "Your Pokémon team is full. Make room, then come see me."); exit(3); end(2);
+                script(2, "DayCare.choose(_I(\"Which one do you want back?\"), 1)");
+                L.Add(new EventCommand(111, 2, 1, 1, 0, 0, 4)); text(3, "Very good. Come again."); exit(3); end(2);
+                script(2, "DayCare.get_details(pbGet(1), 3, 4)");
+                text(2, "\\GIf you want your \\v[3] back, it will cost $\\v[4].");
+                yesNo(2);
+                ifScript(3, "$player.money < pbGet(4)"); text(4, "\\GYou don't have enough money..."); exit(4); end(3);
+                L.Add(new EventCommand(125, 3, 1, 1, 4));
+                L.Add(new EventCommand(250, 3, AudioObj("Mart buy item")));
+                script(3, "DayCare.withdraw(pbGet(1))");
+                text(3, "\\PN took \\v[3] back from the Day-Care Lady.");
+                exit(3);
+                no(2); endChoice(2);
+                no(1); endChoice(1);
+                end(0);
+                // Leave a Pokémon
+                ifScript(0, "DayCare.count < 2");
+                text(1, "I'm the Day-Care Lady. We can raise Pokémon for you. Would you like us to raise one?");
+                yesNo(1);
+                ifScript(2, "$player.able_pokemon_count <= 1"); text(3, "Oh? But you'd have no Pokémon left to battle with. Come back another time."); exit(3); end(2);
+                text(2, "Which Pokémon should we raise for you?");
+                script(2, "pbChooseNonEggPokemon(1, 3)");
+                L.Add(new EventCommand(111, 2, 1, 1, 0, 0, 4)); text(3, "Oh, fine, then. Come again."); exit(3); end(2);
+                ifScript(2, "!$player.has_other_able_pokemon?(pbGet(1))"); text(3, "If you leave me that Pokémon, what are you gonna battle with?"); exit(3); end(2);
+                script(2, "DayCare.deposit(pbGet(1))");
+                text(2, "Fine, we'll raise your \\v[3] for a while. Come back for it later.");
+                no(1); text(2, "Oh, fine, then. Come again."); endChoice(1);
+                L.Add(new EventCommand(0, 1)); L.Add(new EventCommand(411, 0));
+                text(1, "We're raising two Pokémon for you already. Come back for them later.");
+                end(0);
+            }
+            else
+            {
+                ifScript(0, "DayCare.egg_generated?");
+                text(1, "Ah, it's you! We were raising your Pokémon, and my word, were we surprised! Your Pokémon had an Egg! Do you want it?");
+                yesNo(1);
+                ifScript(2, "$player.party_full?"); text(3, "You have no room for it... Come back when you've made room."); exit(3); end(2);
+                script(2, "DayCare.collect_egg");
+                L.Add(new EventCommand(249, 2, AudioObj("Egg get")));
+                text(2, "\\PN received the Egg from the Day-Care Man.");
+                text(2, "Take good care of it.");
+                no(1); script(2, "DayCare.reset_egg_counters"); text(2, "Well then, I'll keep it. Thanks!"); endChoice(1);
+                exit(1);
+                end(0);
+                ifScript(0, "DayCare.count == 2");
+                script(1, "DayCare.get_compatibility(1)");
+                string[] lines = { "The two prefer to play with other Pokémon more than with each other.", "The two don't really seem to like each other very much.", "The two seem to get along.", "The two seem to get along very well." };
+                for (int c = 0; c < 4; c++) { L.Add(new EventCommand(111, 1, 1, 1, 0, c, 0)); text(2, lines[c]); end(1); }
+                L.Add(new EventCommand(0, 1)); L.Add(new EventCommand(411, 0));
+                text(1, "I'm the Day-Care Man. My wife and I raise Pokémon for Trainers. Talk to her if you'd like us to raise one.");
+                end(0);
+            }
+            L.Add(new EventCommand(0, 0));
+            return L;
         }
 
         /// <summary>The Essentials object graphic if the project has it; otherwise left for the user to pick.</summary>

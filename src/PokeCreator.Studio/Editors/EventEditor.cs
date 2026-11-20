@@ -53,7 +53,7 @@ namespace PokeCreator.Studio.Editors
                         return "◆ Control Variables: " + target + " " + ops[Math.Min(5, c.IntParam(2))] + " " + val;
                     }
                 case 123: return "◆ Control Self Switch: " + c.StrParam(0) + " = " + (c.IntParam(1) == 0 ? "ON" : "OFF");
-                case 125: return "◆ Change Money: " + (c.IntParam(0) == 0 ? "+" : "-") + c.IntParam(2);
+                case 125: return "◆ Change Money: " + (c.IntParam(0) == 0 ? "+" : "-") + (c.IntParam(1) == 1 ? "Variable [" + c.IntParam(2).ToString("0000") + ": " + p.VariableName(c.IntParam(2)) + "]" : c.IntParam(2).ToString());
                 case 201:
                     {
                         if (c.IntParam(0) != 0) return "◆ Transfer Player: (from variables)";
@@ -87,6 +87,8 @@ namespace PokeCreator.Studio.Editors
                         if (sc == "pbTrainerName" || sc.StartsWith("pbEnterPlayerName")) return "◆ Enter Player Name";
                         if (sc.Replace(" ", "") == "$player.has_pokedex=true" || sc.Replace(" ", "") == "$Trainer.pokedex=true") return "◆ Give Pokédex";
                         if (sc.Replace(" ", "") == "$player.has_running_shoes=true") return "◆ Give Running Shoes";
+                        var bd = System.Text.RegularExpressions.Regex.Match(sc.Replace(" ", ""), @"^\$player\.badges\[(\d+)\]=true$");
+                        if (bd.Success) return "◆ Give Badge " + (int.Parse(bd.Groups[1].Value) + 1);
                         var cp = System.Text.RegularExpressions.Regex.Match(sc, @"^pbChangePlayer\(\s*(\d+)\s*\)$");
                         if (cp.Success) { int n = int.Parse(cp.Groups[1].Value); return "◆ Change Player Character: " + n + (n >= 1 && n <= p.Players.Count ? " (" + p.Players[n - 1] + ")" : ""); }
                         var gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbAddPokemon\(\s*:(\w+)\s*,\s*(\d+)\s*\)$");
@@ -150,6 +152,9 @@ namespace PokeCreator.Studio.Editors
                         var tb = System.Text.RegularExpressions.Regex.Match(sc, @"^(?:TrainerBattle\.start|pbTrainerBattle)\(\s*:(\w+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+))?");
                         if (tb.Success) return "won Trainer Battle against " + tb.Groups[1].Value + " " + tb.Groups[2].Value + (tb.Groups[3].Success && tb.Groups[3].Value != "0" ? " (version " + tb.Groups[3].Value + ")" : "");
                         if (sc == "pbCut") return "the player uses Cut";
+                        var hb = System.Text.RegularExpressions.Regex.Match(sc.Replace(" ", ""), @"^\$player\.badges\[(\d+)\]$");
+                        if (hb.Success) return "the player has Badge " + (int.Parse(hb.Groups[1].Value) + 1);
+                        if (sc.Replace(" ", "").StartsWith("$player.badge_count>=")) return "the player has at least " + sc.Substring(sc.IndexOf(">=") + 2).Trim() + " badges";
                         if (sc == "pbRockSmash") return "the player uses Rock Smash";
                         if (sc.StartsWith("pbItemBall(")) return "the player picks up " + sc.Substring(11).Trim(')', ' ', ':');
                         return "Script: " + sc;

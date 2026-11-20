@@ -175,7 +175,7 @@ namespace PokeCreator.Runtime.Script
                 string inner = e.Substring(1, e.Length - 2).Trim();
                 return inner.Length == 0 ? new List<object>() : SplitTopLevel(inner, ',').Where(x => x.Trim().Length > 0).Select(x => Eval(x, ctx)).ToList();
             }
-            var intl = Regex.Match(e, @"^_I(?:NTL|SPRINTF)\((.*)\)$", RegexOptions.Singleline);
+            var intl = Regex.Match(e, @"^_I(?:NTL|SPRINTF)?\((.*)\)$", RegexOptions.Singleline);
             if (intl.Success)
             {
                 var parts = SplitTopLevel(intl.Groups[1].Value, ',').Select(p => Eval(p, ctx)).ToList();

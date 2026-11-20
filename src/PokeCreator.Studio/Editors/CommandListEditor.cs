@@ -217,6 +217,11 @@ namespace PokeCreator.Studio.Editors
             cmd(party, "Enter Player Name", () => Insert(new EventCommand(355, 0, "pbTrainerName")));
             cmd(party, "Give Pokédex", () => Insert(new EventCommand(355, 0, "$player.has_pokedex = true")));
             cmd(party, "Give Running Shoes", () => Insert(new EventCommand(355, 0, "$player.has_running_shoes = true")));
+            cmd(party, "Give Badge", () =>
+            {
+                int b = ChoiceDialog.Ask(FindForm(), "Which badge?", Enumerable.Range(1, 8).Select(i => "Badge " + i).ToArray());
+                if (b >= 0) Insert(new EventCommand(355, 0, "$player.badges[" + b + "] = true"));
+            });
             cmd(party, "Change Player Character", () =>
             {
                 if (_p.Players.Count == 0) { MessageBox.Show(FindForm(), "There are no player characters. Add them under Game Settings > Player Characters.", "Change Player Character"); return; }
