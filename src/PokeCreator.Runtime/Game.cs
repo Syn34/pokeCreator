@@ -460,6 +460,7 @@ namespace PokeCreator.Runtime
         {
             var end = setup.OnEnd;
             // Rain, snow, sandstorm and sun on the map carry into the battle (as Essentials)
+            b.SwitchStyle = Options == null || !Options.BattleStyleSet;
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
             setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (end != null) end(o); };

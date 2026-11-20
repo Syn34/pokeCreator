@@ -97,6 +97,28 @@ namespace PokeCreator.Battles
         /// <summary>Player slots whose Pokémon fainted and must be replaced before the next turn.</summary>
         public readonly List<int> PlayerSlotsToFill = new List<int>();
         public bool NeedPlayerSwitch { get { return PlayerSlotsToFill.Count > 0; } }
+        /// <summary>"Switch" battle style: before a trainer sends in their next Pokémon, the player may change theirs.</summary>
+        public bool SwitchStyle;
+        int _pendingFoe = -1, _pendingFoeSlot;
+        /// <summary>A trainer's next Pokémon is waiting so the player can choose to switch (FinishFoeSendOut).</summary>
+        public bool PendingFoeSendOut { get { return _pendingFoe >= 0; } }
+        public Pokemon PendingFoePokemon { get { return _pendingFoe >= 0 ? Parties[1][_pendingFoe] : null; } }
+        public string PendingFoeTrainer { get { return _pendingFoe >= 0 ? TrainerLabel(_pendingFoe) : ""; } }
+
+        /// <summary>Completes a held-back send-out; switchTo = the player's new Pokémon (party index) or -1 to keep it.</summary>
+        public List<BattleEvent> FinishFoeSendOut(int switchTo)
+        {
+            _ev = new List<BattleEvent>();
+            if (_pendingFoe < 0) return _ev;
+            if (switchTo >= 0 && Field[0][0] != null) SwitchPlayer(0, switchTo);
+            var nb = Place(1, _pendingFoeSlot, _pendingFoe);
+            _pendingFoe = -1;
+            Say(TrainerLabel(nb.PartyIndex) + " sent out " + nb.Pk.Name(P) + "!");
+            SendOutEvent(nb);
+            MarkParticipant();
+            SwitchInAbility(nb);
+            return _ev;
+        }
         public readonly HashSet<int> LeveledUp = new HashSet<int>();  // party indexes to check for evolution afterwards
         public Pokemon CaughtPokemon;
         readonly Dictionary<int, HashSet<int>> _participants = new Dictionary<int, HashSet<int>>(); // foe party index -> player party indexes
@@ -932,6 +954,12 @@ namespace PokeCreator.Battles
                         if (!IsWild && FoeBench(slot).Count > 0)
                         {
                             int next = AINextPokemon(slot);
+                            // Switch style (single battles): hold the send-out so the player can change Pokémon first
+                            if (SwitchStyle && !IsDouble && Live(0).Count > 0 && Bench(0).Count > 0)
+                            {
+                                _pendingFoe = next; _pendingFoeSlot = slot;
+                                continue;
+                            }
                             var nb = Place(1, slot, next);
                             Say(TrainerLabel(next) + " sent out " + nb.Pk.Name(P) + "!");
                             SendOutEvent(nb);

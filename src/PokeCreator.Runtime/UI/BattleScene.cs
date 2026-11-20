@@ -98,6 +98,7 @@ namespace PokeCreator.Runtime.UI
             // All played: what next?
             if (_b.Outcome != BattleOutcome.Ongoing) { EndBattle(); return; }
             if (_b.NeedPlayerSwitch) { ChooseReplacement(); return; }
+            if (_b.PendingFoeSendOut) { AskShift(); return; }
             StartCommands();
         }
 
@@ -367,6 +368,25 @@ namespace PokeCreator.Runtime.UI
                 close();
                 Commit(BattleCommand.Switch(i));
             }, () => _mode = Mode.Command));
+        }
+
+        /// <summary>Switch battle style: "X is about to send in Y. Will you change Pokémon?"</summary>
+        void AskShift()
+        {
+            _mode = Mode.Busy;
+            string text = _b.PendingFoeTrainer + " is about to send in " + _b.PendingFoePokemon.Name(Game.Project) + ".\\nWill \\PN change Pokémon?";
+            Game.Message.Show(text, new List<string> { "Yes", "No" }, 1, c =>
+            {
+                if (c != 0) { Run(_b.FinishFoeSendOut(-1)); return; }
+                Game.PushScene(new PartyScene(Game, "Choose a Pokémon.", null, (i, close) =>
+                {
+                    var pk = _party[i];
+                    if (OnField(i)) { Game.Message.Show(pk.Name(Game.Project) + " is already in battle!"); return; }
+                    if (!Battle.Able(pk)) { Game.Message.Show(pk.IsEgg ? "An Egg can't battle!" : pk.Name(Game.Project) + " has no energy left to battle!"); return; }
+                    close();
+                    Run(_b.FinishFoeSendOut(i));
+                }, () => Run(_b.FinishFoeSendOut(-1))));
+            });
         }
 
         void ChooseReplacement()
