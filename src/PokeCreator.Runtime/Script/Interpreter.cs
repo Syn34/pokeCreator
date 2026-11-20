@@ -300,7 +300,8 @@ namespace PokeCreator.Runtime.Script
                 case 245: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayBgs(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
                 case 247: _game.MemorizedBgm = _game.Audio.CurrentBgm; return true;
                 case 248: if (!string.IsNullOrEmpty(_game.MemorizedBgm)) _game.Audio.PlayBgm(_game.MemorizedBgm); return true;
-                case 246: case 251: return true;
+                case 246: _game.Audio.FadeOutBgs(c.IntParam(0)); return true;
+                case 251: return true;
                 case 249: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayMe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
                 case 250: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlaySe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
 

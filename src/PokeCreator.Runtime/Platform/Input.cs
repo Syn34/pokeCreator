@@ -77,7 +77,7 @@ namespace PokeCreator.Runtime.Platform
             {
                 SDL.Mix_Init(0x08 | 0x10 | 0x20); // MP3 | OGG | MID
                 _ok = SDL.Mix_OpenAudio(44100, 0x8010, 2, 2048) == 0;
-                if (_ok) SDL.Mix_AllocateChannels(16);
+                if (_ok) { SDL.Mix_AllocateChannels(16); SDL.Mix_ReserveChannels(2); } // 0 = BGS, 1 = ME
                 else Console.WriteLine("Audio disabled: " + SDL.GetError());
             }
             catch (Exception ex) { Console.WriteLine("Audio disabled: " + ex.Message); _ok = false; }
@@ -110,7 +110,7 @@ namespace PokeCreator.Runtime.Platform
         public void StopBgm()
         {
             if (_ok && _music != IntPtr.Zero) { SDL.Mix_HaltMusic(); SDL.Mix_FreeMusic(_music); }
-            _music = IntPtr.Zero; _bgmName = "";
+            _music = IntPtr.Zero; _bgmName = ""; _musicPausedForMe = false;
         }
 
         public void FadeOutBgm(int seconds)
@@ -120,19 +120,50 @@ namespace PokeCreator.Runtime.Platform
         }
 
         public void PlaySe(string name, int volume = 100) { PlayChunk("Audio/SE", name, volume); }
-        public void PlayMe(string name, int volume = 100) { PlayChunk("Audio/ME", name, volume); }
-        /// <summary>A Pokémon's cry (Audio/SE/Cries/SPECIES, or SPECIES_form).</summary>
-        public void PlayCry(PokeCreator.Pkmn.Pokemon pk)
-        {
-            if (pk == null || pk.IsEgg) return;
-            string name = pk.Form > 0 && _project.FindAsset("Audio/SE", "Cries/" + pk.Species + "_" + pk.Form) != null ? pk.Species + "_" + pk.Form : pk.Species;
-            PlayChunk("Audio/SE", "Cries/" + name, 100);
-        }
-        public void PlayBgs(string name, int volume = 100) { /* ambient loops: planned */ }
+        const int BgsChannel = 0, MeChannel = 1;
+        bool _musicPausedForMe;
+        string _bgsName = "";
+        public string CurrentBgs { get { return _bgsName; } }
 
-        void PlayChunk(string folder, string name, int volume)
+        /// <summary>A music effect (jingle): the BGM pauses while it plays and carries on afterwards (as RMXP).</summary>
+        public void PlayMe(string name, int volume = 100)
         {
             if (!_ok || string.IsNullOrEmpty(name)) return;
+            IntPtr c = Chunk("Audio/ME", name);
+            if (c == IntPtr.Zero) return;
+            if (_music != IntPtr.Zero && !_musicPausedForMe) { SDL.Mix_PauseMusic(); _musicPausedForMe = true; }
+            SDL.Mix_PlayChannelTimed(MeChannel, c, 0, -1);
+            SDL.Mix_Volume(MeChannel, volume * BgmVolume / 100 * 128 / 100);
+        }
+
+        public bool MePlaying { get { return _ok && SDL.Mix_Playing(MeChannel) != 0; } }
+
+        public void StopMe() { if (_ok) SDL.Mix_HaltChannel(MeChannel); Update(); }
+
+        /// <summary>Background sound: an ambient loop (rain, wind, waves) under the music (Audio/BGS).</summary>
+        public void PlayBgs(string name, int volume = 100)
+        {
+            if (string.IsNullOrEmpty(name)) { StopBgs(); return; }
+            if (!_ok) { _bgsName = name; return; }
+            if (string.Equals(name, _bgsName, StringComparison.OrdinalIgnoreCase) && SDL.Mix_Playing(BgsChannel) != 0) { SDL.Mix_Volume(BgsChannel, volume * BgmVolume / 100 * 128 / 100); return; }
+            IntPtr c = Chunk("Audio/BGS", name);
+            if (c == IntPtr.Zero) { Console.WriteLine("BGS not found: " + name); return; }
+            SDL.Mix_PlayChannelTimed(BgsChannel, c, -1, -1);
+            SDL.Mix_Volume(BgsChannel, volume * BgmVolume / 100 * 128 / 100);
+            _bgsName = name;
+        }
+
+        public void StopBgs() { if (_ok) SDL.Mix_HaltChannel(BgsChannel); _bgsName = ""; }
+        public void FadeOutBgs(int seconds) { if (_ok) SDL.Mix_FadeOutChannel(BgsChannel, Math.Max(0, seconds) * 1000); _bgsName = ""; }
+
+        /// <summary>Called every frame: resumes the BGM once a music effect has finished.</summary>
+        public void Update()
+        {
+            if (_musicPausedForMe && (!_ok || SDL.Mix_Playing(MeChannel) == 0)) { _musicPausedForMe = false; if (_ok && _music != IntPtr.Zero) SDL.Mix_ResumeMusic(); }
+        }
+
+        IntPtr Chunk(string folder, string name)
+        {
             string key = folder + "/" + name;
             IntPtr c;
             if (!_chunks.TryGetValue(key, out c))
@@ -141,6 +172,20 @@ namespace PokeCreator.Runtime.Platform
                 c = path == null ? IntPtr.Zero : SDL.Mix_LoadWAV_RW(SDL.SDL_RWFromFile(SDL.U8(path), SDL.U8("rb")), 1);
                 _chunks[key] = c;
             }
+            return c;
+        }
+        /// <summary>A Pokémon's cry (Audio/SE/Cries/SPECIES, or SPECIES_form).</summary>
+        public void PlayCry(PokeCreator.Pkmn.Pokemon pk)
+        {
+            if (pk == null || pk.IsEgg) return;
+            string name = pk.Form > 0 && _project.FindAsset("Audio/SE", "Cries/" + pk.Species + "_" + pk.Form) != null ? pk.Species + "_" + pk.Form : pk.Species;
+            PlayChunk("Audio/SE", "Cries/" + name, 100);
+        }
+
+        void PlayChunk(string folder, string name, int volume)
+        {
+            if (!_ok || string.IsNullOrEmpty(name)) return;
+            IntPtr c = Chunk(folder, name);
             if (c == IntPtr.Zero) return;
             int ch = SDL.Mix_PlayChannelTimed(-1, c, 0, -1);
             if (ch >= 0) SDL.Mix_Volume(ch, volume * SeVolume / 100 * 128 / 100);

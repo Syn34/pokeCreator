@@ -140,6 +140,11 @@ namespace PokeCreator.Runtime.Platform
         [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_PlayChannelTimed(int channel, IntPtr chunk, int loops, int ticks);
         [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_Volume(int channel, int volume);
         [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_HaltChannel(int channel);
+        [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_FadeOutChannel(int channel, int ms);
+        [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_Playing(int channel);
+        [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern int Mix_ReserveChannels(int num);
+        [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern void Mix_PauseMusic();
+        [DllImport(Mix, CallingConvention = CallingConvention.Cdecl)] public static extern void Mix_ResumeMusic();
     }
 
     /// <summary>SDL scancodes used by the engine.</summary>

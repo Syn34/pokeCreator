@@ -309,6 +309,8 @@ namespace PokeCreator.Runtime
             if (!string.IsNullOrEmpty(ride)) { if (Audio.CurrentBgm != ride) Audio.PlayBgm(ride); return; }
             var data = Map != null ? Map.Data : null;
             if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            if (data != null && data.AutoplayBgs && data.Bgs != null && !string.IsNullOrEmpty(data.Bgs.Name)) Audio.PlayBgs(data.Bgs.Name, data.Bgs.Volume);
+            else if (data != null && data.AutoplayBgs) Audio.StopBgs();
         }
 
         /// <summary>Gets off the bike on maps that don't allow it, and on maps where you're always on it.</summary>
@@ -770,6 +772,7 @@ namespace PokeCreator.Runtime
         }
         void Update()
         {
+            Audio.Update();
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
             if (_scenes.Count > 0)
             {
