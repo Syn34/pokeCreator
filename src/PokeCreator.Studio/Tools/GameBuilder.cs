@@ -20,7 +20,7 @@ namespace PokeCreator.Studio.Tools
         public bool MakeZip = true;
 
         /// <summary>Project folders the game reads.</summary>
-        public static readonly string[] ContentFolders = { "Data", "Graphics", "Audio", "Fonts", "Scripts", "Languages" };
+        public static readonly string[] ContentFolders = { "Data", "Graphics", "Audio", "Fonts", "Scripts", "Languages", "Plugins" };
         /// <summary>Files next to the Studio that are for making games, not playing them.</summary>
         static readonly HashSet<string> EditorFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "PokeCreatorStudio.exe", "PokeCreatorStudio.exe.config", "PokeCreatorImport.exe", "PokeCreatorImport.exe.config", "PokeCreator.Import.dll", "errorlog.txt" };

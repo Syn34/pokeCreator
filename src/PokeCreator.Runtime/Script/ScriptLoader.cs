@@ -19,13 +19,21 @@ namespace PokeCreator.Runtime.Script
         public ScriptCommandAttribute(string name) { Name = name; }
     }
 
-    /// <summary>Compiles the project's Scripts/*.cs files at startup and registers their commands.</summary>
+    /// <summary>
+    /// Marks a static method that runs once when the game starts, after every script is loaded:
+    /// <c>[ScriptInit] public static void Setup(Game game)</c> (subscribe to GameEvents here).
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class ScriptInitAttribute : Attribute { }
+
+    /// <summary>Compiles the project's Scripts/*.cs files and the switched-on plugins' scripts at startup and registers their commands.</summary>
     public static class ScriptLoader
     {
         public static void Load(Game game, string scriptsDir)
         {
-            if (!Directory.Exists(scriptsDir)) return;
-            var files = Directory.GetFiles(scriptsDir, "*.cs", SearchOption.AllDirectories);
+            var list = PokeCreator.Projects.Plugins.ScriptFiles(game.Project);
+            if (Directory.Exists(scriptsDir)) list.AddRange(Directory.GetFiles(scriptsDir, "*.cs", SearchOption.AllDirectories));
+            var files = list.ToArray();
             if (files.Length == 0) return;
 
             var opts = new CompilerParameters { GenerateInMemory = true, GenerateExecutable = false, TreatWarningsAsErrors = false };
@@ -45,6 +53,10 @@ namespace PokeCreator.Runtime.Script
             }
 
             int count = 0;
+            var inits = new List<MethodInfo>();
+            foreach (var type in result.CompiledAssembly.GetTypes())
+                foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+                    if (m.GetCustomAttributes(typeof(ScriptInitAttribute), false).Length > 0) inits.Add(m);
             foreach (var type in result.CompiledAssembly.GetTypes())
                 foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
                     foreach (ScriptCommandAttribute attr in m.GetCustomAttributes(typeof(ScriptCommandAttribute), false))
@@ -56,6 +68,11 @@ namespace PokeCreator.Runtime.Script
                         count++;
                     }
             Console.WriteLine("[scripts] Loaded " + count + " script command(s) from " + files.Length + " file(s)");
+            foreach (var m in inits)
+            {
+                try { m.Invoke(null, m.GetParameters().Length == 1 ? new object[] { game } : new object[0]); }
+                catch (TargetInvocationException e) { Console.WriteLine("[scripts] " + m.DeclaringType.Name + "." + m.Name + " failed: " + e.InnerException.Message); }
+            }
         }
     }
 }

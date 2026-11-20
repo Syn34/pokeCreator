@@ -84,7 +84,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 
 ## v0.7: Sharing
 - [x] Translations (Game → Translations…: Languages/<name>.json with every message, choice, script message and database name; grid editor; refresh keeps existing translations; players choose in Options → Language; included in built games)
+- [x] Plugin system (Plugins/<name>: plugin.json, scripts, assets and database records; requirements; install / export .zip / make from scripts in Game → Plugins…; [ScriptInit] and GameEvents hooks for scripts)
 
 ## Later
-- Plugin system for sharing scripts between projects
 - Online trading/battling hooks

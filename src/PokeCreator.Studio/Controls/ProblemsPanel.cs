@@ -98,6 +98,8 @@ namespace PokeCreator.Studio.Controls
             Filter();
             int run = ++_runId;
             string scripts = p.ScriptsDir;
+            PluginProject = p;
+            foreach (var msg in PokeCreator.Projects.Plugins.Problems(p)) _all.Add(new Problem { Severity = ProblemSeverity.Error, Where = "Plugins", Message = msg, Target = "sys:plugins" });
             _form = FindForm();
             ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -124,13 +126,18 @@ namespace PokeCreator.Studio.Controls
         protected override void OnParentChanged(EventArgs e) { base.OnParentChanged(e); _form = FindForm(); }
 
         /// <summary>Compiles Scripts/*.cs the same way the game does, so script errors show up before you playtest.</summary>
+        /// <summary>The project whose switched-on plugins' scripts are checked with its own.</summary>
+        public static PokeCreator.Projects.Project PluginProject;
+
         public static List<Problem> CompileScripts(string dir)
         {
             var result = new List<Problem>();
             try
             {
-                if (!Directory.Exists(dir)) return result;
-                var files = Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories);
+                var fileList = new List<string>();
+                if (Directory.Exists(dir)) fileList.AddRange(Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories));
+                if (PluginProject != null) fileList.InsertRange(0, PokeCreator.Projects.Plugins.ScriptFiles(PluginProject));
+                var files = fileList.ToArray();
                 if (files.Length == 0) return result;
                 string game = Path.Combine(Application.StartupPath, "Game.exe");
                 if (!File.Exists(game)) return result;

@@ -134,6 +134,7 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add("Game Settings", null, (s, e) => OpenSettings());
             game.DropDownItems.Add("Player Characters", null, (s, e) => OpenPlayers());
             game.DropDownItems.Add("Switches && Variables", null, (s, e) => OpenDocument("sys:switches", () => new SwitchesEditor(this, Project)));
+            game.DropDownItems.Add("Plugins…", null, (s, e) => OpenPlugins());
             game.DropDownItems.Add("Translations…", null, (s, e) => { if (Project != null) using (var dlg = new TranslationsDialog(Project)) dlg.ShowDialog(this); });
 
             var db = new ToolStripMenuItem("&Database");
@@ -228,6 +229,7 @@ namespace PokeCreator.Studio
                 // New images dropped into tileset folders become new areas
                 try { if (p.SyncTilesetFolders()) Json.Json.ToFile(p.DataFile("tilesets.json"), p.Tilesets); } catch { }
                 Project = p;
+                Plugins.UseAssets(p); // plugin graphics show in previews
                 FormBuilder.Project = p;
                 foreach (TabPage tp in _tabs.TabPages.Cast<TabPage>().ToList()) { _tabs.TabPages.Remove(tp); tp.Dispose(); }
                 RebuildTree();
@@ -647,6 +649,7 @@ namespace PokeCreator.Studio
             string t = target ?? "";
             var parts = t.Split(':');
             int n;
+            if (t == "sys:plugins") { OpenPlugins(); return; }
             if (t.StartsWith("map:") && int.TryParse(parts[1], out n))
             {
                 if (Project.GetMapInfo(n) == null) return;
@@ -898,6 +901,13 @@ namespace PokeCreator.Studio
         static string Quote(string s) { return "\"" + s + "\""; }
 
         /// <summary>Game → Test Battle: pick a team and an opponent and jump straight into the battle.</summary>
+        void OpenPlugins()
+        {
+            if (Project == null) return;
+            using (var dlg = new PluginsDialog(Project)) dlg.ShowDialog(this);
+            Plugins.UseAssets(Project);
+        }
+
         void TestBattle()
         {
             if (Project == null) return;

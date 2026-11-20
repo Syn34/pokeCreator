@@ -114,10 +114,14 @@ namespace PokeCreator.Projects
         public string MapFile(int id) { return Path.Combine(MapsDir, "Map" + id.ToString("000") + ".json"); }
 
         /// <summary>Finds a resource like ("Graphics/Characters", "NPC 01") trying common extensions.</summary>
+        /// <summary>More folders searched for assets after the project's own (switched-on plugins).</summary>
+        public readonly List<string> ExtraAssetRoots = new List<string>();
+
         public string FindAsset(string folder, string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
             string found = FindIn(Root, folder, name);
+            for (int i = 0; found == null && i < ExtraAssetRoots.Count; i++) found = FindIn(ExtraAssetRoots[i], folder, name);
             // Fonts fall back to the shared defaults next to the programs (BaseData/Fonts) until the project has its own
             if (found == null && folder == "Fonts" && SharedFontsDir != null) found = FindIn(Path.GetDirectoryName(SharedFontsDir), "Fonts", name);
             return found;

@@ -71,7 +71,9 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Ending**: Hall of Fame (`pbHallOfFameEntry`: shows the team, records it and saves; `pbHallOfFamePC` views past entries) and scrolling credits (`$scene = Scene_Credits.new`, text and music in Game Settings)
 - Poké Marts (`pbPokemonMart`), the Pokémon Center PC (Pokémon storage boxes and item storage) and trainers who spot the player and walk up
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
-- C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands
+- C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands, `[ScriptInit]` methods run at startup and can hook `GameEvents` (steps, map changes, battle ends, frames)
+- Plugins (Game → Plugins…): share scripts, graphics, sounds and database records between projects as folders or .zip files
+- Translations (Game → Translations…): every message and database name in a per-language file with a grid editor; players pick the language in Options
 - Location signs, day/night tint on outdoor maps, BGM/SE/ME through SDL_mixer
 - **Weather**: rain, storm (with lightning), heavy rain, snow, blizzard, sandstorm, sun and fog, from a map's Weather property (e.g. `Rain,50`) or the Set Weather command
 - **Pokémon:** real individual Pokémon with official stat formulas, 25 natures, IVs/EVs, all six EXP growth curves, gender ratios, abilities, shininess and level-up movesets. Events that give Pokémon (`pbAddPokemon`) create them, and healing commands restore HP and PP

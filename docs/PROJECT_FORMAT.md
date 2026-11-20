@@ -70,7 +70,7 @@ A move route (209, or a page's `MoveRoute` when `MoveType` is 3) is `{ "Repeat":
 
 ## Built games
 
-**Game → Build Game** copies the game program (renamed after the game, with its `.config`), `PokeCreator.Core.dll`, the SDL libraries, `licenses/`, `project.json` and the `Data`, `Graphics`, `Audio`, `Fonts` and `Scripts` folders. The game program finds `project.json` next to itself, so the folder runs as it is. Saves go to `%AppData%\PokeCreator\Saves\<game title>`.
+**Game → Build Game** copies the game program (renamed after the game, with its `.config`), `PokeCreator.Core.dll`, the SDL libraries, `licenses/`, `project.json` and the `Data`, `Graphics`, `Audio`, `Fonts`, `Scripts`, `Languages` and `Plugins` folders. The game program finds `project.json` next to itself, so the folder runs as it is. Saves go to `%AppData%\PokeCreator\Saves\<game title>`.
 
 ## Scripts
 
@@ -89,8 +89,44 @@ public static class Rewards
         game.Message.Show("\\PN received 5 Potions!");
         return true;
     }
+
+    // Runs once at startup, after every script and plugin is loaded
+    [ScriptInit]
+    public static void Setup(Game game)
+    {
+        GameEvents.Step += g => { /* every step on the map */ };
+        GameEvents.MapChanged += g => { /* arrived on g.Map */ };
+        GameEvents.BattleEnded += (g, outcome) => { /* Win, Loss, Escaped, Caught */ };
+        GameEvents.GameStarted += g => { /* new game or loaded save */ };
+        GameEvents.Frame += g => { /* every frame on the map */ };
+    }
 }
 ```
+
+## Plugins
+
+`Plugins/<Name>/` folders hold things to share between projects (**Game → Plugins…** installs, switches on/off, exports a plugin as a .zip, or makes one from some of your scripts):
+
+```
+Plugins/MyPlugin/
+  plugin.json         { "Name": "MyPlugin", "Version": "1.0", "Author": "...", "Description": "...", "Requires": ["OtherPlugin"], "Disabled": false }
+  Scripts/*.cs        compiled together with the project's Scripts ([ScriptCommand], [ScriptInit], GameEvents)
+  Graphics/ Audio/ Fonts/   used when the project has no file of that name
+  Data/items.json     database records (any table file name: items.json, moves.json, species.json...) added to
+                      the game's database, replacing entries with the same ID; the project's own files are untouched
+```
+
+Plugins load after the plugins they require; a missing requirement shows in the Problems panel.
+
+## Translations
+
+`Languages/<Name>.json` (made by **Game → Translations…**):
+
+```json
+{ "Language": "Español", "Texts": { "Hello! Welcome to the world of Pokémon!": "¡Hola! ¡Bienvenido al mundo Pokémon!", "Potion": "Poción" } }
+```
+
+Keys are the original texts: event messages (a Show Text command with its continuation lines, joined by spaces), choices, `pbMessage("...")` texts, map names and database names and descriptions. Empty translations fall back to the original. The player picks the language in Options.
 
 ## Map connections
 

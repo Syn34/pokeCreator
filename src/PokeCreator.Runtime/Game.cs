@@ -91,6 +91,10 @@ namespace PokeCreator.Runtime
         public void Run()
         {
             Project = Project.Load(_opt.ProjectDir);
+            // Plugins: their graphics / sounds and database records join the project's
+            PokeCreator.Projects.Plugins.UseAssets(Project);
+            int pluginRecords = PokeCreator.Projects.Plugins.MergeData(Project);
+            if (pluginRecords > 0) Console.WriteLine("[plugins] Added " + pluginRecords + " database record(s)");
             if (SDL.SDL_Init(SDL.INIT_VIDEO | SDL.INIT_EVENTS) != 0) throw new Exception("SDL_Init failed: " + SDL.GetError());
             SDL.SDL_InitSubSystem(SDL.INIT_AUDIO);
             SDL.IMG_Init(0x2 | 0x1); // PNG | JPG
@@ -128,7 +132,7 @@ namespace PokeCreator.Runtime
 
             Player = new Player(this);
             if (_opt.TestParty != null) { NewGame(); StartTestBattle(); }
-            else if (_opt.StartMap > 0 || _opt.SkipTitle) NewGame();
+            else if (_opt.StartMap > 0 || _opt.SkipTitle) { NewGame(); Script.GameEvents.RaiseGameStarted(this); }
             else PushScene(new TitleScene(this));
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
             MessageWindow.Echo = test != null;
@@ -244,6 +248,7 @@ namespace PokeCreator.Runtime
                 Message.Show("The save file couldn't be loaded, so a new game was started.\\n(" + ex.Message + ")");
             }
             _fadeAlpha = 255;
+            Script.GameEvents.RaiseGameStarted(this);
         }
 
         /// <summary>Opens the name entry screen; the running event waits until it's done.</summary>
@@ -351,6 +356,7 @@ namespace PokeCreator.Runtime
             RollMapWeather(true);
             Planes.FromTileset(Map.Tileset);
             World.Roaming.OnMapChanged(this);
+            Script.GameEvents.RaiseMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -373,6 +379,7 @@ namespace PokeCreator.Runtime
             RollMapWeather(false);
             Planes.FromTileset(Map.Tileset);
             World.Roaming.OnMapChanged(this);
+            Script.GameEvents.RaiseMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -614,6 +621,7 @@ namespace PokeCreator.Runtime
                 LastOutcome = o; ResumeOutcome = o;
                 if (!setup.Facility) World.Pokerus.AfterBattle(this);
                 foreach (var pk in State.Party.Where(p => p.ShadowPokemon && b.SentOut.Contains(p) && !p.Fainted)) PokeCreator.Pkmn.Shadow.AdjustHeart(pk, -100);
+                Script.GameEvents.RaiseBattleEnded(this, o);
                 if (end != null) end(o);
             };
             BattleJustStarted = true;
@@ -763,6 +771,7 @@ namespace PokeCreator.Runtime
             // Berry plants grow in real time: update their sprites now and then
             if (++_berryTimer >= 300 && State.BerryPlants.Count > 0) { _berryTimer = 0; Berries.Refresh(this); }
             World.BugContest.Update(this);
+            Script.GameEvents.RaiseFrame(this);
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
