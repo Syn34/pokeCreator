@@ -84,6 +84,12 @@ namespace PokeCreator.Studio.Editors
                         if (cp.Success) { int n = int.Parse(cp.Groups[1].Value); return "◆ Change Player Character: " + n + (n >= 1 && n <= p.Players.Count ? " (" + p.Players[n - 1] + ")" : ""); }
                         var gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbAddPokemon\(\s*:(\w+)\s*,\s*(\d+)\s*\)$");
                         if (gm.Success) return "◆ Give Pokémon: " + gm.Groups[1].Value + " Lv. " + gm.Groups[2].Value;
+                        if (sc.StartsWith("pbPokemonMart(")) return "◆ Poké Mart: " + System.Text.RegularExpressions.Regex.Matches(sc, @":\w+").Count + " item(s)";
+                        if (sc == "pbSetPokemonCenter") return "◆ Set Blackout Point (Pokémon Center)";
+                        if (sc == "pbPokeCenterPC" || sc == "pbTrainerPC") return "◆ Open PC";
+                        if (sc.StartsWith("pbNoticePlayer")) return "◆ Trainer Notices Player (! and walk up)";
+                        if (sc.StartsWith("pbTrainerIntro")) return "◆ Trainer Intro Music";
+                        if (sc == "pbTrainerEnd") return "◆ Trainer End (map music)";
                         var wb = System.Text.RegularExpressions.Regex.Match(sc, @"^(?:WildBattle\.start|pbWildBattle)\(\s*:(\w+)\s*,\s*(\d+)");
                         if (wb.Success) return "◆ Wild Battle: " + wb.Groups[1].Value + " Lv. " + wb.Groups[2].Value;
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");

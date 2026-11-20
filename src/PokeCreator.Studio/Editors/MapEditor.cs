@@ -816,6 +816,9 @@ namespace PokeCreator.Studio.Editors
                 menu.Items.Add("New NPC (talks when spoken to)…", null, (s, a) => QuickNpc(cell));
                 menu.Items.Add("New Door / Warp…", null, (s, a) => QuickWarp(cell));
                 menu.Items.Add("New Item Ball…", null, (s, a) => QuickItem(cell));
+                menu.Items.Add("New Trainer (battles when they see you)…", null, (s, a) => QuickTrainer(cell));
+                menu.Items.Add("New Nurse (heals the party)…", null, (s, a) => QuickNurse(cell));
+                menu.Items.Add("New Poké Mart Clerk…", null, (s, a) => QuickMart(cell));
                 if (_clipboard != null) menu.Items.Add("Paste Event", null, (s, a) => PasteEvent(cell));
             }
             else
@@ -940,7 +943,7 @@ namespace PokeCreator.Studio.Editors
             if (text == null) return;
             var ev = NewEvent(cell); ev.Name = "NPC";
             var pg = ev.Pages[0];
-            pg.Graphic.CharacterName = "NPC 01"; pg.MoveType = 1; pg.Trigger = Triggers.Action;
+            pg.Graphic.CharacterName = TemplateSprite("NPC 01"); pg.MoveType = 1; pg.Trigger = Triggers.Action;
             pg.List = new List<EventCommand> { new EventCommand(101, 0, text), new EventCommand(0, 0) };
             _ed.EditEvent(ev);
         }
@@ -961,8 +964,10 @@ namespace PokeCreator.Studio.Editors
 
         void QuickItem(Point cell)
         {
-            string item = Prompt.Ask(FindForm(), "New item ball", "Item ID (e.g. POTION):", "POTION");
-            if (string.IsNullOrEmpty(item)) return;
+            var itemIds = _p.Items.Where(i => i.Pocket != 8).Select(i => i.Id).ToArray();
+            int pick = ChoiceDialog.Ask(FindForm(), "New item ball: which item?", itemIds, true);
+            if (pick < 0) return;
+            string item = itemIds[pick];
             var ev = NewEvent(cell); ev.Name = "Item";
             var p1 = ev.Pages[0];
             p1.Graphic.CharacterName = "Object ball"; p1.Trigger = Triggers.Action;
@@ -978,6 +983,125 @@ namespace PokeCreator.Studio.Editors
             p2.Condition.SelfSwitchValid = true; p2.Condition.SelfSwitchCh = "A";
             ev.Pages.Add(p2);
             _ed.EditEvent(ev);
+        }
+
+        /// <summary>
+        /// An Essentials trainer: "Trainer(n)" event that walks up when it sees the player, battles, and afterwards
+        /// says its after-battle line (self switch A).
+        /// </summary>
+        void QuickTrainer(Point cell)
+        {
+            var list = _p.Trainers.OrderBy(t => t.TrainerType).ThenBy(t => t.Name).ToList();
+            if (list.Count == 0) { MessageBox.Show(FindForm(), "There are no trainers yet. Add them under Database > Trainers first.", "New Trainer"); return; }
+            int k = ChoiceDialog.Ask(FindForm(), "New trainer: which trainer from the database?", list.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (version " + t.Version + ")" : "") + "  -  " + t.Pokemon.Count + " Pokémon").ToArray(), true);
+            if (k < 0) return;
+            var tr = list[k];
+            int range = NumberDialog.Ask(FindForm(), "How many tiles can they see? (0 = only when talked to)", 3);
+            if (range < 0) return;
+            string before = Prompt.Ask(FindForm(), "New trainer", "What do they say before battling?", "Hey! You there! Let's battle!");
+            if (before == null) return;
+            string after = Prompt.Ask(FindForm(), "New trainer", "What do they say after you beat them?", "You're strong!");
+            if (after == null) return;
+            string battle = "TrainerBattle.start(:" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"" + (tr.Version > 0 ? ", " + tr.Version : "") + ")";
+            var ev = NewEvent(cell); ev.Name = range > 0 ? "Trainer(" + range + ")" : "Trainer";
+            var p1 = ev.Pages[0];
+            // Overworld sprites follow the trainer_<TYPE> naming
+            string sprite = "trainer_" + tr.TrainerType;
+            p1.Graphic.CharacterName = TemplateSprite(sprite);
+            p1.Trigger = range > 0 ? Triggers.EventTouch : Triggers.Action;
+            p1.List = new List<EventCommand>
+            {
+                new EventCommand(355, 0, "pbTrainerIntro(:" + tr.TrainerType + ")"),
+                new EventCommand(355, 0, "pbNoticePlayer(get_self)"),
+                new EventCommand(101, 0, before),
+                new EventCommand(111, 0, 12, battle),
+                new EventCommand(123, 1, "A", 0),
+                new EventCommand(0, 1),
+                new EventCommand(412, 0),
+                new EventCommand(355, 0, "pbTrainerEnd"),
+                new EventCommand(0, 0)
+            };
+            var p2 = new EventPage();
+            p2.Condition.SelfSwitchValid = true; p2.Condition.SelfSwitchCh = "A";
+            p2.Graphic.CharacterName = p1.Graphic.CharacterName; p2.Graphic.Direction = p1.Graphic.Direction;
+            p2.Trigger = Triggers.Action;
+            p2.List = new List<EventCommand> { new EventCommand(101, 0, after), new EventCommand(0, 0) };
+            ev.Pages.Add(p2);
+            _ed.EditEvent(ev);
+        }
+
+        /// <summary>A Pokémon Center nurse: heals the party and makes this the place to return to after blacking out.</summary>
+        void QuickNurse(Point cell)
+        {
+            var ev = NewEvent(cell); ev.Name = "Nurse";
+            var pg = ev.Pages[0];
+            pg.Graphic.CharacterName = TemplateSprite("NPC 16");
+            pg.Trigger = Triggers.Action;
+            pg.List = new List<EventCommand>
+            {
+                new EventCommand(102, 0, new List<object> { "Yes", "No" }, 2),
+                new EventCommand(402, 0, 0, "Yes"),
+                new EventCommand(101, 1, "OK, I'll take your Pokémon for a few seconds."),
+                new EventCommand(355, 1, "pbSetPokemonCenter"),
+                new EventCommand(314, 1, 0),
+                new EventCommand(249, 1, AudioObj("Pkmn healing")),
+                new EventCommand(106, 1, 40),
+                new EventCommand(101, 1, "Thank you for waiting. We've restored your Pokémon to full health. We hope to see you again!"),
+                new EventCommand(0, 1),
+                new EventCommand(402, 0, 1, "No"),
+                new EventCommand(101, 1, "We hope to see you again!"),
+                new EventCommand(0, 1),
+                new EventCommand(404, 0),
+                new EventCommand(0, 0)
+            };
+            pg.List.Insert(0, new EventCommand(101, 0, "Welcome to our Pokémon Center! Would you like me to heal your Pokémon back to perfect health?"));
+            _ed.EditEvent(ev);
+        }
+
+        /// <summary>A shop clerk selling the items you tick.</summary>
+        void QuickMart(Point cell)
+        {
+            var items = _p.Items.Where(i => i.Price > 0 && i.Pocket != 8).OrderBy(i => i.Pocket).ThenBy(i => i.Price).ToList();
+            using (var f = new Form { Text = "New Poké Mart Clerk: tick the items to sell", Width = 460, Height = 560, StartPosition = FormStartPosition.CenterParent, MinimizeBox = false, ShowInTaskbar = false })
+            {
+                var search = new TextBox { Dock = DockStyle.Top };
+                var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
+                var ok = new Button { Text = "Create", Dock = DockStyle.Bottom, Height = 32, DialogResult = DialogResult.OK };
+                var chosen = new HashSet<string> { "POKEBALL", "POTION", "ANTIDOTE", "PARALYZEHEAL", "ESCAPEROPE", "REPEL" };
+                Action fill = () =>
+                {
+                    list.Items.Clear();
+                    foreach (var it in items)
+                        if (search.Text.Length == 0 || (it.Name ?? it.Id).IndexOf(search.Text, StringComparison.OrdinalIgnoreCase) >= 0)
+                            list.Items.Add(new KeyValuePair<string, string>(it.Id, (it.Name ?? it.Id) + "  ($" + it.Price + ")"), chosen.Contains(it.Id));
+                };
+                list.Format += (s, e) => e.Value = ((KeyValuePair<string, string>)e.ListItem).Value;
+                list.ItemCheck += (s, e) => { var id = ((KeyValuePair<string, string>)list.Items[e.Index]).Key; if (e.NewValue == CheckState.Checked) chosen.Add(id); else chosen.Remove(id); };
+                search.TextChanged += (s, e) => fill();
+                f.Controls.Add(list); f.Controls.Add(search); f.Controls.Add(ok); f.AcceptButton = ok;
+                fill();
+                if (f.ShowDialog(FindForm()) != DialogResult.OK || chosen.Count == 0) return;
+                var stock = items.Where(i => chosen.Contains(i.Id)).Select(i => ":" + i.Id).ToList();
+                var ev = NewEvent(cell); ev.Name = "Mart";
+                var pg = ev.Pages[0];
+                pg.Graphic.CharacterName = TemplateSprite("NPC 19");
+                pg.Trigger = Triggers.Action;
+                pg.List = new List<EventCommand> { new EventCommand(355, 0, "pbPokemonMart([" + string.Join(", ", stock) + "])"), new EventCommand(0, 0) };
+                _ed.EditEvent(ev);
+            }
+        }
+
+        /// <summary>
+        /// A character sprite for a template event: the preferred one if the project has it, else any character
+        /// sprite, so the event is visible and can be talked to from the front.
+        /// </summary>
+        string TemplateSprite(string preferred)
+        {
+            if (_p.FindAsset("Graphics/Characters", preferred) != null) return preferred;
+            string dir = System.IO.Path.Combine(_p.GraphicsDir, "Characters");
+            if (!System.IO.Directory.Exists(dir)) return "";
+            var any = System.IO.Directory.GetFiles(dir, "*.png").Select(System.IO.Path.GetFileNameWithoutExtension).OrderBy(n => n.StartsWith("trainer_") ? 1 : 0).ThenBy(n => n).FirstOrDefault();
+            return any ?? "";
         }
 
         static JsonObject AudioObj(string name) { var a = new JsonObject(); a["Name"] = name; a["Volume"] = 100; a["Pitch"] = 100; return a; }
