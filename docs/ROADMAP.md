@@ -92,6 +92,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Event commands: button input, save / menu / encounter access, name input; Summary Memo & Ribbons pages, move details and reordering
 - [x] Overworld ability and item effects on wild encounters (Stench, Cleanse Tag, Arena Trap, Sand Veil, Hustle, Intimidate, Static / Magnet Pull, Synchronize, Cute Charm…), White / Black Flute, Pokégear Jukebox (March / Lullaby / Oak / custom music)
 - [x] Debug menu in playtests (F9): warp, switches, variables, heal, add Pokémon / items, fill Bag, money, wild / trainer battles, fill Pokédex, toggles, hatch eggs, PC; hold Ctrl to walk through walls
+- [x] setBattleRule: cannotRun, noExp, noMoney, weather, terrain, backdrop / environment, noPartner, disablePokeBalls, switchStyle / setStyle, battleBGM (plus size, canLose, outcomeVar)
 - [x] Essentials Battle Frontier calls: pbBattleChallenge.set / start / pbEnd / pbCancel / pbAddWin / pbMatchOver? / setDecision / pbGoToStart / pbRest / pbGoOn / getMaxWins, tower/factory/palace/arena/cup rules, pbEntryScreen, pbHasEligible?, pbBattleChallengeBattle / Graphic / BeginSpeech, Factory rentals
 - [x] Mystery Gift (Database → Mystery Gifts: Pokémon or items, open to everyone or unlocked by a code on the title screen; pbReceiveMysteryGift / pbNextMysteryGiftID for the delivery person)
 - [x] Shadow Pokémon (trainer Pokémon with the Shadow flag, Shadow type and moves, Snag Machine catching from trainers, heart gauge opened by walking, battling and scents, EXP saved until purified at a Relic Stone)

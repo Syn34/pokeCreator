@@ -625,8 +625,37 @@ namespace PokeCreator.Runtime
             return true;
         }
 
+        /// <summary>setBattleRule settings waiting for the next battle.</summary>
+        public Dictionary<string, object> NextBattleRules;
+
+        void ApplyBattleRules(PokeCreator.Battles.Battle b, BattleSetup setup, Dictionary<string, object> r)
+        {
+            Func<string, bool> on = k => { object v; return r.TryGetValue(k, out v) && v != null && !(v is bool && !(bool)v); };
+            Func<string, string> str = k => { object v; return r.TryGetValue(k, out v) && v != null && !(v is bool) ? Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture).TrimStart(':') : null; };
+            if (on("cannotRun") || (r.ContainsKey("canRun") && !on("canRun"))) b.CannotRun = true;
+            if (on("noExp") || on("noexp")) b.NoExp = true;
+            if (on("noMoney") || on("nomoney")) setup.NoMoney = true;
+            if (on("disablePokeBalls")) b.DisablePokeBalls = true;
+            if (on("noPartner") || on("nopartner")) setup.NoPartner = true;
+            if (on("switchStyle")) b.SwitchStyle = true;
+            if (on("setStyle")) b.SwitchStyle = false;
+            string w = str("weather");
+            if (!string.IsNullOrEmpty(w))
+            {
+                string wl = w.ToLowerInvariant();
+                b.Weather = wl.Contains("rain") ? (wl.Contains("heavy") ? "HeavyRain" : "Rain") : wl.Contains("sun") ? (wl.Contains("harsh") ? "HarshSun" : "Sun") : wl.Contains("sand") ? "Sandstorm" : wl.Contains("hail") || wl.Contains("snow") ? PokeCreator.Battles.Battle.FromFieldWeather("Snow") : wl.Contains("none") ? b.Weather : PokeCreator.Battles.Battle.FromFieldWeather(w);
+            }
+            string t = str("terrain");
+            if (!string.IsNullOrEmpty(t) && !t.Equals("none", StringComparison.OrdinalIgnoreCase)) { b.Terrain = char.ToUpperInvariant(t[0]) + t.Substring(1).ToLowerInvariant(); b.TerrainTurns = 999; }
+            string bd = str("backdrop") ?? str("environment") ?? str("base");
+            if (!string.IsNullOrEmpty(bd)) setup.Backdrop = bd.ToLowerInvariant();
+            string bgm = str("battleBGM");
+            if (!string.IsNullOrEmpty(bgm)) setup.Bgm = bgm;
+        }
+
         void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
         {
+            var rules = NextBattleRules; NextBattleRules = null;
             var end = setup.OnEnd;
             // Safari Zone: wild battles are Safari battles
             if (setup.Wild && World.Safari.InZone(this) && b.Parties[1].Count == 1 && !b.IsDouble)
@@ -644,7 +673,7 @@ namespace PokeCreator.Runtime
             }
             // A registered partner fights alongside the player (the battle becomes a double battle)
             var partner = State.Extras.Partner;
-            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari && !setup.BugContest && !setup.Facility)
+            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari && !setup.BugContest && !setup.Facility && (rules == null || !rules.ContainsKey("noPartner")))
             {
                 var ptt = Project.TrainerTypes.FirstOrDefault(t => t.Id == partner.TrainerType);
                 b.AddPartner(partner.Party, partner.Name, ptt != null && !string.IsNullOrEmpty(ptt.Name) ? ptt.Name : partner.TrainerType, ptt != null ? Math.Max(32, ptt.SkillLevel) : 32);
@@ -656,6 +685,7 @@ namespace PokeCreator.Runtime
             b.CanSnag = State.Flags.Contains("has_snag_machine");
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
+            if (rules != null) ApplyBattleRules(b, setup, rules);
             setup.OnEnd = o =>
             {
                 LastOutcome = o; ResumeOutcome = o;

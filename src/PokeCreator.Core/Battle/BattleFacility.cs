@@ -18,6 +18,9 @@ namespace PokeCreator.Battles
         /// <summary>The weather when the battle began (before abilities), for playing it back.</summary>
         public string InitialWeather;
 
+        /// <summary>setBattleRule("cannotRun") / ("disablePokeBalls").</summary>
+        public bool CannotRun, DisablePokeBalls;
+
         /// <summary>"palace", "arena" or null.</summary>
         public string FacilityRule;
 

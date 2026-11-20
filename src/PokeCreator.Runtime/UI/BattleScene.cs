@@ -31,6 +31,8 @@ namespace PokeCreator.Runtime.UI
         public bool Facility;
         /// <summary>A link battle: no Bag, no running, no prize money; LinkUpdate runs every frame (network).</summary>
         public bool Link;
+        /// <summary>setBattleRule("noMoney") / ("noPartner").</summary>
+        public bool NoMoney, NoPartner;
         /// <summary>Plays back a recorded battle: the recorded decisions are made instead of asking the player.</summary>
         public List<List<int>> Replay;
         public Action LinkUpdate;
@@ -657,7 +659,7 @@ namespace PokeCreator.Runtime.UI
                 if (tr != null && !string.IsNullOrEmpty(tr.LoseText)) steps.Add(next => Game.Message.Show(tr.LoseText, null, -1, _ => next()));
                 var tr2 = _setup.Trainer2;
                 if (tr2 != null && !string.IsNullOrEmpty(tr2.LoseText)) steps.Add(next => Game.Message.Show(tr2.LoseText, null, -1, _ => next()));
-                int money = Prize();
+                int money = _setup.NoMoney ? 0 : Prize();
                 if (money > 0) steps.Add(next => { Game.State.Money += money; Game.Message.Show("\\PN got $" + money + " for winning!", null, -1, _ => next()); });
             }
             else if (o == BattleOutcome.Win)

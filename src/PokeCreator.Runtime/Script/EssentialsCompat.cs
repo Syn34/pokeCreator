@@ -916,7 +916,7 @@ namespace PokeCreator.Runtime.Script
                 if (a.Count >= 6 && a[2] is string && a[4] is string)
                 {
                     if (_game.ResumeOutcome.HasValue && c != null && _game.ResumeOwner == c) { var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null; return (int)o; }
-                    int ov = OutcomeVar(); _battleRules.Clear();
+                    int ov = OutcomeVar(); HandOffRules();
                     _game.StartTripleWildBattle(Str(a, 0), ToInt(a[1]), Str(a, 2), ToInt(a[3]), Str(a, 4), ToInt(a[5]), o => _game.State.SetVar(ov, (int)o));
                     return 1;
                 }
@@ -1079,6 +1079,13 @@ namespace PokeCreator.Runtime.Script
 
         readonly Dictionary<string, object> _battleRules = new Dictionary<string, object>();
 
+        /// <summary>The rules not used for choosing the battle (weather, terrain, noExp...) go with the next battle.</summary>
+        void HandOffRules()
+        {
+            if (_battleRules.Count > 0) _game.NextBattleRules = new Dictionary<string, object>(_battleRules, StringComparer.OrdinalIgnoreCase);
+            _battleRules.Clear();
+        }
+
         bool TakeRule(string name) { object v; bool on = _battleRules.TryGetValue(name, out v) && Truthy(v); return on; }
 
         /// <summary>TrainerBattle.start(:TYPE, "Name"[, version][, :TYPE2, "Name2"[, version2]]).</summary>
@@ -1110,7 +1117,7 @@ namespace PokeCreator.Runtime.Script
             }
             bool canLose = TakeRule("canLose");
             int outcomeVar = OutcomeVar();
-            _battleRules.Clear();
+            HandOffRules();
             var t2 = trainers.Count > 1 ? trainers[1] : null;
             if (!_game.StartDoubleTrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], t2 != null ? (string)t2[0] : null, t2 != null ? (string)t2[1] : null, t2 != null ? (int)t2[2] : 0, canLose, o => _game.State.SetVar(outcomeVar, (int)o), triple))
             {
@@ -1145,7 +1152,7 @@ namespace PokeCreator.Runtime.Script
                 return asBool ? (object)(o != PokeCreator.Battles.BattleOutcome.Loss) : (int)o;
             }
             int outcomeVar = OutcomeVar();
-            _battleRules.Clear();
+            HandOffRules();
             _game.StartDoubleWildBattle(s1, l1, s2, l2, o => _game.State.SetVar(outcomeVar, (int)o));
             return asBool ? (object)true : 1;
         }
@@ -1160,7 +1167,7 @@ namespace PokeCreator.Runtime.Script
             }
             bool canLose = TakeRule("canLose");
             int outcomeVar = OutcomeVar();
-            _battleRules.Clear();
+            HandOffRules();
             if (!_game.StartTrainerBattle(type, name, version, canLose, o => _game.State.SetVar(outcomeVar, (int)o)))
             {
                 WarnOnce("Trainer battle skipped (no trainer " + type + " \"" + name + "\" in the database, or no Pokémon that can battle)");
@@ -1181,7 +1188,7 @@ namespace PokeCreator.Runtime.Script
             }
             int outcomeVar = OutcomeVar();
             bool canLose = TakeRule("canLose");
-            _battleRules.Clear();
+            HandOffRules();
             _game.StartWildBattle(species, level, o => _game.State.SetVar(outcomeVar, (int)o));
             return asBool ? (object)true : 1;
         }

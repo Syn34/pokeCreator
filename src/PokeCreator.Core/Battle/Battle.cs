@@ -1663,6 +1663,7 @@ namespace PokeCreator.Battles
         bool TryRun()
         {
             if (!IsWild) { Say("No! There's no running from a Trainer battle!"); return false; }
+            if (CannotRun) { Say("You can't escape!"); return false; }
             RunAttempts++;
             var me = Live(0).FirstOrDefault() ?? Field[0][0]; var foe = Live(1).FirstOrDefault() ?? Field[1][0];
             bool ghost = TypesOf(me).Contains("GHOST");
@@ -1740,6 +1741,7 @@ namespace PokeCreator.Battles
         {
             var item = P.Items.FirstOrDefault(i => i.Id == ball);
             string bname = item != null ? item.Name : ball;
+            if (DisablePokeBalls) { Say("You can't throw a Poké Ball now!"); return; }
             Say(PlayerName + " threw " + (StartsWithVowel(bname) ? "an " : "a ") + bname + "!");
             if (!IsWild && !(CanSnag && Live(1).Count == 1 && Live(1)[0].Pk.ShadowPokemon))
             {
