@@ -36,6 +36,14 @@ namespace PokeCreator.Pkmn
         public static string Display(string id) { return string.IsNullOrEmpty(id) ? "" : id.Substring(0, 1) + id.Substring(1).ToLowerInvariant(); }
     }
 
+    /// <summary>A Mail item's message (as Essentials' Mail): the item, the text and who wrote it.</summary>
+    public class PokemonMail
+    {
+        public string Item { get; set; }
+        public string Message { get; set; }
+        public string Sender { get; set; }
+    }
+
     public static class GrowthRates
     {
         public const int MaxLevel = 100;
@@ -166,6 +174,8 @@ namespace PokeCreator.Pkmn
             Pokerus = (Pokerus & 0xF0) | Math.Max(0, (Pokerus & 15) - days);
         }
         public string Ball { get; set; }
+        /// <summary>The letter on held Mail (null when it holds none).</summary>
+        public PokemonMail Mail { get; set; }
         /// <summary>Box markings (bits: circle, triangle, square, heart, star, diamond).</summary>
         public int Markings { get; set; }
         public string OTName { get; set; }

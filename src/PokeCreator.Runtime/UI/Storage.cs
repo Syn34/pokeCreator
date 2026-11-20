@@ -163,7 +163,11 @@ namespace PokeCreator.Runtime.UI
                 if (_party >= Party.Count) { if (Party.Count >= GameState.MaxParty) { Buzz(); return; } Party.Add(_held); _held = null; }
                 else { Party[_party] = _held; _held = target; }
             }
-            else { Box.Slots[_cursor] = _held; _held = target; }
+            else
+            {
+                if (_held.Mail != null) { Game.Message.Show("Please remove the Mail first."); return; }
+                Box.Slots[_cursor] = _held; _held = target;
+            }
             Game.Audio.PlaySe("GUI storage put down");
         }
 
@@ -178,6 +182,7 @@ namespace PokeCreator.Runtime.UI
         {
             var pk = Party[_party];
             if (Battle.Able(pk) && AbleInParty(pk) == 0) { Game.Message.Show("That's your last Pokémon!"); return; }
+            if (pk.Mail != null) { Game.Message.Show("Please remove the Mail first."); return; }
             int at = Box.Slots.IndexOf(null);
             int boxNo = S.Current;
             if (at < 0) { boxNo = S.TryAdd(pk); if (boxNo < 0) { Game.Message.Show("The boxes are full."); return; } }

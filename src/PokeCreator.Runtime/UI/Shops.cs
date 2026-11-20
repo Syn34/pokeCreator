@@ -228,13 +228,57 @@ namespace PokeCreator.Runtime.UI
             });
         }
 
+        /// <summary>The PC mailbox: read letters, move the Mail back to the Bag (the message is lost) or give it to a Pokémon.</summary>
+        static void Mailbox(Game g, Action back)
+        {
+            var box = g.State.Extras.Mailbox;
+            if (box == null || box.Count == 0) { back(); return; }
+            var names = box.Select(m => { var it = g.Project.Items.FirstOrDefault(i => i.Id == m.Item); return (it != null ? it.Name : m.Item) + " (" + m.Sender + ")"; }).ToList();
+            names.Add("Cancel");
+            g.Message.Show("Which Mail?", names, names.Count - 1, k =>
+            {
+                if (k < 0 || k >= box.Count) { back(); return; }
+                var mail = box[k];
+                g.Message.Show("What do you want to do with it?", new List<string> { "Read", "Move to Bag", "Give", "Cancel" }, 3, a =>
+                {
+                    Action again = () => Mailbox(g, back);
+                    if (a == 0) { var sc = new MailScene(g, mail); sc.OnClosed = again; g.PushScene(sc); }
+                    else if (a == 1)
+                    {
+                        g.Message.Show("The message will be lost. Is that OK?", new List<string> { "Yes", "No" }, 1, y =>
+                        {
+                            if (y == 0) { box.Remove(mail); g.State.AddItem(mail.Item, 1); g.Message.Show("The Mail was returned to the Bag with its message erased.", null, -1, _ => again()); }
+                            else again();
+                        });
+                    }
+                    else if (a == 2)
+                    {
+                        g.PushScene(new PartyScene(g, "Give to which Pokémon?", null, (i, close) =>
+                        {
+                            var pk = g.State.Party[i];
+                            if (pk.IsEgg) { g.Message.Show("Eggs can't hold items."); return; }
+                            if (!string.IsNullOrEmpty(pk.Item)) { g.Message.Show(pk.Name(g.Project) + " is already holding an item."); return; }
+                            close(); box.Remove(mail); pk.Item = mail.Item; pk.Mail = mail;
+                            g.Message.Show("The Mail was given to " + pk.Name(g.Project) + ".", null, -1, _ => again());
+                        }, again));
+                    }
+                    else again();
+                });
+            });
+        }
+
         static void PlayerPc(Game g, Action back)
         {
             g.Audio.PlaySe("PC access");
-            var options = new List<string> { "Withdraw Item", "Deposit Item", "Toss Item", "Log off" };
-            g.Message.Show("What do you want to do?", options, 3, c =>
+            bool mail = g.State.Extras.Mailbox != null && g.State.Extras.Mailbox.Count > 0;
+            var options = new List<string> { "Withdraw Item", "Deposit Item", "Toss Item" };
+            if (mail) options.Add("Mailbox");
+            options.Add("Log off");
+            g.Message.Show("What do you want to do?", options, options.Count - 1, c =>
             {
                 Action again = () => PlayerPc(g, back);
+                if (mail && c == 3) { Mailbox(g, again); return; }
+                if (mail && c == 4) c = 3;
                 if (c == 0) WithdrawItem(g, again);
                 else if (c == 1) g.PushScene(new BagScene(g, id =>
                 {

@@ -209,6 +209,25 @@ namespace PokeCreator.Runtime.Script
             Register("pbFlyToNewLocation", (c, a) => false);
             Register("pbEncounter", (c, a) => FieldMoves.EncounterFrom(_game, new[] { Str(a, 0).TrimStart(':') }));
             Register("pbFadeOutInWithMusic", (c, a) => true);
+            Register("pbStoreMail", (c, a) =>
+            {
+                var pk = Arg(a, 0) as Pokemon; if (pk == null) return false;
+                pk.Item = Str(a, 1); pk.Mail = new PokemonMail { Item = Str(a, 1), Message = Str(a, 2), Sender = _game.State.PlayerName };
+                return true;
+            });
+            Register("pbMoveToMailbox", (c, a) =>
+            {
+                var pk = Arg(a, 0) as Pokemon; if (pk == null || pk.Mail == null) return false;
+                if (_game.State.Extras.Mailbox == null) _game.State.Extras.Mailbox = new List<PokemonMail>();
+                if (_game.State.Extras.Mailbox.Count >= 10) return false;
+                _game.State.Extras.Mailbox.Add(pk.Mail); pk.Mail = null; pk.Item = null; return true;
+            });
+            Register("pbDisplayMail", (c, a) =>
+            {
+                var m = Arg(a, 0) as PokemonMail ?? (Arg(a, 0) is Pokemon ? ((Pokemon)Arg(a, 0)).Mail : null);
+                if (m != null) _game.PushScene(new UI.MailScene(_game, m));
+                return true;
+            });
             // $PokemonStorage: boxes as lists ($PokemonStorage[box][slot]) plus the usual queries
             Register("$PokemonStorage", (c, a) => _game.State.Storage.Boxes.Select(b => (object)b.Slots).ToList());
             Register("$PokemonStorage.full?", (c, a) => _game.State.Storage.Full);

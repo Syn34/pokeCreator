@@ -217,8 +217,10 @@ namespace PokeCreator.Runtime.UI
                 else if (_fieldMoves.ContainsKey(cmd)) FieldMoves.UseFromParty(Game, pk, _fieldMoves[cmd]);
                 else if (cmd == "Switch") { _switchFrom = _index; _help = "Move to where?"; }
                 else if (cmd == "Item") _popup = new CommandList(new[] { "Give", "Take", "Cancel" });
+                else if (cmd == "Mail") _popup = new CommandList(new[] { "Read", "Take", "Cancel" });
+                else if (cmd == "Read") { if (pk.Mail != null) Game.PushScene(new MailScene(Game, pk.Mail)); }
                 else if (cmd == "Give") Game.PushScene(new BagScene(Game, id => ItemFlow.Give(Game, pk, id, null)));
-                else if (cmd == "Take") ItemFlow.Take(Game, pk, null);
+                else if (cmd == "Take") { if (pk.Mail != null) ItemFlow.TakeMail(Game, pk, null); else ItemFlow.Take(Game, pk, null); }
                 return;
             }
             int last = Party.Count; // index of the Cancel button
@@ -253,7 +255,7 @@ namespace PokeCreator.Runtime.UI
                     _fieldMoves[label] = m; cmds.Add(label);
                 }
                 cmds.Add("Switch");
-                if (!Party[_index].IsEgg) cmds.Add("Item");
+                if (!Party[_index].IsEgg) cmds.Add(Party[_index].Mail != null ? "Mail" : "Item");
                 cmds.Add("Cancel");
                 _popup = new CommandList(cmds);
             }

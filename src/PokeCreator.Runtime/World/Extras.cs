@@ -55,6 +55,8 @@ namespace PokeCreator.Runtime.World
         /// <summary>$PokemonGlobal.nextBattleBGM / nextBattleME: music for the next battle only.</summary>
         public string NextBattleBgm { get; set; }
         public string NextBattleMe { get; set; }
+        /// <summary>Letters kept in the PC mailbox.</summary>
+        public List<PokeCreator.Pkmn.PokemonMail> Mailbox { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>

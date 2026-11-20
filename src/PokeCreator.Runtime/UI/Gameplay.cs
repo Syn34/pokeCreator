@@ -251,9 +251,42 @@ namespace PokeCreator.Runtime.UI
                 });
                 return;
             }
+            if (IsMail(item))
+            {
+                // Mail: write the letter first; giving it up cancels
+                g.AskName("Write a message (" + iname + ")", "", 40, text =>
+                {
+                    if (string.IsNullOrEmpty(text)) { Say(g, "The Mail was put away.", done); return; }
+                    g.State.AddItem(item.Id, -1); pk.Item = item.Id;
+                    pk.Mail = new PokemonMail { Item = item.Id, Message = text, Sender = g.State.PlayerName };
+                    Say(g, "The " + iname + " was given to " + name + " to hold.", done);
+                }, null);
+                return;
+            }
             g.State.AddItem(item.Id, -1); pk.Item = item.Id;
             FormChangedByItem(g, pk);
             Say(g, name + " is now holding the " + iname + ".", done);
+        }
+
+        public static bool IsMail(ItemData item) { return item != null && (item.Pocket == 6 || item.Flags.Contains("Mail") || item.Flags.Contains("IconMail")); }
+
+        /// <summary>Takes held Mail: the letter goes to the PC mailbox (or is erased to put the Mail in the Bag).</summary>
+        public static void TakeMail(Game g, Pokemon pk, Action done)
+        {
+            if (pk.Mail == null) { Take(g, pk, done); return; }
+            g.Message.Show("The message will be lost. Is that OK?", new List<string> { "Send to PC mailbox", "Erase it", "Cancel" }, 2, c =>
+            {
+                if (c == 2 || c < 0) { if (done != null) done(); return; }
+                if (c == 0)
+                {
+                    if (g.State.Extras.Mailbox == null) g.State.Extras.Mailbox = new List<PokemonMail>();
+                    if (g.State.Extras.Mailbox.Count >= 10) { Say(g, "The mailbox is full.", done); return; }
+                    g.State.Extras.Mailbox.Add(pk.Mail); pk.Mail = null; pk.Item = null;
+                    Say(g, "The Mail was sent to your PC.", done);
+                    return;
+                }
+                pk.Mail = null; Take(g, pk, done);
+            });
         }
 
         public static void Take(Game g, Pokemon pk, Action done)
@@ -821,6 +854,44 @@ namespace PokeCreator.Runtime.UI
                 if (i == _pos) g.FillRect(dx - 2, y + 14, cw - 4, 32, new Color(248, 232, 160));
                 Ui.Text(g, dx + 4, y + 16, _digits[i].ToString());
             }
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>Reading a letter: the Mail's picture (Graphics/UI/Mail/ITEM, or a plain card) with its message and sender.</summary>
+    public class MailScene : Scene
+    {
+        readonly PokemonMail _mail;
+        public MailScene(Game g, PokemonMail mail) : base(g) { Opaque = true; _mail = mail; }
+
+        protected override void Update()
+        {
+            if (Input.Trigger(Button.Cancel) || Input.Trigger(Button.Action)) { Cancel(); Close(); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            var bg = g.Load(Game.Project.FindAsset("Graphics/UI/Mail", (_mail.Item ?? "").ToLowerInvariant())) ?? g.Load(Game.Project.FindAsset("Graphics/UI/Mail", _mail.Item ?? ""));
+            if (bg != null) g.Draw(bg, 0, 0, Math.Min(bg.Width, g.Width), Math.Min(bg.Height, g.Height), 0, 0);
+            else
+            {
+                Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 232, 200), new Color(232, 200, 160));
+                Ui.Panel(g, 24, 24, g.Width - 48, g.Height - 48, new Color(252, 248, 236), new Color(176, 136, 96));
+                for (int y = 96; y < g.Height - 60; y += 36) g.FillRect(48, y + 30, g.Width - 96, 1, new Color(216, 192, 160));
+            }
+            var it = Game.Project.Items.FirstOrDefault(x => x.Id == _mail.Item);
+            Ui.Text(g, 48, 40, it != null ? it.Name : (_mail.Item ?? "Mail"));
+            var words = (_mail.Message ?? "").Split(' '); string line = ""; int ly = 96;
+            foreach (var w in words)
+            {
+                string t = line.Length == 0 ? w : line + " " + w;
+                if (line.Length > 0 && g.TextWidth(t) > g.Width - 112) { Ui.Text(g, 56, ly, line); ly += 36; line = w; }
+                else line = t;
+            }
+            Ui.Text(g, 56, ly, line);
+            if (!string.IsNullOrEmpty(_mail.Sender)) Ui.TextRight(g, g.Width - 56, g.Height - 76, "From " + _mail.Sender);
         }
     }
 }
