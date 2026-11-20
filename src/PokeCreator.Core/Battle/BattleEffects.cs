@@ -152,14 +152,23 @@ namespace PokeCreator.Battles
                     break;
             }
             MoreSwitchInAbilities(b);
+            if (_heroPending.Remove(b.Pk)) { Splash(b); Say(Name(b) + " underwent a heroic transformation!"); }
         }
 
         /// <summary>Natural Cure and Regenerator when a Pokémon is withdrawn.</summary>
+        readonly HashSet<PokeCreator.Pkmn.Pokemon> _heroPending = new HashSet<PokeCreator.Pkmn.Pokemon>();
+
         void SwitchOutAbility(Battler b)
         {
             if (b == null || b.Pk.Fainted) return;
             if (HasAbility(b, "NATURALCURE") && !string.IsNullOrEmpty(b.Pk.Status)) b.Pk.Status = "";
             if (HasAbility(b, "REGENERATOR")) { int max = b.Pk.TotalHP(P); b.Pk.HP = Math.Min(max, b.Pk.HP + max / 3); }
+            // Zero to Hero: Palafin comes back in its Hero Form
+            if (HasAbility(b, "ZEROTOHERO") && b.Pk.Species == "PALAFIN" && b.Pk.Form == 0 && P.Species.Any(s => s.Id == "PALAFIN_1"))
+            {
+                if (!_formBeforeMega.ContainsKey(b.Pk)) _formBeforeMega[b.Pk] = 0;
+                b.Pk.Form = 1; _heroPending.Add(b.Pk);
+            }
         }
 
         /// <summary>Speed multipliers from abilities and weather.</summary>

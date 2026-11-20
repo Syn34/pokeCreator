@@ -227,6 +227,8 @@ namespace PokeCreator.Pkmn
             var d = pk.Data(p);
             for (int s = 0; s < 6; s++) pk.IV[s] = rng.Next(32);
             pk.Nature = Natures.All[rng.Next(Natures.All.Length)];
+            // Random, seasonal or nature-based forms (Unown, Deerling, Toxtricity, Tatsugiri...)
+            if (pk.Form == 0) { pk.Form = FormRules.FormOnCreation(p, pk, rng); d = pk.Data(p); }
             int fc = FemaleChance(d != null ? d.GenderRatio : "Female50Percent");
             pk.Gender = fc < 0 ? "" : rng.Next(256) < fc ? "F" : "M";
             pk.AbilityIndex = d != null && d.Abilities.Count > 1 ? rng.Next(d.Abilities.Count) : 0;
@@ -249,7 +251,7 @@ namespace PokeCreator.Pkmn
             if (!string.IsNullOrEmpty(tp.Gender)) pk.Gender = tp.Gender.StartsWith("f", StringComparison.OrdinalIgnoreCase) ? "F" : "M";
             if (!string.IsNullOrEmpty(tp.Ability)) pk.Ability = tp.Ability;
             if (tp.AbilityIndex.HasValue) pk.AbilityIndex = tp.AbilityIndex.Value;
-            if (!string.IsNullOrEmpty(tp.Item)) pk.Item = tp.Item;
+            if (!string.IsNullOrEmpty(tp.Item)) { pk.Item = tp.Item; FormRules.UpdateItemForm(p, pk); }
             if (tp.IV.Count == 6) pk.IV = new List<int>(tp.IV);
             if (tp.EV.Count == 6) pk.EV = new List<int>(tp.EV);
             if (tp.Happiness.HasValue) pk.Happiness = tp.Happiness.Value;

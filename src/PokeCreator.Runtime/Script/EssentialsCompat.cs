@@ -1102,7 +1102,7 @@ namespace PokeCreator.Runtime.Script
             if (pk == null) { WarnOnce("Can't set " + member); return; }
             switch (member)
             {
-                case "item": pk.Item = val == null ? null : Convert.ToString(val); return;
+                case "item": pk.Item = val == null ? null : Convert.ToString(val); FormRules.UpdateItemForm(_game.Project, pk); return;
                 case "form": pk.Form = ToInt(val); return;
                 case "level": pk.Level = Math.Max(1, Math.Min(PokeCreator.Pkmn.GrowthRates.MaxLevel, ToInt(val))); return;
                 case "name": pk.Nickname = val == null || Convert.ToString(val).Length == 0 ? null : Convert.ToString(val); return;

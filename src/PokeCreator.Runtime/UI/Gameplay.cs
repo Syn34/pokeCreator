@@ -231,11 +231,13 @@ namespace PokeCreator.Runtime.UI
                 {
                     if (c != 0) { done(); return; }
                     g.State.AddItem(pk.Item, 1); g.State.AddItem(item.Id, -1); pk.Item = item.Id;
+                    FormChangedByItem(g, pk);
                     Say(g, "The " + oldName + " was taken and replaced with the " + iname + ".", done);
                 });
                 return;
             }
             g.State.AddItem(item.Id, -1); pk.Item = item.Id;
+            FormChangedByItem(g, pk);
             Say(g, name + " is now holding the " + iname + ".", done);
         }
 
@@ -244,7 +246,16 @@ namespace PokeCreator.Runtime.UI
             if (string.IsNullOrEmpty(pk.Item)) { Say(g, pk.Name(g.Project) + " isn't holding anything.", done); return; }
             string iname = Item(g, pk.Item).Name ?? pk.Item;
             g.State.AddItem(pk.Item, 1); pk.Item = null;
+            FormChangedByItem(g, pk);
             Say(g, "Received the " + iname + " from " + pk.Name(g.Project) + ".", done);
+        }
+
+        /// <summary>Arceus, Genesect, Giratina, Ogerpon... take the form their held item gives.</summary>
+        static void FormChangedByItem(Game g, Pokemon pk)
+        {
+            int before = pk.Form;
+            FormRules.UpdateItemForm(g.Project, pk);
+            if (pk.Form != before) g.Message.Show(pk.Name(g.Project) + " transformed!");
         }
     }
 

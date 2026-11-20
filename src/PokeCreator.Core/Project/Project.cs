@@ -228,6 +228,7 @@ namespace PokeCreator.Projects
             p.Tilesets = LoadOr(p.DataFile("tilesets.json"), p.Tilesets);
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);
             p.CommonEvents = LoadOr(p.DataFile("common_events.json"), p.CommonEvents);
+            PokeCreator.Pkmn.FormRules.EnsureGen9Forms(p);
             return p;
         }
 

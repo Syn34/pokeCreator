@@ -60,7 +60,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Fog/panorama images (tileset settings, Change Fog / Panorama / Fog Opacity commands)
 
 ## v0.5: Studio power features
-- [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves
+- [x] Forms: random/seasonal/nature forms on creation (Unown, Deerling, Flabébé, Vivillon, Toxtricity...), held-item forms (Arceus, Silvally, Genesect, Giratina, Zacian, Zamazenta, Ogerpon), Gen 9 forms (Tatsugiri, Squawkabilly, Maushold, Dudunsparce, Gimmighoul, Poltchageist, Sinistcha, Palafin's Zero to Hero, Ogerpon's masks)
 - [x] Move-route editor and full command palette in the event editor
 - [x] Problems panel: missing graphics and audio, broken references, script errors
 - [x] Common events
