@@ -84,6 +84,7 @@ namespace PokeCreator.Battles
                     break;
             }
             b.StartItem = b.Pk.Item;
+            FormAbilities(b, false);
         }
 
         /// <summary>Normal-type moves becoming another type (Pixilate, Refrigerate, Aerilate, Galvanize) and Liquid Voice.</summary>
@@ -276,9 +277,64 @@ namespace PokeCreator.Battles
             { Splash(user); Inflict(target, "TOXIC", false, user); }
         }
 
+        /// <summary>Zen Mode, Schooling, Shields Down, Forecast, Flower Gift, Hunger Switch and Power Construct: forms that follow HP, weather or turns.</summary>
+        void FormAbilities(Battler b, bool endOfTurn)
+        {
+            if (b == null || b.Pk.Fainted) return;
+            int hp = b.Pk.HP, max = b.Pk.TotalHP(P), form = b.Pk.Form;
+            switch (AbilityOf(b))
+            {
+                case "ZENMODE":
+                    if (b.Pk.Species != "DARMANITAN") break;
+                    if (hp * 2 <= max && form % 2 == 0) ChangeForm(b, form + 1, Name(b) + " triggered Zen Mode!");
+                    else if (hp * 2 > max && form % 2 == 1) ChangeForm(b, form - 1, "Zen Mode ended!");
+                    break;
+                case "SCHOOLING":
+                    if (b.Pk.Species != "WISHIWASHI") break;
+                    if (b.Pk.Level >= 20 && hp * 4 > max && form == 0) ChangeForm(b, 1, Name(b) + " formed a school!");
+                    else if ((hp * 4 <= max || b.Pk.Level < 20) && form == 1) ChangeForm(b, 0, Name(b) + " stopped schooling!");
+                    break;
+                case "SHIELDSDOWN":
+                    if (b.Pk.Species != "MINIOR") break;
+                    if (hp * 2 <= max && form < 7) ChangeForm(b, 7 + Math.Abs((b.Pk.IV[0] + b.Pk.IV[1] * 3 + b.Pk.IV[2] * 7) % 7), "Its shell burst!");
+                    else if (hp * 2 > max && form >= 7) ChangeForm(b, 0, Name(b) + " shielded itself!");
+                    break;
+                case "FORECAST":
+                    if (b.Pk.Species != "CASTFORM") break;
+                    {
+                        int want = EffWeather == Sun ? 1 : EffWeather == Rain ? 2 : EffWeather == Hail ? 3 : 0;
+                        if (want != form) ChangeForm(b, want, Name(b) + " transformed!");
+                    }
+                    break;
+                case "FLOWERGIFT":
+                    if (b.Pk.Species != "CHERRIM") break;
+                    { int want = EffWeather == Sun ? 1 : 0; if (want != form) ChangeForm(b, want, Name(b) + " transformed!"); }
+                    break;
+                case "HUNGERSWITCH":
+                    if (endOfTurn && b.Pk.Species == "MORPEKO") ChangeForm(b, form == 0 ? 1 : 0, null);
+                    break;
+                case "POWERCONSTRUCT":
+                    if (endOfTurn && b.Pk.Species == "ZYGARDE" && hp * 2 <= max && form < 2)
+                    {
+                        Say("You sense the presence of many!");
+                        ChangeForm(b, 2, Name(b) + " transformed into its Complete Forme!");
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>Stance Change: Aegislash takes Blade Forme to attack and Shield Forme for King's Shield.</summary>
+        void StanceChange(Battler b, MoveData md)
+        {
+            if (b.Pk.Species != "AEGISLASH" || !HasAbility(b, "STANCECHANGE") || md == null) return;
+            if (md.Category != "Status" && b.Pk.Form == 0) ChangeForm(b, 1, "Changed to Blade Forme!");
+            else if (md.Id == "KINGSSHIELD" && b.Pk.Form == 1) ChangeForm(b, 0, "Changed to Shield Forme!");
+        }
+
         void MoreEndOfTurnAbilities(Battler b)
         {
             if (b.Pk.Fainted) return;
+            FormAbilities(b, true);
             switch (AbilityOf(b))
             {
                 case "MOODY":

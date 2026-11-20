@@ -65,6 +65,22 @@ namespace PokeCreator.Battles
         /// <summary>The AI Mega Evolves as soon as it can.</summary>
         bool AIWantsMega(Battler b) { return CanMegaEvolve(b); }
 
+        /// <summary>Changes a battler's form for the rest of the battle (form-changing abilities); reverted at the end.</summary>
+        bool ChangeForm(Battler b, int form, string message)
+        {
+            if (b == null || b.Pk.Fainted || b.Pk.Form == form) return false;
+            if (P.Species.FirstOrDefault(s => s.Id == b.Pk.Species + (form > 0 ? "_" + form : "")) == null && form > 0) return false;
+            if (!_formBeforeMega.ContainsKey(b.Pk)) _formBeforeMega[b.Pk] = b.Pk.Form;
+            int oldMax = b.Pk.TotalHP(P);
+            b.Pk.Form = form;
+            int newMax = b.Pk.TotalHP(P);
+            if (newMax != oldMax) { int f = b.Pk.HP; b.Pk.HP = Math.Max(1, Math.Min(newMax, b.Pk.HP + newMax - oldMax)); Hp(b, f); }
+            Splash(b);
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.FormChange, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Text = "Form" });
+            if (!string.IsNullOrEmpty(message)) Say(message);
+            return true;
+        }
+
         /// <summary>Mega Pokémon go back to their normal form when the battle ends.</summary>
         public void RevertForms()
         {

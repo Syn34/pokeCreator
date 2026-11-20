@@ -617,6 +617,7 @@ namespace PokeCreator.Battles
             user.Charging = null; user.Invulnerable = false;
             if (pm != null && !wasCharging && !continuing) pm.PP = Math.Max(0, pm.PP - 1);
 
+            StanceChange(user, md);
             Say(n + " used " + (md.Name ?? md.Id) + "!");
             _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveUsed, Side = user.Side, Party = user.PartyIndex, Text = md.Id });
             bool selfTarget = md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies" || md.Target == "UserOrNearAlly" || md.Target == "FoeSide" && md.Category == "Status" && code.StartsWith("Add");
@@ -852,6 +853,7 @@ namespace PokeCreator.Battles
                     Splash(target); Say("Its disguise served it as a decoy!");
                     int fd = target.Pk.HP; target.Pk.HP = Math.Max(1, target.Pk.HP - target.Pk.TotalHP(P) / 8); Hp(target, fd);
                     Say(Name(target) + "'s disguise was busted!");
+                    if (target.Pk.Species == "MIMIKYU") ChangeForm(target, 1, null);
                     continue;
                 }
                 // A substitute takes the hit instead

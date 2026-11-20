@@ -434,6 +434,8 @@ namespace PokeCreator.Battles
         void OnKnockOut(Battler user)
         {
             if (user.Pk.Fainted) return;
+            if (HasAbility(user, "BATTLEBOND") && user.Pk.Species == "GRENINJA" && user.Pk.Form == 1)
+                ChangeForm(user, 2, Name(user) + " became fully charged due to its bond with its Trainer!");
             if (HasAbility(user, "MOXIE") && user.Stages[PokeCreator.Pkmn.Stat.Attack] < 6) { Splash(user); ChangeStat(user, PokeCreator.Pkmn.Stat.Attack, 1); }
             if (HasAbility(user, "BEASTBOOST") && user.Stages[PokeCreator.Pkmn.Stat.Attack] < 6) { Splash(user); ChangeStat(user, PokeCreator.Pkmn.Stat.Attack, 1); }
         }
