@@ -81,6 +81,8 @@ namespace PokeCreator.Runtime.World
                 {
                     var pk = g.State.Party[i];
                     if (pk.IsEgg) { g.Message.Show("An Egg can't take part!"); return; }
+                    var sd = pk.Data(g.Project);
+                    if (pk.ShadowPokemon || (sd != null && sd.Flags != null && (sd.Flags.Contains("Legendary") || sd.Flags.Contains("Mythical")))) { g.Message.Show(pk.Name(g.Project) + " can't take part in this challenge!"); return; }
                     if (chosen.Contains(i)) { g.Message.Show("That Pokémon is already entered!"); return; }
                     if (chosen.Any(j => g.State.Party[j].Species == pk.Species)) { g.Message.Show("You can't enter two of the same species!"); return; }
                     close(); chosen.Add(i); pick();

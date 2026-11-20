@@ -48,6 +48,18 @@ namespace PokeCreator.Runtime.Script
             return _game.Map != null ? _game.Map.Events.FirstOrDefault(e => e.Id == ToInt(o)) : null;
         }
 
+        /// <summary>Battle challenge entry: no Eggs, Shadow Pokémon, legendary or mythical Pokémon, or Pokémon above the level limit (0 = none).</summary>
+        bool Eligible(PokeCreator.Pkmn.Pokemon p, int maxLevel)
+        {
+            if (p.IsEgg || p.ShadowPokemon) return false;
+            if (maxLevel > 0 && p.Level > maxLevel) return false;
+            var d = p.Data(_game.Project);
+            var fr = _game.State.Extras.Frontier;
+            bool open = fr != null && fr.Rules != null && fr.Rules.Kind == "cup";
+            if (!open && d != null && d.Flags != null && (d.Flags.Contains("Legendary") || d.Flags.Contains("Mythical") || d.Flags.Contains("UltraBeast"))) return false;
+            return true;
+        }
+
         static string AudioName(object o)
         {
             if (o == null) return "";
@@ -361,7 +373,7 @@ namespace PokeCreator.Runtime.Script
             Register("pbHasEligible?", (c, a) =>
             {
                 int need = a.Count > 0 ? ToInt(a[0]) : 3;
-                return _game.State.Party.Where(p => !p.IsEgg && !p.ShadowPokemon).Select(p => p.Species).Distinct().Count() >= need;
+                return _game.State.Party.Where(p => Eligible(p, a.Count > 1 ? ToInt(a[1]) : 0)).Select(p => p.Species).Distinct().Count() >= need;
             });
             Register("pbEntryScreen", (c, a) =>
             {
@@ -383,7 +395,8 @@ namespace PokeCreator.Runtime.Script
                     _game.PushScene(new UI.PartyScene(_game, "Choose Pokémon " + (entries.Count + 1) + " of " + need + ".", null, (i, close) =>
                     {
                         var pk = _game.State.Party[i];
-                        if (pk.IsEgg || entries.Contains(i) || entries.Any(j => _game.State.Party[j].Species == pk.Species)) { _game.Message.Show("That Pokémon can't be entered."); return; }
+                        int maxLv = a.Count > 1 ? ToInt(a[1]) : 0;
+                        if (!Eligible(pk, maxLv) || entries.Contains(i) || entries.Any(j => _game.State.Party[j].Species == pk.Species)) { _game.Message.Show("That Pokémon can't be entered."); return; }
                         close(); entries.Add(i); pick();
                     }, () => _game.SetPrompt(c, false)));
                 };
