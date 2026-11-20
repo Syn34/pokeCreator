@@ -396,11 +396,14 @@ namespace PokeCreator.Runtime.World
             if (method == "Land" && BugContest.InProgress(_game)) m = table.Methods.FirstOrDefault(mm => mm.Type == "BugContest" && mm.Slots.Count > 0) ?? m;
             if (m == null || m.Slots.Count == 0) return;
             int density = m.Density > 0 ? m.Density : 25;
-            if (_game.Rng.Next(180) >= density) return;
+            if (_game.Rng.NextDouble() * 180 >= density * EncounterModifiers.RateFactor(_game)) return;
             int total = m.Slots.Sum(s => s.Chance), roll = _game.Rng.Next(Math.Max(1, total));
             EncounterSlot slot = m.Slots[0];
             foreach (var s in m.Slots) { if (roll < s.Chance) { slot = s; break; } roll -= s.Chance; }
+            slot = EncounterModifiers.PickSlot(_game, m, slot);
             int level = _game.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1);
+            level = EncounterModifiers.AdjustLevel(_game, slot, level);
+            if (EncounterModifiers.Scared(_game, level)) return;
             // Repel: no wild Pokémon weaker than the first healthy party member
             if (_game.State.RepelSteps > 0)
             {

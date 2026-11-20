@@ -99,6 +99,13 @@ namespace PokeCreator.Runtime.UI
             {
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
+                case "WHITEFLUTE": case "BLACKFLUTE":
+                    {
+                        bool white = itemId == "WHITEFLUTE";
+                        g.State.Extras.Flute = white ? 1 : -1; g.State.Extras.FluteMap = g.Map != null ? g.Map.Id : 0;
+                        g.Message.Show(white ? "Wild Pokémon will be lured." : "Wild Pokémon will be repelled.");
+                        return;
+                    }
                 case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
                 case "POKERADAR": g.CloseAllScenes(); PokeRadar.Use(g); return;
                 case "JOYSCENT": case "EXCITESCENT": case "VIVIDSCENT":

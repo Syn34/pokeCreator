@@ -57,6 +57,11 @@ namespace PokeCreator.Runtime.World
         public string NextBattleMe { get; set; }
         /// <summary>Letters kept in the PC mailbox.</summary>
         public List<PokeCreator.Pkmn.PokemonMail> Mailbox { get; set; }
+        /// <summary>White Flute (1) / Black Flute (-1) used on map FluteMap: more / fewer wild Pokémon there.</summary>
+        public int Flute { get; set; }
+        public int FluteMap { get; set; }
+        /// <summary>Music chosen on the Pokégear jukebox (plays instead of map music until turned off).</summary>
+        public string JukeboxBgm { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>

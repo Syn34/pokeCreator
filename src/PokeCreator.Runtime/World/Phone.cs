@@ -136,6 +136,7 @@ namespace PokeCreator.Runtime.World
             var labels = new List<string>();
             _ids.Add("map"); labels.Add("Map");
             _ids.Add("phone"); labels.Add("Phone");
+            _ids.Add("jukebox"); labels.Add("Jukebox");
             _ids.Add("exit"); labels.Add("Exit");
             _list = new CommandList(labels);
             Opaque = true;
@@ -151,8 +152,45 @@ namespace PokeCreator.Runtime.World
             {
                 case "map": Game.PushScene(new TownMapScene(Game, false, null)); break;
                 case "phone": Game.PushScene(new PhoneScene(Game)); break;
+                case "jukebox": Jukebox(); break;
                 default: Close(); break;
             }
+        }
+
+        /// <summary>
+        /// The jukebox (as Essentials): the Pokémon March lures wild Pokémon, the Lullaby keeps them away, Oak's tune is
+        /// just music; Custom plays any BGM. The choice replaces map music until it's turned off.
+        /// </summary>
+        void Jukebox()
+        {
+            var g = Game;
+            var opts = new List<string> { "Pokémon March", "Pokémon Lullaby", "Professor Oak", "Custom...", "Turn Off", "Cancel" };
+            g.Message.Show("Choose a song.", opts, opts.Count - 1, k =>
+            {
+                Action<string, int> play = (bgm, flute) =>
+                {
+                    g.State.Extras.JukeboxBgm = bgm;
+                    g.State.Extras.Flute = flute; g.State.Extras.FluteMap = flute != 0 && g.Map != null ? g.Map.Id : 0;
+                    g.Audio.PlayBgm(bgm);
+                };
+                if (k == 0) play("Radio - March", 1);
+                else if (k == 1) play("Radio - Lullaby", -1);
+                else if (k == 2) play("Radio - Oak", 0);
+                else if (k == 3)
+                {
+                    var files = new List<string>();
+                    foreach (var root in new[] { g.Project.Root }.Concat(g.Project.ExtraAssetRoots))
+                    {
+                        var dir = System.IO.Path.Combine(root, "Audio", "BGM");
+                        if (System.IO.Directory.Exists(dir)) files.AddRange(System.IO.Directory.GetFiles(dir).Select(System.IO.Path.GetFileNameWithoutExtension));
+                    }
+                    files = files.Distinct().OrderBy(x => x).Take(40).ToList();
+                    if (files.Count == 0) { g.Message.Show("There's no music."); return; }
+                    var withCancel = files.Concat(new[] { "Cancel" }).ToList();
+                    g.Message.Show("Choose a song.", withCancel, withCancel.Count - 1, f => { if (f >= 0 && f < files.Count) play(files[f], 0); });
+                }
+                else if (k == 4) { g.State.Extras.JukeboxBgm = null; g.State.Extras.Flute = 0; g.Audio.StopBgm(); g.PlayMapMusic(); }
+            });
         }
 
         public override void Draw(Platform.Gfx g)

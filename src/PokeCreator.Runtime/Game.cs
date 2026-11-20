@@ -308,7 +308,8 @@ namespace PokeCreator.Runtime
             string ride = Player == null ? null : Player.Cycling ? Project.Settings.BicycleBGM : Player.Surfing ? Project.Settings.SurfBGM : null;
             if (!string.IsNullOrEmpty(ride)) { if (Audio.CurrentBgm != ride) Audio.PlayBgm(ride); return; }
             var data = Map != null ? Map.Data : null;
-            if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+            if (State != null && !string.IsNullOrEmpty(State.Extras.JukeboxBgm)) { if (Audio.CurrentBgm != State.Extras.JukeboxBgm) Audio.PlayBgm(State.Extras.JukeboxBgm); }
+            else if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
             if (data != null && data.AutoplayBgs && data.Bgs != null && !string.IsNullOrEmpty(data.Bgs.Name)) Audio.PlayBgs(data.Bgs.Name, data.Bgs.Volume);
             else if (data != null && data.AutoplayBgs) Audio.StopBgs();
         }
@@ -478,6 +479,7 @@ namespace PokeCreator.Runtime
         public void StartWildBattle(string species, int level, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
             var wild = PokeCreator.Pkmn.Pokemon.Create(Project, species, level, Rng);
+            World.EncounterModifiers.ApplyToWild(this, wild);
             if (wild.Data(Project) == null || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
             var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { wild }, true, Rng) { PlayerName = State.PlayerName };
             b.AlreadyCaught = sp => State.Caught.Contains(sp);
