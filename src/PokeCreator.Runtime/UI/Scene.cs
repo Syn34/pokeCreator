@@ -20,7 +20,9 @@ namespace PokeCreator.Runtime.UI
 
         protected Scene(Game g) { Game = g; }
 
-        public void Close() { Closed = true; OnClose(); }
+        public void Close() { Closed = true; OnClose(); var cb = OnClosed; OnClosed = null; if (cb != null) cb(); }
+        /// <summary>Runs once when the scene closes (scripts waiting for a screen to finish).</summary>
+        public Action OnClosed;
         protected virtual void OnClose() { }
 
         public void Tick() { Frame++; Update(); }

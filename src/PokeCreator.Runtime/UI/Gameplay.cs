@@ -480,19 +480,108 @@ namespace PokeCreator.Runtime.UI
             Opaque = true; _list = list; _index = index; _onClose = onClose;
         }
 
+        int _page; // 0 = info, 1 = area, 2 = forms
+        int _form;
+        static readonly string[] PageNames = { "INFO", "AREA", "FORMS" };
+
         protected override void Update()
         {
-            if (Input.Trigger(Button.Cancel) || Input.Trigger(Button.Action)) { Cancel(); Close(); if (_onClose != null) _onClose(_index); return; }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); if (_onClose != null) _onClose(_index); return; }
+            if (Input.Trigger(Button.Action))
+            {
+                if (_page == 2 && Forms().Count > 1) { _form = (_form + 1) % Forms().Count; Cursor(); return; }
+                Game.Audio.PlayCry(new Pokemon { Species = _list[_index].Id, Form = _page == 2 ? Forms()[_form].Form : 0 }); return;
+            }
+            if (Input.Trigger(Button.Right) && _page < 2) { _page++; _form = 0; Cursor(); return; }
+            if (Input.Trigger(Button.Left) && _page > 0) { _page--; _form = 0; Cursor(); return; }
             int dir = Input.Repeat(Button.Down) ? 1 : Input.Repeat(Button.Up) ? -1 : 0;
             if (dir == 0) return;
             for (int i = _index + dir; i >= 0 && i < _list.Count; i += dir)
-                if (Game.State.Seen.Contains(_list[i].Id)) { _index = i; Cursor(); break; }
+                if (Game.State.Seen.Contains(_list[i].Id)) { _index = i; _form = 0; Cursor(); break; }
+        }
+
+        List<SpeciesData> Forms()
+        {
+            string id = _list[_index].Id;
+            var l = Game.Project.Species.Where(x => x.Id == id || (x.Form > 0 && x.Id.StartsWith(id + "_"))).OrderBy(x => x.Form).ToList();
+            return l.Count > 0 ? l : new List<SpeciesData> { _list[_index] };
+        }
+
+        static readonly Dictionary<int, PokeCreator.Maps.MapProperties> _propCache = new Dictionary<int, PokeCreator.Maps.MapProperties>();
+
+        /// <summary>Town map squares (region → x,y) where wild encounters include this species.</summary>
+        public static Dictionary<int, HashSet<int>> AreaSquares(Game g, string species)
+        {
+            var res = new Dictionary<int, HashSet<int>>();
+            foreach (var enc in g.Project.Encounters.Where(e => e.Methods.Any(m => m.Slots.Any(sl => sl.Species == species))))
+            {
+                PokeCreator.Maps.MapProperties props;
+                if (!_propCache.TryGetValue(enc.Map, out props))
+                {
+                    PokeCreator.Maps.MapData md = null; try { md = g.Project.LoadMap(enc.Map); } catch { }
+                    props = md != null ? md.Properties : null; _propCache[enc.Map] = props;
+                }
+                if (props == null || props.MapPosition == null || props.MapPosition.Count < 3) continue;
+                int region = props.MapPosition[0], x = props.MapPosition[1], y = props.MapPosition[2], w = 1, h = 1;
+                if (!string.IsNullOrEmpty(props.MapSize))
+                {
+                    var parts = props.MapSize.Split(',');
+                    if (int.TryParse(parts[0].Trim(), out w) && w > 0) { string fl = parts.Length > 1 ? parts[1].Trim() : ""; h = Math.Max(1, (int)Math.Ceiling(fl.Length / (double)w)); } else w = 1;
+                }
+                HashSet<int> set; if (!res.TryGetValue(region, out set)) res[region] = set = new HashSet<int>();
+                for (int yy = 0; yy < h; yy++) for (int xx = 0; xx < w; xx++) set.Add((x + xx) * 1000 + y + yy);
+            }
+            return res;
+        }
+
+        void DrawArea(Gfx g, SpeciesData s)
+        {
+            var squares = AreaSquares(Game, s.Id);
+            int regionNo = 0; var pos = TownMapScene.CurrentPosition(Game); if (pos != null) regionNo = pos[0];
+            if (!squares.ContainsKey(regionNo) && squares.Count > 0) regionNo = squares.Keys.First();
+            var region = Game.Project.TownMaps.FirstOrDefault(r => r.Id == regionNo.ToString()) ?? Game.Project.TownMaps.FirstOrDefault();
+            if (region == null) { Ui.TextCenter(g, g.Width / 2, g.Height / 2, "There is no town map."); return; }
+            var img = string.IsNullOrEmpty(region.Filename) ? null : g.Load(Game.Project.FindAsset("Graphics/UI/Town Map", System.IO.Path.GetFileNameWithoutExtension(region.Filename)));
+            int mw = img != null ? img.Width : 480, mh = img != null ? img.Height : 288;
+            mw = Math.Min(mw, g.Width - 32); mh = Math.Min(mh, g.Height - 96);
+            int mx = (g.Width - mw) / 2, my = 60;
+            if (img != null) g.Draw(img, 0, 0, mw, mh, mx, my); else g.FillRect(mx, my, mw, mh, new Color(96, 168, 96));
+            HashSet<int> set;
+            bool any = squares.TryGetValue(regionNo, out set) && set.Count > 0;
+            if (any)
+            {
+                byte alpha = (byte)(140 + (int)(80 * Math.Sin(Frame / 10.0)));
+                foreach (int k in set) { int sx = mx + (k / 1000) * 16, sy = my + (k % 1000) * 16; g.FillRect(sx, sy, 16, 16, new Color(248, 40, 40, alpha)); g.FillRect(sx, sy, 16, 2, new Color(160, 0, 0)); g.FillRect(sx, sy + 14, 16, 2, new Color(160, 0, 0)); g.FillRect(sx, sy, 2, 16, new Color(160, 0, 0)); g.FillRect(sx + 14, sy, 2, 16, new Color(160, 0, 0)); }
+            }
+            Ui.Box(g, 8, g.Height - 44, g.Width - 16, 36);
+            Ui.Text(g, 20, g.Height - 40, any ? (s.Name ?? s.Id) + "'s area" + (string.IsNullOrEmpty(region.Name) ? "" : " in " + region.Name) : "Area unknown");
+        }
+
+        void DrawForms(Gfx g)
+        {
+            var forms = Forms(); if (_form >= forms.Count) _form = 0;
+            var f = forms[_form];
+            Ui.Panel(g, g.Width / 2 - 110, 60, 220, 220, new Color(232, 232, 224), new Color(160, 160, 152));
+            Ui.PokemonFront(g, Game, new Pokemon { Species = _list[_index].Id, Form = f.Form }, g.Width / 2, 270, 190);
+            string fname = !string.IsNullOrEmpty(f.FormName) ? f.FormName : f.Form == 0 ? "Normal Form" : "Form " + f.Form;
+            Ui.TextCenter(g, g.Width / 2, 292, fname);
+            if (forms.Count > 1) Ui.TextCenter(g, g.Width / 2, 326, (_form + 1) + " / " + forms.Count + "   (Action: next form)");
         }
 
         public override void Draw(Gfx g)
         {
             var s = _list[_index];
             bool caught = Game.State.Caught.Contains(s.Id);
+            if (_page > 0)
+            {
+                Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
+                Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 240), new Color(120, 24, 24));
+                Ui.Text(g, 20, 14, (_index + 1).ToString("000") + "  " + (s.Name ?? s.Id));
+                Ui.TextRight(g, g.Width - 20, 14, "< " + PageNames[_page] + " >");
+                if (_page == 1) DrawArea(g, s); else DrawForms(g);
+                return;
+            }
+            Ui.TextRight(g, g.Width - 24, g.Height - 40, "INFO >");
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
             Ui.Panel(g, 8, 8, g.Width - 16, g.Height - 16, new Color(248, 248, 240), new Color(120, 24, 24));
             Ui.Panel(g, 20, 20, 200, 200, new Color(232, 232, 224), new Color(160, 160, 152));

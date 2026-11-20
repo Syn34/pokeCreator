@@ -209,6 +209,18 @@ namespace PokeCreator.Runtime.Script
             Register("pbFlyToNewLocation", (c, a) => false);
             Register("pbEncounter", (c, a) => FieldMoves.EncounterFrom(_game, new[] { Str(a, 0).TrimStart(':') }));
             Register("pbFadeOutInWithMusic", (c, a) => true);
+            Handler showMap = (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                var scene = new UI.TownMapScene(_game, false, null);
+                scene.OnClosed = () => _game.SetPrompt(c, true);
+                _game.PushScene(scene);
+                return false;
+            };
+            Register("pbShowMap", showMap);
+            Register("pbTownMap", showMap);
         }
     }
 }
