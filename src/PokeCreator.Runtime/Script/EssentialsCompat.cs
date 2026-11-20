@@ -388,7 +388,7 @@ namespace PokeCreator.Runtime.Script
             Register("$player.female?", (c, a) => PlayerGender() == "Female");
             Register("$Trainer.male?", (c, a) => PlayerGender() != "Female");
             Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
-            Register("pbInChallenge?", (c, a) => false);
+            Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game));
             Register("pbNextMysteryGiftID", (c, a) => 0);
             Register("$game_player.has_follower?", (c, a) => false);
             Register("get_event", (c, a) => _game.Map == null ? null : _game.Map.Events.FirstOrDefault(e => e.Id == ToInt(Arg(a, 0))));

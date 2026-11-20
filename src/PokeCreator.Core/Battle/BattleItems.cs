@@ -31,7 +31,6 @@ namespace PokeCreator.Battles
             { "FIGYBERRY", S.Attack }, { "WIKIBERRY", S.SpAtk }, { "MAGOBERRY", S.Speed }, { "AGUAVBERRY", S.SpDef }, { "IAPAPABERRY", S.Defense }
         };
         static readonly string[] AsOneAbilities = { "ASONECHILLINGNEIGH", "ASONEGRIMNEIGH", "ASONEGLASTRIER", "ASONESPECTRIER" };
-        static readonly string[] Gems = { "NORMAL", "FIRE", "WATER", "ELECTRIC", "GRASS", "ICE", "FIGHTING", "POISON", "GROUND", "FLYING", "PSYCHIC", "BUG", "ROCK", "GHOST", "DRAGON", "DARK", "STEEL", "FAIRY" };
 
         double _gemBoost = 1;
         readonly HashSet<Battler> _quickClaw = new HashSet<Battler>();

@@ -27,6 +27,8 @@ namespace PokeCreator.Runtime.UI
         public bool Safari;
         /// <summary>A Bug-Catching Contest battle: the Bag throws a Sport Ball; the catch is kept by the contest.</summary>
         public bool BugContest;
+        /// <summary>A battle facility round (Battle Tower): no items from the Bag, no prize money.</summary>
+        public bool Facility;
     }
 
     /// <summary>
@@ -496,6 +498,7 @@ namespace PokeCreator.Runtime.UI
 
         void OpenBag()
         {
+            if (_setup.Facility) { Game.Message.Show("Items can't be used here."); return; }
             if (_setup.BugContest)
             {
                 var cs = World.BugContest.State(Game);

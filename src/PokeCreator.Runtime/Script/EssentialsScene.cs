@@ -166,6 +166,14 @@ namespace PokeCreator.Runtime.Script
             Register("pbBugContestState.lastPokemon", (c, a) => BugContest.State(_game).Caught);
             Register("pbBugContestStartOver", (c, a) => { BugContest.End(_game, true); return true; });
 
+            // Battle Tower: pbBattleTower(rounds = 7, double = false, level = 50)
+            Register("pbBattleTower", (c, a) => { BattleTower.Run(_game, a.Count > 0 ? ToInt(a[0]) : 7, a.Count > 1 && Truthy(a[1]), a.Count > 2 ? ToInt(a[2]) : 50); return true; });
+            Register("pbBattleChallenge.wins", (c, a) => BattleTower.State(_game).Wins);
+            Register("pbBattleChallenge.decision", (c, a) => BattleTower.State(_game).Decision);
+            Register("pbBattleChallenge.pbInProgress?", (c, a) => BattleTower.InProgress(_game));
+            Register("pbBattleChallenge.record", (c, a) => { int r; BattleTower.State(_game).Records.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
+            Register("pbBattleChallenge.streak", (c, a) => { int r; BattleTower.State(_game).Streaks.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

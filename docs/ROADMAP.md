@@ -77,7 +77,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Bug-Catching Contest (pbBugContestState: one Pokémon, Sport Balls, timer, BugContest encounters, keep one catch, judging with Essentials' score formula and prizes from Game Settings)
 - [x] Pokérus (catching it after battles, spreading in the party, wearing off by day, double EVs, PKRS on the Summary, pbPokerus? for Nurse Joy)
 - [x] Poké Radar (shaking grass patches, PokeRadar encounter slots, chains of the same species raising the shiny chance, 50-step recharge)
-- [ ] Battle Tower / challenges (pbBattleChallenge)
+- [x] Battle Tower (pbBattleTower(rounds, double, level): pick 3 or 4 Pokémon, copies at level 50, generated trainers that get stronger with the streak, healing between rounds, Battle Points, records; pbInChallenge?, pbBattleChallenge.wins / decision / record / streak)
 - [ ] Mystery Gift
 - [ ] Shadow Pokémon and purification
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver

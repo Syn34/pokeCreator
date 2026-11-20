@@ -11,6 +11,8 @@ namespace PokeCreator.Battles
     public partial class Battle
     {
         public bool Safari;
+        /// <summary>No EXP or EVs (battle facilities, where the team are copies).</summary>
+        public bool NoExp;
         int _catchFactor, _escapeFactor, _bait, _rock;
         int? _catchRateOverride;
 

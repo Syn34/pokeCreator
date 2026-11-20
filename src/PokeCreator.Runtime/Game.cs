@@ -466,6 +466,23 @@ namespace PokeCreator.Runtime
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
+        /// <summary>Script calls that run over several screens (Battle Tower) hold the event interpreter until they finish.</summary>
+        public int ScriptHolds;
+
+        /// <summary>A battle facility round: a generated trainer, no prize money, losing doesn't black out.</summary>
+        public void StartFacilityBattle(PokeCreator.Data.TrainerTypeData tt, string name, List<PokeCreator.Pkmn.Pokemon> foes, bool dbl, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, dbl)
+            {
+                PlayerName = State.PlayerName, TrainerName = name,
+                TrainerTypeName = tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name : "Trainer", TrainerSkill = 100, NoExp = true,
+            };
+            var tr = new PokeCreator.Data.TrainerData { TrainerType = tt != null ? tt.Id : "", Name = name };
+            var ttNoMoney = tt != null ? Json.Json.Deserialize<PokeCreator.Data.TrainerTypeData>(Json.Json.Write(tt)) : null;
+            if (ttNoMoney != null) ttNoMoney.BaseMoney = 0;
+            StartBattle(b, new BattleSetup { Wild = false, Trainer = tr, TrainerType = ttNoMoney, Backdrop = Backdrop(), CanLose = true, OnEnd = onEnd, Facility = true });
+        }
+
         /// <summary>A wild battle against a Pokémon made by the caller (Poké Radar, shiny patches...).</summary>
         public void StartWildPokemonBattle(PokeCreator.Pkmn.Pokemon wild, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
@@ -579,7 +596,7 @@ namespace PokeCreator.Runtime
             }
             // A registered partner fights alongside the player (the battle becomes a double battle)
             var partner = State.Extras.Partner;
-            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari && !setup.BugContest)
+            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari && !setup.BugContest && !setup.Facility)
             {
                 var ptt = Project.TrainerTypes.FirstOrDefault(t => t.Id == partner.TrainerType);
                 b.AddPartner(partner.Party, partner.Name, ptt != null && !string.IsNullOrEmpty(ptt.Name) ? ptt.Name : partner.TrainerType, ptt != null ? Math.Max(32, ptt.SkillLevel) : 32);
@@ -590,7 +607,7 @@ namespace PokeCreator.Runtime
             b.SwitchStyle = Options == null || !Options.BattleStyleSet;
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
-            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; World.Pokerus.AfterBattle(this); if (end != null) end(o); };
+            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (!setup.Facility) World.Pokerus.AfterBattle(this); if (end != null) end(o); };
             BattleJustStarted = true;
             Audio.PlaySe("Encounter");
             Flash(20);

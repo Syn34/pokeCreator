@@ -1535,7 +1535,7 @@ namespace PokeCreator.Battles
         void GiveExp(Battler foe)
         {
             HashSet<int> set;
-            if (!_participants.TryGetValue(foe.PartyIndex, out set)) return;
+            if (NoExp || !_participants.TryGetValue(foe.PartyIndex, out set)) return;
             var who = set.Where(i => i < Parties[0].Count && Able(Parties[0][i]) && !IsPartnerIndex(i)).ToList();
             if (who.Count == 0) return;
             var fd = foe.Pk.Data(P);

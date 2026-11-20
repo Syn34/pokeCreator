@@ -22,6 +22,7 @@ namespace PokeCreator.Runtime.World
         public List<RoamerState> Roamers { get; set; }
         public SafariState Safari { get; set; }
         public BugContestState BugContest { get; set; }
+        public ChallengeState Challenge { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
         public int PokerusDay { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>

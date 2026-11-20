@@ -108,6 +108,7 @@ namespace PokeCreator.Runtime.Script
                 if (_wait > 0) { _wait--; return; }
                 if (_game.MessageBusy || _game.Transferring) return;
                 if (_game.SceneOpen) return; // a battle, name entry or other screen opened by the last command
+                if (_game.ScriptHolds > 0) return; // a multi-step script call (Battle Tower) is still going
                 if (_waitForMoves)
                 {
                     if (_game.Player.MoveRouteForcing || _game.Map.Events.Any(e => e.MoveRouteForcing)) return;
