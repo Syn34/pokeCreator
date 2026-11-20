@@ -28,6 +28,8 @@ namespace PokeCreator.Runtime.UI
         public bool BattleEffectsOff { get; set; }
         /// <summary>Translation chosen by the player (a file in the project's Languages folder; "" = original).</summary>
         public string Language { get; set; }
+        /// <summary>Window size: 0 = the game's default, 1-4 = times the game size, 5 = full screen.</summary>
+        public int ScreenSize { get; set; }
         [Json.JsonIgnore] public bool BattleEffects { get { return !BattleEffectsOff; } set { BattleEffectsOff = !value; } }
         public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; SpeechFrame = ""; MenuFrame = ""; }
 
@@ -51,7 +53,9 @@ namespace PokeCreator.Runtime.UI
             g.Audio.SeVolume = Math.Max(0, Math.Min(100, SeVolume));
             g.Audio.ApplyVolume();
             g.LoadFrames();
+            if (ScreenSize > 0 && g.Gfx != null && ScreenSize != _appliedSize) { g.Gfx.SetScreenSize(ScreenSize >= 5 ? 0 : ScreenSize); _appliedSize = ScreenSize; }
         }
+        int _appliedSize;
 
         /// <summary>Frame images in Graphics/Windowskins whose names start with prefix ("speech", "choice"), in natural order.</summary>
         public static List<string> Frames(Game g, string prefix)
@@ -721,8 +725,8 @@ namespace PokeCreator.Runtime.UI
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
             _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
             Labels = _langs.Count > 1
-                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Language", "Close" }
-                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Close" };
+                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Close" }
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Close" };
         }
 
         static string Cycle(List<string> list, string cur, int d)
@@ -732,6 +736,7 @@ namespace PokeCreator.Runtime.UI
         }
 
         static string FrameLabel(string f) { return string.IsNullOrEmpty(f) ? "Default" : f; }
+        string ScreenLabel() { int s = _o.ScreenSize <= 0 ? Math.Max(1, Game.Project.Settings.WindowScale) : _o.ScreenSize; return s >= 5 ? "Full Screen" : "×" + s; }
 
         protected override void Update()
         {
@@ -748,7 +753,8 @@ namespace PokeCreator.Runtime.UI
                 else if (_row == 5) _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d);
                 else if (_row == 6) _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d);
                 else if (_row == 7) _o.RunToggle = !_o.RunToggle;
-                else if (_row == 8 && _langs.Count > 1) { _o.Language = Cycle(_langs, _o.Language, d); PokeCreator.Projects.Localization.Apply(Game.Project, _o.Language); }
+                else if (_row == 8) { int cur = _o.ScreenSize <= 0 ? Math.Max(1, Game.Project.Settings.WindowScale) : _o.ScreenSize; _o.ScreenSize = (cur - 1 + d + 5) % 5 + 1; }
+                else if (_row == 9 && _langs.Count > 1) { _o.Language = Cycle(_langs, _o.Language, d); PokeCreator.Projects.Localization.Apply(Game.Project, _o.Language); }
                 _o.Apply(Game);
                 if (_row != Labels.Length - 1) Cursor();
             }
@@ -760,11 +766,11 @@ namespace PokeCreator.Runtime.UI
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Options");
-            Ui.Panel(g, 8, 60, g.Width - 16, 234, new Color(248, 248, 248), new Color(32, 48, 96));
+            Ui.Panel(g, 8, 60, g.Width - 16, 262, new Color(248, 248, 248), new Color(32, 48, 96));
             string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶",
-                                "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "◀ " + (string.IsNullOrEmpty(_o.Language) ? "Original" : _o.Language) + " ▶", "" };
-            if (Labels.Length == 9) values = values.Take(8).Concat(new[] { "" }).ToArray();
-            int rowH = Labels.Length > 9 ? 22 : 25;
+                                "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "◀ " + ScreenLabel() + " ▶", "◀ " + (string.IsNullOrEmpty(_o.Language) ? "Original" : _o.Language) + " ▶", "" };
+            if (Labels.Length == 10) values = values.Take(9).Concat(new[] { "" }).ToArray();
+            int rowH = Labels.Length > 10 ? 23 : 25;
             for (int i = 0; i < Labels.Length; i++)
             {
                 int y = 66 + i * rowH;
@@ -772,9 +778,8 @@ namespace PokeCreator.Runtime.UI
                 Ui.Text(g, 44, y, Labels[i]);
                 Ui.TextRight(g, g.Width - 32, y, values[i]);
             }
-            Ui.Box(g, 4, g.Height - 84, g.Width - 8, 80);
-            Ui.Text(g, 22, g.Height - 72, "◀ ▶ change a setting.");
-            Ui.Text(g, 22, g.Height - 42, "Settings are kept for every save.");
+            Ui.Box(g, 4, g.Height - 56, g.Width - 8, 52);
+            Ui.Text(g, 22, g.Height - 44, "◀ ▶ change a setting (kept for all saves).");
         }
     }
 

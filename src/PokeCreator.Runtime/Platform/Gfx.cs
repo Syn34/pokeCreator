@@ -53,6 +53,16 @@ namespace PokeCreator.Runtime.Platform
 
         public void SetTitle(string t) { SDL.SDL_SetWindowTitle(Window, SDL.U8(t)); }
 
+        /// <summary>Window size: scale 1-4 times the game size, or 0 for full screen (desktop resolution, letterboxed).</summary>
+        public void SetScreenSize(int scale)
+        {
+            if (Window == IntPtr.Zero) return;
+            if (scale <= 0) { SDL.SDL_SetWindowFullscreen(Window, 0x00001001); return; } // SDL_WINDOW_FULLSCREEN_DESKTOP
+            SDL.SDL_SetWindowFullscreen(Window, 0);
+            SDL.SDL_SetWindowSize(Window, Width * scale, Height * scale);
+            SDL.SDL_SetWindowPosition(Window, SDL.WINDOWPOS_CENTERED, SDL.WINDOWPOS_CENTERED);
+        }
+
         public bool LoadFont(string path, int size)
         {
             if (path == null || !File.Exists(path)) return false;
