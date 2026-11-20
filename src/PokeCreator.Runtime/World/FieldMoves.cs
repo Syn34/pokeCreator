@@ -73,7 +73,7 @@ namespace PokeCreator.Runtime.World
         public static bool EncounterFrom(Game g, string[] methods)
         {
             if (g.Map == null) return false;
-            var table = g.Project.Encounters.FirstOrDefault(en => en.Map == g.Map.Id && en.Version == 0);
+            var table = g.EncounterTable(g.Map.Id);
             if (table == null) return false;
             var m = table.Methods.FirstOrDefault(mm => methods.Contains(mm.Type) && mm.Slots.Count > 0);
             if (m == null) return false;

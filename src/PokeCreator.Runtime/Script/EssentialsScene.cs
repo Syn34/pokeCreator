@@ -216,3 +216,21 @@ namespace PokeCreator.Runtime.Script
         }
     }
 }
+
+namespace PokeCreator.Runtime.Script
+{
+    /// <summary>GameData::Ribbon.get(:ID): a ribbon's name ("FOOTPRINT" → "Footprint Ribbon").</summary>
+    public class RibbonInfo
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public RibbonInfo(string id)
+        {
+            Id = id ?? "";
+            string words = string.Join(" ", Id.Split('_').Select(w => w.Length == 0 ? w : w.Substring(0, 1) + w.Substring(1).ToLowerInvariant()));
+            Name = words.EndsWith("Ribbon") ? words : words + " Ribbon";
+            Description = "";
+        }
+    }
+}

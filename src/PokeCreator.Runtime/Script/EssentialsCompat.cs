@@ -316,6 +316,7 @@ namespace PokeCreator.Runtime.Script
                 return;
             }
             if (lhs.StartsWith("$stats.")) return; // play statistics aren't tracked
+            if (lhs == "$PokemonGlobal.encounter_version") { _game.State.Extras.EncounterVersion = ToInt(val); return; }
             WarnOnce("Can't assign to " + lhs);
         }
 
@@ -389,6 +390,14 @@ namespace PokeCreator.Runtime.Script
             Register("$Trainer.male?", (c, a) => PlayerGender() != "Female");
             Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
             Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game));
+            Register("$PokemonGlobal.encounter_version", (c, a) => _game.State.Extras.EncounterVersion);
+            Register("pbFirstAblePokemon", (c, a) =>
+            {
+                int i = _game.State.Party.FindIndex(PokeCreator.Battles.Battle.Able);
+                if (a.Count > 0) _game.State.SetVar(ToInt(a[0]), i);
+                return i >= 0 ? _game.State.Party[i] : null;
+            });
+            Register("GameData::Ribbon.get", (c, a) => new RibbonInfo(Str(a, 0)));
             Register("pbNextMysteryGiftID", (c, a) => { var w = World.MysteryGift.Waiting(_game); return w.Count > 0 ? (object)w[0].Id : 0; });
             Register("pbReceiveMysteryGift", (c, a) => World.MysteryGift.Receive(_game, a.Count > 0 && a[0] != null && !(a[0] is int) ? Str(a, 0) : null));
             Register("pbMysteryGiftWaiting?", (c, a) => World.MysteryGift.Waiting(_game).Count > 0);
@@ -1090,7 +1099,31 @@ namespace PokeCreator.Runtime.Script
                     case "forget_move": { string id = Convert.ToString(args.Count > 0 ? args[0] : null); if (pk.Moves.Count > 1) pk.Moves.RemoveAll(x => x.Id == id); return true; }
                     case "moves": return pk.Moves;
                     case "calc_stats": return true;
-                    case "giveRibbon": case "record_first_moves": case "reset_moves": return true;
+                    case "record_first_moves": case "reset_moves": return true;
+                    case "giveRibbon": { string r = Convert.ToString(args.Count > 0 ? args[0] : ""); if (r.Length > 0 && !pk.Ribbons.Contains(r)) pk.Ribbons.Add(r); return true; }
+                    case "hasRibbon?": return pk.Ribbons.Contains(Convert.ToString(args.Count > 0 ? args[0] : ""));
+                    case "takeRibbon": pk.Ribbons.Remove(Convert.ToString(args.Count > 0 ? args[0] : "")); return true;
+                    case "numRibbons": return pk.Ribbons.Count;
+                    case "ribbons": return pk.Ribbons.Cast<object>().ToList();
+                    case "clearAllRibbons": pk.Ribbons.Clear(); return true;
+                    case "upgradeRibbon":
+                        {
+                            // Gives the next ribbon of a series (Normal -> Super -> Hyper -> Master); nil if it has the last one
+                            var series = args.Select(x => Convert.ToString(x)).ToList();
+                            if (series.Count == 0) return null;
+                            for (int i = series.Count - 2; i >= 0; i--)
+                                if (pk.Ribbons.Contains(series[i])) { pk.Ribbons[pk.Ribbons.IndexOf(series[i])] = series[i + 1]; return series[i + 1]; }
+                            if (pk.Ribbons.Contains(series[series.Count - 1])) return null;
+                            pk.Ribbons.Add(series[0]); return series[0];
+                        }
+                    case "changeHappiness": pk.ChangeHappiness(Convert.ToString(args.Count > 0 ? args[0] : "")); return true;
+                    case "cool": return pk.Cool;
+                    case "beauty": return pk.Beauty;
+                    case "cute": return pk.Cute;
+                    case "smart": return pk.Smart;
+                    case "tough": return pk.Tough;
+                    case "sheen": return pk.Sheen;
+                    case "calcIV": case "ivs": return pk.IV;
                 }
                 WarnOnce("Unsupported Pokémon member: " + member);
                 return null;
@@ -1121,7 +1154,13 @@ namespace PokeCreator.Runtime.Script
                 case "name": pk.Nickname = val == null || Convert.ToString(val).Length == 0 ? null : Convert.ToString(val); return;
                 case "shiny": pk.Shiny = Truthy(val); return;
                 case "nature": pk.Nature = Convert.ToString(val); return;
-                case "happiness": pk.Happiness = ToInt(val); return;
+                case "happiness": pk.Happiness = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "cool": pk.Cool = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "beauty": pk.Beauty = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "cute": pk.Cute = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "smart": pk.Smart = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "tough": pk.Tough = Math.Max(0, Math.Min(255, ToInt(val))); return;
+                case "sheen": pk.Sheen = Math.Max(0, Math.Min(255, ToInt(val))); return;
                 case "ability": pk.Ability = Convert.ToString(val); return;
                 case "owner": case "ot": pk.OTName = Convert.ToString(val); return;
                 case "gender": pk.Gender = ToInt(val) == 1 ? "F" : ToInt(val) == 0 ? "M" : ""; return;

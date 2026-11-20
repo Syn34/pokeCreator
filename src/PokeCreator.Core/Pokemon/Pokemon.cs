@@ -107,6 +107,43 @@ namespace PokeCreator.Pkmn
         /// <summary>"" or BURN, POISON, TOXIC, PARALYSIS, SLEEP, FROZEN.</summary>
         public string Status { get; set; }
         public int Happiness { get; set; }
+        /// <summary>Ribbons the Pokémon has earned (IDs like "FOOTPRINT", "EFFORT").</summary>
+        public List<string> Ribbons { get; set; }
+        /// <summary>Contest conditions (Pokéblocks, grooming): 0-255.</summary>
+        public int Cool { get; set; }
+        public int Beauty { get; set; }
+        public int Cute { get; set; }
+        public int Smart { get; set; }
+        public int Tough { get; set; }
+        public int Sheen { get; set; }
+
+        /// <summary>Essentials' happiness changes: walking, levelup, groom, evberry, vitamin, wing, machine, battleitem, faint, faintbad, powder, energyroot, revivalherb.</summary>
+        public void ChangeHappiness(string method)
+        {
+            int h = Happiness, tier = h < 100 ? 0 : h < 200 ? 1 : 2;
+            int[] d;
+            switch ((method ?? "").ToLowerInvariant())
+            {
+                case "walking": d = new[] { 2, 2, 1 }; break;
+                case "levelup": d = new[] { 5, 4, 3 }; break;
+                case "groom": d = new[] { 10, 10, 4 }; break;
+                case "evberry": d = new[] { 10, 5, 2 }; break;
+                case "vitamin": d = new[] { 5, 3, 2 }; break;
+                case "wing": d = new[] { 3, 2, 1 }; break;
+                case "machine": case "battleitem": d = new[] { 1, 1, 0 }; break;
+                case "faint": d = new[] { -1, -1, -1 }; break;
+                case "faintbad": d = new[] { -5, -5, -10 }; break;
+                case "powder": d = new[] { -5, -5, -10 }; break;
+                case "energyroot": d = new[] { -10, -10, -15 }; break;
+                case "revivalherb": d = new[] { -15, -15, -20 }; break;
+                default: d = new[] { 0, 0, 0 }; break;
+            }
+            int change = d[tier];
+            if (change > 0 && Item == "SOOTHEBELL") change = change * 3 / 2;
+            if (change > 0 && Ball == "LUXURYBALL") change++;
+            Happiness = Math.Max(0, Math.Min(255, h + change));
+        }
+
         /// <summary>Shadow Pokémon (see Shadow): heart gauge 0-4000, EXP saved until purified.</summary>
         public bool ShadowPokemon { get; set; }
         public int HeartGauge { get; set; }
@@ -139,7 +176,7 @@ namespace PokeCreator.Pkmn
 
         public Pokemon()
         {
-            IV = new List<int> { 0, 0, 0, 0, 0, 0 }; EV = new List<int> { 0, 0, 0, 0, 0, 0 };
+            IV = new List<int> { 0, 0, 0, 0, 0, 0 }; EV = new List<int> { 0, 0, 0, 0, 0, 0 }; Ribbons = new List<string>();
             Moves = new List<PokemonMove>(); Level = 1; Nature = "HARDY"; Gender = ""; Status = ""; Ball = "POKEBALL"; Happiness = 70;
         }
 

@@ -31,7 +31,7 @@ namespace PokeCreator.Runtime.World
 
         static EncounterMethod Table(Game g, bool radarOnly)
         {
-            var table = g.Project.Encounters.FirstOrDefault(en => en.Map == g.Map.Id && en.Version == 0);
+            var table = g.EncounterTable(g.Map.Id);
             if (table == null) return null;
             var radar = table.Methods.FirstOrDefault(m => m.Type == "PokeRadar" && m.Slots.Count > 0);
             var land = table.Methods.FirstOrDefault(m => m.Type == "Land" && m.Slots.Count > 0);

@@ -386,7 +386,7 @@ namespace PokeCreator.Runtime.World
             else if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) method = "Land";
             else if (map.Tileset != null && _game.Project.Encounters.Any(en => en.Map == map.Id && en.Methods.Any(mt => mt.Type.StartsWith("Cave")))) method = "Cave";
             else return;
-            var table = _game.Project.Encounters.FirstOrDefault(en => en.Map == map.Id && en.Version == 0);
+            var table = _game.EncounterTable(map.Id);
             if (table == null) return;
             bool night = DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20;
             var m = table.Methods.FirstOrDefault(mm => mm.Type == method + (night ? "Night" : "Day")) ?? table.Methods.FirstOrDefault(mm => mm.Type == method);

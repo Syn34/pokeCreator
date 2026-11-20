@@ -474,6 +474,13 @@ namespace PokeCreator.Runtime
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
+        /// <summary>The map's encounter table for the current encounter version (falling back to version 0).</summary>
+        public PokeCreator.Data.EncounterData EncounterTable(int mapId)
+        {
+            int v = State.Extras.EncounterVersion;
+            return (v != 0 ? Project.Encounters.FirstOrDefault(en => en.Map == mapId && en.Version == v) : null) ?? Project.Encounters.FirstOrDefault(en => en.Map == mapId && en.Version == 0);
+        }
+
         /// <summary>Script calls that run over several screens (Battle Tower) hold the event interpreter until they finish.</summary>
         public int ScriptHolds;
 
