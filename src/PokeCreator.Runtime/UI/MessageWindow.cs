@@ -356,7 +356,24 @@ namespace PokeCreator.Runtime.UI
         }
 
         // ------------------------------------------------------------------ drawing
+        /// <summary>Frames from Game Settings (Speech frame / Menu frame); null = the built-in box.</summary>
+        public static WindowSkin SpeechSkin, MenuSkin;
+
+        /// <summary>Message box frame.</summary>
+        public static void DrawSpeechBox(Gfx g, int x, int y, int w, int h)
+        {
+            if (SpeechSkin != null) SpeechSkin.Draw(g, x, y, w, h);
+            else DrawPlainBox(g, x, y, w, h);
+        }
+
+        /// <summary>Menu / choice / sign frame.</summary>
         public static void DrawBox(Gfx g, int x, int y, int w, int h)
+        {
+            if (MenuSkin != null) MenuSkin.Draw(g, x, y, w, h);
+            else DrawPlainBox(g, x, y, w, h);
+        }
+
+        public static void DrawPlainBox(Gfx g, int x, int y, int w, int h)
         {
             g.FillRect(x, y, w, h, new Color(72, 72, 80));
             g.FillRect(x + 2, y + 2, w - 4, h - 4, new Color(248, 248, 248));
@@ -373,7 +390,7 @@ namespace PokeCreator.Runtime.UI
             int bh = BoxHeight(g);
             int bx = Margin, bw = g.Width - Margin * 2;
             int by = _position == 0 ? Margin : _position == 1 ? (g.Height - bh) / 2 : g.Height - bh - Margin;
-            DrawBox(g, bx, by, bw, bh);
+            DrawSpeechBox(g, bx, by, bw, bh);
             if (!string.IsNullOrEmpty(_speaker))
             {
                 string sp = Expand(_speaker);

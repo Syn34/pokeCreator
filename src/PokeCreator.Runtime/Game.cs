@@ -91,6 +91,7 @@ namespace PokeCreator.Runtime
             }
             Audio = new Audio(Project);
             Message = new MessageWindow(this);
+            LoadFrames();
             Options = PlayerOptions.Load(this);
             Options.Apply(this);
             Interpreter = new Interpreter(this);
@@ -211,6 +212,14 @@ namespace PokeCreator.Runtime
             if (!warped && type == Weather.Type && type != World.WeatherSystem.None) return;
             if (type != World.WeatherSystem.None && Rng.Next(100) < chance) Weather.Set(type, 9, 0);
             else Weather.Set(World.WeatherSystem.None, 0, 0);
+        }
+
+        /// <summary>Loads the speech and menu frames from Game Settings (missing files fall back to the built-in box).</summary>
+        public void LoadFrames()
+        {
+            var st = Project.Settings;
+            MessageWindow.SpeechSkin = string.IsNullOrEmpty(st.SpeechFrame) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", st.SpeechFrame));
+            MessageWindow.MenuSkin = string.IsNullOrEmpty(st.MenuFrame) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", st.MenuFrame));
         }
 
         /// <summary>Map music, or the Bicycle / Surf music while riding.</summary>

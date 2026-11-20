@@ -91,6 +91,25 @@ namespace PokeCreator.Runtime.Platform
             return t;
         }
 
+        /// <summary>Reads an image's pixels as ARGB values ([y, x]); null if it can't be loaded.</summary>
+        public uint[,] ReadPixels(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+            IntPtr surf = SDL.IMG_Load(SDL.U8(path));
+            if (surf == IntPtr.Zero) return null;
+            IntPtr conv = SDL.SDL_ConvertSurfaceFormat(surf, SDL.PIXELFORMAT_ARGB8888, 0);
+            SDL.SDL_FreeSurface(surf);
+            if (conv == IntPtr.Zero) return null;
+            int w = Marshal.ReadInt32(conv, 16), h = Marshal.ReadInt32(conv, 20), pitch = Marshal.ReadInt32(conv, 24);
+            IntPtr px = Marshal.ReadIntPtr(conv, 32);
+            var result = new uint[h, w];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    result[y, x] = (uint)Marshal.ReadInt32(px, y * pitch + x * 4);
+            SDL.SDL_FreeSurface(conv);
+            return result;
+        }
+
         public void Draw(Texture t, int sx, int sy, int sw, int sh, int dx, int dy, int dw = -1, int dh = -1, int alpha = 255)
         {
             if (t == null) return;

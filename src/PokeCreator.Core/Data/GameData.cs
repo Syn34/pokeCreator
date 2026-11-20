@@ -316,7 +316,9 @@ namespace PokeCreator.Data
         [Field("Use my own font", Help = "Off: the game uses PokeCreator's default font (the FireRed font in BaseData/Fonts), even if this project's Fonts folder has fonts in it. On: it uses the Message font below from this project's Fonts folder.", Group = "Display")] public bool UseProjectFont { get; set; }
         [Field("Message font", Asset = "Fonts", Help = "Used when 'Use my own font' is on. When it's off, you can still pick another default font here.", Group = "Display")] public string Font { get; set; }
         [Field("Font size", Group = "Display")] public int FontSize { get; set; }
-        [Field("Windowskin", Asset = "Graphics/Windowskins", Group = "Display")] public string Windowskin { get; set; }
+        [Field("Windowskin", Asset = "Graphics/Windowskins", Group = "Display", Help = "RMXP system windowskin (kept from imported games; the frames below are what the game draws).")] public string Windowskin { get; set; }
+        [Field("Speech frame", Asset = "Graphics/Windowskins", Group = "Display", Help = "Message box frame, e.g. speech hgss 1. Empty or missing = PokeCreator's built-in box.")] public string SpeechFrame { get; set; }
+        [Field("Menu frame", Asset = "Graphics/Windowskins", Group = "Display", Help = "Frame for menus and choice boxes, e.g. choice 1. Empty or missing = built-in box.")] public string MenuFrame { get; set; }
         [Field("Wild battle BGM", Asset = "Audio/BGM", Group = "Music")] public string WildBattleBGM { get; set; }
         [Field("Trainer battle BGM", Asset = "Audio/BGM", Group = "Music")] public string TrainerBattleBGM { get; set; }
         [Field("Wild victory ME", Asset = "Audio/BGM", Group = "Music")] public string WildVictoryBGM { get; set; }
@@ -330,6 +332,7 @@ namespace PokeCreator.Data
             Title = "My Pokémon Game"; StartMap = 1; StartDirection = 2; DefaultPlayerName = "Red"; StartMoney = 3000;
             StartItemStorage = new List<string>(); Home = new List<int>();
             ScreenWidth = 512; ScreenHeight = 384; WindowScale = 1; Font = "power green.ttf"; FontSize = 26; Windowskin = "";
+            SpeechFrame = "speech hgss 1"; MenuFrame = "choice 1";
         }
     }
 

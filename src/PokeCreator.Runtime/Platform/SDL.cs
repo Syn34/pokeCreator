@@ -90,6 +90,7 @@ namespace PokeCreator.Runtime.Platform
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_SetTextureColorMod(IntPtr texture, byte r, byte g, byte b);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_SetTextureBlendMode(IntPtr texture, int mode);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_FreeSurface(IntPtr surface);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_ConvertSurfaceFormat(IntPtr src, uint format, uint flags);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_CreateRGBSurfaceWithFormat(uint flags, int w, int h, int depth, uint format);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_RWFromFile(byte[] file, byte[] mode);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_SaveBMP_RW(IntPtr surface, IntPtr dst, int freedst);
