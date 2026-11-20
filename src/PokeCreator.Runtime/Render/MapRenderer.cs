@@ -148,6 +148,18 @@ namespace PokeCreator.Runtime.Render
             int cw = tex.Width / 4, ch = tex.Height / 4;
             int row = c.Direction == 2 ? 0 : c.Direction == 4 ? 1 : c.Direction == 6 ? 2 : 3;
             int col = c.Pattern % 4;
+            // Reflection on still water or puddles just below (as Essentials)
+            int below = map.TerrainTag(c.X, c.Y + 1);
+            if (!c.Jumping && (below == 6 || below == 16))
+                _g.DrawEx(tex, col * cw, row * ch, cw, ch, sx, sy + ch / 2.0, 1, -1, 0, false, c.Opacity * 90 / 255, 0);
+            // Bush tiles (tall grass) hide the lower part of whoever stands in them
+            if (!c.Jumping && map.IsBush(c.X, c.Y) && ch > 12)
+            {
+                const int depth = 12;
+                _g.Draw(tex, col * cw, row * ch, cw, ch - depth, sx - cw / 2, sy - ch, -1, -1, c.Opacity);
+                _g.Draw(tex, col * cw, row * ch + ch - depth, cw, depth, sx - cw / 2, sy - depth, -1, -1, c.Opacity / 2);
+                return;
+            }
             _g.Draw(tex, col * cw, row * ch, cw, ch, sx - cw / 2, sy - ch, -1, -1, c.Opacity);
         }
     }
