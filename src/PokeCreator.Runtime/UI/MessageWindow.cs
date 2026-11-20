@@ -26,6 +26,8 @@ namespace PokeCreator.Runtime.UI
         public bool Busy { get; private set; }
         /// <summary>Characters revealed per frame (Options: Slow 1, Normal 2, Fast 4, Instant 999).</summary>
         public int CharsPerFrame = 2;
+        /// <summary>Autotest: print every message to the console.</summary>
+        public static bool Echo;
         public int LastChoice { get; private set; }
 
         public MessageWindow(Game g) { _game = g; }
@@ -34,6 +36,7 @@ namespace PokeCreator.Runtime.UI
         public void Show(string text, List<string> choices = null, int cancelIndex = -1, Action<int> onChoice = null)
         {
             string plain = Expand(text ?? "");
+            if (Echo) Console.WriteLine("[msg] " + plain.Replace("\n", " / "));
             int width = _game.Gfx.Width - Margin * 2 - PadX * 2;
             _lines = Wrap(plain, width);
             if (_lines.Count == 0) _lines.Add("");

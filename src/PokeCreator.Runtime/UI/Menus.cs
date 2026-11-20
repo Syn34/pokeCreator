@@ -407,12 +407,18 @@ namespace PokeCreator.Runtime.UI
         static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
         int _pocket, _index, _scroll;
         CommandList _popup;
-        readonly Action<string> _choose; // choose mode: picking an item to give
+        readonly Action<string> _choose; // choose mode: picking an item to give or use in battle
+        readonly Func<ItemData, bool> _filter;
+        readonly Action _onCancel;
 
         public BagScene(Game g) : base(g) { Opaque = true; }
 
         /// <summary>Pick an item (e.g. to give to a Pokémon); the bag closes and onChosen gets the item ID.</summary>
         public BagScene(Game g, Action<string> onChosen) : base(g) { Opaque = true; _choose = onChosen; }
+
+        /// <summary>Choose mode showing only some items (e.g. those usable in battle).</summary>
+        public BagScene(Game g, Action<string> onChosen, Func<ItemData, bool> filter, Action onCancel) : base(g)
+        { Opaque = true; _choose = onChosen; _filter = filter; _onCancel = onCancel; }
 
         List<KeyValuePair<ItemData, int>> Items()
         {
@@ -420,7 +426,7 @@ namespace PokeCreator.Runtime.UI
             foreach (var kv in Game.State.Bag)
             {
                 var it = Game.Project.Items.FirstOrDefault(i => i.Id == kv.Key) ?? new ItemData { Id = kv.Key, Name = kv.Key, Pocket = 1 };
-                if (Math.Max(1, Math.Min(8, it.Pocket)) == _pocket + 1) list.Add(new KeyValuePair<ItemData, int>(it, kv.Value));
+                if (Math.Max(1, Math.Min(8, it.Pocket)) == _pocket + 1 && (_filter == null || _filter(it))) list.Add(new KeyValuePair<ItemData, int>(it, kv.Value));
             }
             return list;
         }
@@ -454,15 +460,15 @@ namespace PokeCreator.Runtime.UI
             if (Input.Repeat(Button.Up)) { _index = (_index + n - 1) % n; Cursor(); }
             if (_index < _scroll) _scroll = _index;
             if (_index >= _scroll + 7) _scroll = _index - 6;
-            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); if (_onCancel != null) _onCancel(); return; }
             if (Input.Trigger(Button.Action))
             {
-                if (_index >= items.Count) { Cancel(); Close(); return; }
+                if (_index >= items.Count) { Cancel(); Close(); if (_onCancel != null) _onCancel(); return; }
                 Decide();
                 var it = items[_index].Key;
                 if (_choose != null)
                 {
-                    if (it.Pocket == 8) { Game.Message.Show("The " + (it.Name ?? it.Id) + " can't be held."); return; }
+                    if (it.Pocket == 8 && _filter == null) { Game.Message.Show("The " + (it.Name ?? it.Id) + " can't be held."); return; }
                     Close(); _choose(it.Id); return;
                 }
                 var cmds = new List<string>();

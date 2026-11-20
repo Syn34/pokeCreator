@@ -99,13 +99,17 @@ namespace PokeCreator.Battles
             _ev = new List<BattleEvent>();
             int f = FirstAble(1);
             Active[1] = new Battler(Parties[1][f], 1, f);
-            if (IsWild) Say("A wild " + Active[1].Pk.Name(P) + " appeared!");
+            if (IsWild)
+            {
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = f });
+                Say("A wild " + Active[1].Pk.Name(P) + " appeared!");
+            }
             else
             {
                 Say(TrainerTypeName + " " + TrainerName + " would like to battle!");
                 Say(TrainerTypeName + " " + TrainerName + " sent out " + Active[1].Pk.Name(P) + "!");
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = f });
             }
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = f });
             int pi = FirstAble(0);
             Active[0] = new Battler(Parties[0][pi], 0, pi);
             Say("Go! " + Active[0].Pk.Name(P) + "!");

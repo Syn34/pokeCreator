@@ -223,6 +223,10 @@ namespace PokeCreator.Studio.Editors
                 if (k >= 0) Insert(new EventCommand(355, 0, "pbChangePlayer(" + (k + 1) + ")"));
             });
 
+            var battle = group("Battles");
+            cmd(battle, "Trainer Battle", AddTrainerBattle);
+            cmd(battle, "Wild Battle", AddWildBattle);
+
             var map = group("Map && Movement");
             cmd(map, "Transfer Player (Warp)", AddTransfer);
             cmd(map, "Set Event Location", AddEventLocation);
@@ -382,6 +386,29 @@ namespace PokeCreator.Studio.Editors
             int k = ChoiceDialog.Ask(FindForm(), "Give Pokémon", ids, true); if (k < 0) return;
             int lv = NumberDialog.Ask(FindForm(), "Level", 5); if (lv < 1) return;
             Insert(new EventCommand(355, 0, "pbAddPokemon(:" + ids[k] + ", " + Math.Min(100, lv) + ")"));
+        }
+
+        /// <summary>A Conditional Branch around TrainerBattle.start: commands under it run if the player wins.</summary>
+        void AddTrainerBattle()
+        {
+            var list = _p.Trainers.OrderBy(t => t.TrainerType).ThenBy(t => t.Name).ThenBy(t => t.Version).ToList();
+            if (list.Count == 0) { MessageBox.Show(FindForm(), "There are no trainers yet. Add them under Database > Trainers.", "Trainer Battle"); return; }
+            int k = ChoiceDialog.Ask(FindForm(), "Battle which trainer?", list.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (version " + t.Version + ")" : "") + "  -  " + t.Pokemon.Count + " Pokémon").ToArray(), true);
+            if (k < 0) return;
+            var tr = list[k];
+            string script = "TrainerBattle.start(:" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"" + (tr.Version > 0 ? ", " + tr.Version : "") + ")";
+            Insert(new EventCommand(111, 0, 12, script),
+                   new EventCommand(108, 1, "If the player wins (e.g. turn on Self Switch A)"), new EventCommand(0, 1),
+                   new EventCommand(411, 0), new EventCommand(108, 1, "If the player loses (they black out unless the battle allows losing)"), new EventCommand(0, 1),
+                   new EventCommand(412, 0));
+        }
+
+        void AddWildBattle()
+        {
+            var ids = _p.Species.Where(s => s.Form == 0).Select(s => s.Id).ToArray();
+            int k = ChoiceDialog.Ask(FindForm(), "Wild battle against", ids, true); if (k < 0) return;
+            int lv = NumberDialog.Ask(FindForm(), "Level", 5); if (lv < 1) return;
+            Insert(new EventCommand(355, 0, "WildBattle.start(:" + ids[k] + ", " + Math.Min(100, lv) + ")"));
         }
 
         void AddGiveItem()

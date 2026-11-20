@@ -29,6 +29,8 @@ namespace PokeCreator.Runtime.World
         /// <summary>Pokédex: species seen and caught (owned).</summary>
         public readonly HashSet<string> Seen = new HashSet<string>();
         public readonly HashSet<string> Caught = new HashSet<string>();
+        /// <summary>Where the player goes after blacking out (set by pbSetPokemonCenter at a Pokémon Center).</summary>
+        public int HealMap, HealX, HealY, HealDir;
         /// <summary>Steps left on a Repel.</summary>
         public int RepelSteps;
 

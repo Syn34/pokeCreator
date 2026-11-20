@@ -302,7 +302,8 @@ namespace PokeCreator.Runtime.World
             }
             var sp = _game.Project.Species.FirstOrDefault(s => s.Id == slot.Species);
             _cooldown = 4;
-            _game.StartWildEncounter(sp != null ? sp.Name : slot.Species, level);
+            if (sp == null || !_game.PartyCanBattle) return;
+            _game.StartWildEncounter(slot.Species, level);
         }
     }
 }

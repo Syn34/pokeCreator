@@ -23,13 +23,15 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Evolution by level (Rare Candy / Exp. Candy), stone, happiness, held item, known move and more, with the evolution screen and move learning
 - [x] Pokédex (seen/caught, list and entries), Options menu (text speed, volumes)
 - [x] Name entry (pbTrainerName / pbEnterPlayerName) and nicknames when receiving a Pokémon
-- [ ] Intro sequence: choosing the player character
+- [x] Intro sequence: choosing the player character (pbChangePlayer)
 
 ## v0.3: Battles
-- [ ] Single wild battles: scene, HP bars, move selection, damage formula, type matchups, catching
-- [ ] Trainer battles from `trainers.json`, AI by skill level, prize money, lose text
-- [ ] Move effects via function codes, starting with the most common Essentials codes
-- [ ] Status conditions, stat stages, weather, abilities and held items (incremental)
+- [x] Single wild battles: scene, HP bars, move selection, damage formula, type matchups, catching
+- [x] Trainer battles from `trainers.json`, AI by skill level, prize money, lose text, blacking out
+- [x] Move effects read from Essentials function code names (stat changes, status, confusion, flinch, multi-hit, recoil, draining, healing, fixed damage, OHKO, two-turn, Protect, binding...)
+- [x] Status conditions and stat stages; Leftovers and healing berries
+- [ ] Weather, abilities and more held items (incremental)
+- [ ] Battle animations for moves
 - [ ] Double battles
 
 ## v0.4: World features

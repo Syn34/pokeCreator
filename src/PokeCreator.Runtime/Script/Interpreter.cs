@@ -53,7 +53,7 @@ namespace PokeCreator.Runtime.Script
         public void Setup(List<EventCommand> list, int eventId)
         {
             _list = list; _index = 0; EventId = eventId; MapId = _game.Map.Id;
-            _branch.Clear(); _wait = 0; _waitForMoves = false;
+            _branch.Clear(); _wait = 0; _waitForMoves = false; _resumeBattleCondition = false;
         }
 
         void Finish()
@@ -96,6 +96,7 @@ namespace PokeCreator.Runtime.Script
                 }
                 if (_wait > 0) { _wait--; return; }
                 if (_game.MessageBusy || _game.Transferring) return;
+                if (_game.SceneOpen) return; // a battle, name entry or other screen opened by the last command
                 if (_waitForMoves)
                 {
                     if (_game.Player.MoveRouteForcing || _game.Map.Events.Any(e => e.MoveRouteForcing)) return;
@@ -148,7 +149,17 @@ namespace PokeCreator.Runtime.Script
 
                 case 111:
                     {
+                        _game.BattleJustStarted = false;
                         bool result = Condition(c);
+                        if (_game.BattleJustStarted)
+                        {
+                            // The condition started a battle: wait, then check again (the battle call then returns its result)
+                            _game.BattleJustStarted = false; _resumeBattleCondition = true;
+                            _game.ResumeOwner = this;
+                            return false;
+                        }
+                        if (_resumeBattleCondition && _game.ResumeOwner == this) _game.ResumeOwner = null;
+                        _resumeBattleCondition = false;
                         _branch[c.Indent] = result ? 1 : 0;
                         if (result) { _branch.Remove(c.Indent); return true; }
                         return Skip();
@@ -234,7 +245,7 @@ namespace PokeCreator.Runtime.Script
                 case 249: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayMe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
                 case 250: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlaySe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
 
-                case 301: _game.StartPlaceholderBattle("a trainer"); _branch[c.Indent] = 0; return true;
+                case 301: Warn(301, "RPG Maker troop battles aren't used in Pokémon games; use TrainerBattle.start"); return true;
                 case 601: case 602: case 603: return BattleBranch(c);
                 case 314: foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; // Recover All
                 case 351: case 352: case 353: case 354: return true;
@@ -248,10 +259,16 @@ namespace PokeCreator.Runtime.Script
             }
         }
 
+        bool _resumeBattleCondition;
+
         bool BattleBranch(EventCommand c)
         {
-            // Battle placeholder always counts as a win
-            if (c.Code == 601) return true;
+            // RPG Maker's If Win / If Escape / If Lose after a battle
+            var o = _game.LastOutcome;
+            bool match = c.Code == 601 ? o == PokeCreator.Battles.BattleOutcome.Win || o == PokeCreator.Battles.BattleOutcome.Caught
+                       : c.Code == 602 ? o == PokeCreator.Battles.BattleOutcome.Escaped
+                       : o == PokeCreator.Battles.BattleOutcome.Loss;
+            if (match) return true;
             return Skip();
         }
 

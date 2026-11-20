@@ -206,7 +206,7 @@ namespace PokeCreator.Runtime.Script
         void RegisterBuiltins()
         {
             Handler noop = (c, a) => true;
-            foreach (var n in new[] { "pbTrainerIntro", "pbTrainerEnd", "pbNoticePlayer", "pbSetPokemonCenter", "pbCallBub", "pbFadeOutIn",
+            foreach (var n in new[] { "pbTrainerIntro", "pbTrainerEnd", "pbNoticePlayer", "pbCallBub", "pbFadeOutIn",
                                       "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
                                       "pbMoveRoute", "pbPhoneRegisterBattle", "pbPhoneRegister", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
@@ -257,14 +257,28 @@ namespace PokeCreator.Runtime.Script
             Register("pbPokemonMart", (c, a) => { _game.Message.Show("Shops are coming in a future version of PokeCreator."); return true; });
             Register("pbSellItem", (c, a) => true);
 
-            Handler trainerBattle = (c, a) => { _game.StartPlaceholderBattle(Str(a, 1).Length > 0 ? Str(a, 1) : Str(a, 0)); return true; };
-            Register("pbTrainerBattle", trainerBattle);
-            Register("pbDoubleTrainerBattle", trainerBattle);
-            Register("TrainerBattle.start", trainerBattle);
-            Register("start", trainerBattle);
-            Handler wildBattle = (c, a) => { _game.StartWildEncounter(SpeciesName(Str(a, 0)), a.Count > 1 ? ToInt(a[1]) : 5); return true; };
-            Register("pbWildBattle", wildBattle);
-            Register("WildBattle.start", wildBattle);
+            // Battles. The event waits for the battle; a Conditional Branch re-checks afterwards and gets the result.
+            Register("pbSetPokemonCenter", (c, a) =>
+            {
+                if (_game.Map == null) return true;
+                _game.State.HealMap = _game.Map.Id; _game.State.HealX = _game.Player.X; _game.State.HealY = _game.Player.Y; _game.State.HealDir = 2;
+                return true;
+            });
+            Register("setBattleRule", (c, a) => { _battleRules[Str(a, 0)] = a.Count > 1 ? a[1] : true; return true; });
+            Register("TrainerBattle.start", (c, a) => TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 2 && !(a[2] is string) ? ToInt(a[2]) : 0, c));
+            Register("pbTrainerBattle", (c, a) =>
+            {
+                if (a.Count > 5 && Truthy(a[5])) _battleRules["canLose"] = true;
+                return TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 4 ? ToInt(a[4]) : 0, c);
+            });
+            Register("pbDoubleTrainerBattle", (c, a) => TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 2 && !(a[2] is string) ? ToInt(a[2]) : 0, c));
+            Register("WildBattle.start", (c, a) => WildBattle(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false, c));
+            Register("pbWildBattle", (c, a) =>
+            {
+                if (a.Count > 4 && Truthy(a[4])) _battleRules["canLose"] = true;
+                if (a.Count > 2 && a[2] != null) _battleRules["outcomeVar"] = ToInt(a[2]);
+                return WildBattle(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, true, c);
+            });
 
             // Variables, bag and screen helpers
             Register("pbSet", (c, a) => { _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1))); _game.Map.RefreshEvents(); return Arg(a, 1); });
@@ -317,6 +331,46 @@ namespace PokeCreator.Runtime.Script
             _game.Audio.PlayMe(item != null && item.Pocket == 8 ? "Key item get" : "Item get");
             _game.Message.Show("\\PN " + verb + " " + (qty > 1 ? qty + " " : (StartsWithVowel(name) ? "an " : "a ")) + name + "!");
             return true;
+        }
+
+        readonly Dictionary<string, object> _battleRules = new Dictionary<string, object>();
+
+        bool TakeRule(string name) { object v; bool on = _battleRules.TryGetValue(name, out v) && Truthy(v); return on; }
+
+        /// <summary>Starts a trainer battle, or (when the event re-checks after it) returns whether the player won.</summary>
+        object TrainerBattle(string type, string name, int version, Interpreter ctx)
+        {
+            if (_game.ResumeOutcome.HasValue && ctx != null && _game.ResumeOwner == ctx)
+            {
+                var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
+                return o == PokeCreator.Battles.BattleOutcome.Win;
+            }
+            bool canLose = TakeRule("canLose");
+            int outcomeVar = OutcomeVar();
+            _battleRules.Clear();
+            if (!_game.StartTrainerBattle(type, name, version, canLose, o => _game.State.SetVar(outcomeVar, (int)o)))
+            {
+                WarnOnce("Trainer battle skipped (no trainer " + type + " \"" + name + "\" in the database, or no Pokémon that can battle)");
+                return true;
+            }
+            return false;
+        }
+
+        int OutcomeVar() { object v; return _battleRules.TryGetValue("outcomeVar", out v) ? ToInt(v) : 1; }
+
+        /// <summary>Starts a wild battle, or returns its outcome (1 won, 2 lost, 3 ran, 4 caught) when re-checked.</summary>
+        object WildBattle(string species, int level, bool asBool, Interpreter ctx)
+        {
+            if (_game.ResumeOutcome.HasValue && ctx != null && _game.ResumeOwner == ctx)
+            {
+                var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
+                return asBool ? (object)(o != PokeCreator.Battles.BattleOutcome.Loss) : (int)o;
+            }
+            int outcomeVar = OutcomeVar();
+            bool canLose = TakeRule("canLose");
+            _battleRules.Clear();
+            _game.StartWildBattle(species, level, o => _game.State.SetVar(outcomeVar, (int)o));
+            return asBool ? (object)true : 1;
         }
 
         object AddPokemon(string species, int level, bool announce)

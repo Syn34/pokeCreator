@@ -101,6 +101,7 @@ namespace PokeCreator.Runtime
             if (_opt.StartMap > 0 || _opt.SkipTitle) NewGame();
             else PushScene(new TitleScene(this));
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
+            MessageWindow.Echo = test != null;
 
             ulong freq = SDL.SDL_GetPerformanceFrequency();
             double frameTime = 1.0 / 60.0;
@@ -262,15 +263,83 @@ namespace PokeCreator.Runtime
         }
 
         // ------------------------------------------------------------------ battles (placeholders until the battle system lands)
-        public void StartWildEncounter(string species, int level)
+        // ------------------------------------------------------------------ battles
+        /// <summary>
+        /// The result of the last battle, for the event that started it: a Conditional Branch with
+        /// TrainerBattle.start(...) re-checks its condition after the battle and gets this instead of a new battle.
+        /// </summary>
+        public PokeCreator.Battles.BattleOutcome? ResumeOutcome;
+        /// <summary>Set when a battle starts during an event command, so the event waits for it.</summary>
+        public bool BattleJustStarted;
+        /// <summary>The event waiting for ResumeOutcome (only it may take the result).</summary>
+        public object ResumeOwner;
+        public PokeCreator.Battles.BattleOutcome LastOutcome;
+
+        public bool PartyCanBattle { get { return State.Party.Any(PokeCreator.Battles.Battle.Able); } }
+
+        /// <summary>Wild battle (from grass, or pbWildBattle).</summary>
+        public void StartWildEncounter(string species, int level) { StartWildBattle(species, level, null); }
+
+        public void StartWildBattle(string species, int level, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
-            Audio.PlaySe("Exclaim");
-            Message.Show("A wild " + species + " (Lv. " + level + ") appeared!\\nPokeCreator's battle system is coming soon, so it ran away.");
+            var wild = PokeCreator.Pkmn.Pokemon.Create(Project, species, level, Rng);
+            if (wild.Data(Project) == null || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { wild }, true, Rng) { PlayerName = State.PlayerName };
+            b.AlreadyCaught = sp => State.Caught.Contains(sp);
+            StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
-        public void StartPlaceholderBattle(string who)
+        /// <summary>Trainer battle from trainers.json. Returns false if there's no such trainer.</summary>
+        public bool StartTrainerBattle(string type, string name, int version, bool canLose, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
-            Message.Show("[Battle with " + who + "]\\nBattles aren't implemented yet, so this counts as a win.");
+            var tr = Project.Trainers.FirstOrDefault(t => t.TrainerType == type && t.Name == name && t.Version == version)
+                  ?? Project.Trainers.FirstOrDefault(t => t.TrainerType == type && t.Name == name);
+            if (tr == null || tr.Pokemon.Count == 0) { Console.WriteLine("Trainer not found: " + type + " " + name + " " + version); return false; }
+            if (!PartyCanBattle) return false;
+            var tt = Project.TrainerTypes.FirstOrDefault(t => t.Id == type);
+            var foes = tr.Pokemon.Select(tp => PokeCreator.Pkmn.Pokemon.FromTrainer(Project, tp, Rng)).ToList();
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng)
+            {
+                PlayerName = State.PlayerName, TrainerName = tr.Name,
+                TrainerTypeName = tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name : type,
+                TrainerSkill = tt != null ? tt.SkillLevel : 0,
+            };
+            StartBattle(b, new BattleSetup { Wild = false, Trainer = tr, TrainerType = tt, Backdrop = Backdrop(), CanLose = canLose, OnEnd = onEnd });
+            return true;
+        }
+
+        void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
+        {
+            var end = setup.OnEnd;
+            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (end != null) end(o); };
+            BattleJustStarted = true;
+            Audio.PlaySe("Encounter");
+            Flash(20);
+            PushScene(new BattleScene(this, b, setup));
+        }
+
+        /// <summary>Battle backdrop: the map's metadata, else by time of day.</summary>
+        string Backdrop()
+        {
+            var props = Map != null ? Map.Data.Properties : null;
+            string bd = props != null && !string.IsNullOrEmpty(props.BattleBack) ? props.BattleBack : "field";
+            int h = DateTime.Now.Hour;
+            string time = h >= 20 || h < 6 ? "_night" : h >= 17 ? "_eve" : "";
+            if (time != "" && Project.FindAsset("Graphics/Battlebacks", bd + time + "_bg") != null) bd += time;
+            return bd;
+        }
+
+        /// <summary>After losing: heal the party and go back to the last healing spot (Home in Game Settings, else the start).</summary>
+        public void Whiteout()
+        {
+            foreach (var pk in State.Party) pk.Heal(Project);
+            ResumeOutcome = null; ResumeOwner = null; // the event that started the battle is cancelled
+            var s = Project.Settings;
+            int map = s.StartMap, x = s.StartX, y = s.StartY, dir = 2;
+            if (State.HealMap > 0) { map = State.HealMap; x = State.HealX; y = State.HealY; dir = State.HealDir > 0 ? State.HealDir : 2; }
+            else if (s.Home != null && s.Home.Count >= 3) { map = s.Home[0]; x = s.Home[1]; y = s.Home[2]; if (s.Home.Count > 3) dir = s.Home[3]; }
+            Interpreter.Setup(null, 0);
+            RequestTransfer(map, x, y, dir, true);
         }
 
         // ------------------------------------------------------------------ screen effects
@@ -287,6 +356,7 @@ namespace PokeCreator.Runtime
         // ------------------------------------------------------------------ update
         void Update()
         {
+            if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
             if (_scenes.Count > 0)
             {
                 if (Message.Busy) Message.Update();
@@ -305,7 +375,6 @@ namespace PokeCreator.Runtime
                 for (int i = 0; i < 4; i++) _tone[i] += (_toneTarget[i] - _tone[i]) / _toneFrames;
                 _toneFrames--;
             }
-            if (_flash > 0) _flash--;
             if (_signTimer > 0) _signTimer--;
 
             foreach (var e in Map.Events) e.Update();
@@ -470,6 +539,20 @@ namespace PokeCreator.Runtime
                 case "switch": _g.State.SetSwitch(int.Parse(p[1]), p.Length < 3 || p[2] == "on"); if (_g.Map != null) _g.Map.RefreshEvents(); break;
                 case "log": if (_g.Map == null) { Console.WriteLine("[autotest] (title screen) scenes=" + _g.SceneOpen); break; } Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
                 case "flag": _g.State.Flags.Add(p[1]); break;
+                case "moves": // moves partyIndex MOVE1,MOVE2,...
+                    {
+                        var pk = _g.State.Party[int.Parse(p[1])];
+                        pk.Moves.Clear();
+                        foreach (var m in p[2].Split(',')) { var md = _g.Project.Moves.FirstOrDefault(x => x.Id == m); pk.Moves.Add(new PokeCreator.Pkmn.PokemonMove(m, md != null ? md.TotalPP : 10)); }
+                        break;
+                    }
+                case "money": Console.WriteLine("[autotest] money=" + _g.State.Money); break;
+                case "nearlevel": // nearlevel partyIndex: 1 EXP short of the next level
+                    {
+                        var pk = _g.State.Party[int.Parse(p[1])];
+                        pk.Exp = pk.ExpForNextLevel(_g.Project) - 1;
+                        break;
+                    }
                 case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)), null); break;
                 case "scene":
                     switch (p[1])
