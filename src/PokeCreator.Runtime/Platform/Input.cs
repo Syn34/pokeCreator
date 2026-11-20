@@ -43,7 +43,7 @@ namespace PokeCreator.Runtime.Platform
         /// <summary>A raw key (SDL scancode) pressed this frame.</summary>
         public static bool KeyTrigger(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h == 1; }
         public static bool KeyPress(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h > 0; }
-        static readonly int[] WatchedKeys = { Scancode.F9, Scancode.F5, Scancode.LCtrl, 228 /* right Ctrl */ };
+        static readonly int[] WatchedKeys = { Scancode.F9, Scancode.F5, Scancode.LCtrl, 228 /* right Ctrl */, 226, 230 /* Alt */, Scancode.Return };
 
         public static bool Press(Button b) { return _held[(int)b] > 0; }
         public static bool Trigger(Button b) { return _held[(int)b] == 1; }

@@ -814,9 +814,17 @@ namespace PokeCreator.Runtime
             if (ce == null || Interpreter.Running) return;
             Interpreter.Setup(ce.List, 0);
         }
+        int _windowedSize = 1;
         void Update()
         {
             Audio.Update();
+            // Alt+Enter: full screen on / off
+            if ((Input.KeyPress(226) || Input.KeyPress(230)) && Input.KeyTrigger(Scancode.Return) && Options != null)
+            {
+                if (Options.ScreenSize >= 5) Options.ScreenSize = Math.Max(1, _windowedSize);
+                else { _windowedSize = Options.ScreenSize > 0 ? Options.ScreenSize : Math.Max(1, Project.Settings.WindowScale); Options.ScreenSize = 5; }
+                Options.Apply(this); Options.Save(this);
+            }
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
             if (_scenes.Count > 0)
             {
