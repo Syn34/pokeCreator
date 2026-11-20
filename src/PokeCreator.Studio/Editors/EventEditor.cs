@@ -75,7 +75,17 @@ namespace PokeCreator.Studio.Editors
                 case 250: return "◆ Play SE: " + Audio(c);
                 case 301: return "◆ Battle Processing";
                 case 314: return "◆ Recover All";
-                case 355: return "◆ Script: " + c.StrParam(0);
+                case 355:
+                    {
+                        string sc = c.StrParam(0).Trim();
+                        if (sc == "pbTrainerName" || sc.StartsWith("pbEnterPlayerName")) return "◆ Enter Player Name";
+                        if (sc.Replace(" ", "") == "$player.has_pokedex=true" || sc.Replace(" ", "") == "$Trainer.pokedex=true") return "◆ Give Pokédex";
+                        var gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbAddPokemon\(\s*:(\w+)\s*,\s*(\d+)\s*\)$");
+                        if (gm.Success) return "◆ Give Pokémon: " + gm.Groups[1].Value + " Lv. " + gm.Groups[2].Value;
+                        gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
+                        if (gm.Success) return "◆ Give Item: " + gm.Groups[1].Value + (gm.Groups[2].Success ? " ×" + gm.Groups[2].Value : "");
+                        return "◆ Script: " + sc;
+                    }
                 case 655: return "    " + c.StrParam(0);
                 default: return "◆ [" + c.Code + "] " + string.Join(", ", c.Params.Select(o => Convert.ToString(o, CultureInfo.InvariantCulture)));
             }

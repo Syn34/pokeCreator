@@ -34,6 +34,7 @@ namespace PokeCreator.Runtime
         public Player Player;
         public GameMap Map;
         public MessageWindow Message;
+        public PlayerOptions Options;
         public Interpreter Interpreter;
         public EssentialsCompat Compat;
         public EncounterSystem Encounters;
@@ -88,6 +89,8 @@ namespace PokeCreator.Runtime
             }
             Audio = new Audio(Project);
             Message = new MessageWindow(this);
+            Options = PlayerOptions.Load(this);
+            Options.Apply(this);
             Interpreter = new Interpreter(this);
             Compat = new EssentialsCompat(this);
             Encounters = new EncounterSystem(this) { Enabled = !_opt.NoEncounters };
@@ -162,6 +165,19 @@ namespace PokeCreator.Runtime
                 Message.Show("The save file couldn't be loaded, so a new game was started.\\n(" + ex.Message + ")");
             }
             _fadeAlpha = 255;
+        }
+
+        /// <summary>Opens the name entry screen; the running event waits until it's done.</summary>
+        public void AskName(string prompt, string initial, int max, Action<string> set, Script.Interpreter ctx)
+        {
+            PushScene(new NameEntryScene(this, prompt, initial, max, n => { if (!string.IsNullOrEmpty(n)) set(n); }));
+        }
+
+        /// <summary>Plays the current map's music again (after the evolution tune).</summary>
+        public void RestoreMapBgm()
+        {
+            var data = Map != null ? Map.Data : null;
+            if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
         }
 
         public void ReturnToTitle()
@@ -445,6 +461,31 @@ namespace PokeCreator.Runtime
                 case "item": _g.State.AddItem(p[1], p.Length > 2 ? int.Parse(p[2]) : 1); break;
                 case "switch": _g.State.SetSwitch(int.Parse(p[1]), p.Length < 3 || p[2] == "on"); if (_g.Map != null) _g.Map.RefreshEvents(); break;
                 case "log": if (_g.Map == null) { Console.WriteLine("[autotest] (title screen) scenes=" + _g.SceneOpen); break; } Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
+                case "flag": _g.State.Flags.Add(p[1]); break;
+                case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)), null); break;
+                case "scene":
+                    switch (p[1])
+                    {
+                        case "menu": _g.PushScene(new PauseMenu(_g)); break;
+                        case "bag": _g.PushScene(new BagScene(_g)); break;
+                        case "party": _g.PushScene(new PartyScene(_g)); break;
+                        case "dex": _g.PushScene(new PokedexScene(_g)); break;
+                        case "options": _g.PushScene(new OptionsScene(_g)); break;
+                        case "name": _g.AskName("Your name?", "", 10, n => _g.State.PlayerName = n, null); break;
+                    }
+                    break;
+                case "use": // use ITEM partyIndex [moveSlot is chosen in the message]
+                    {
+                        var it = _g.Project.Items.FirstOrDefault(i => i.Id == p[1]);
+                        var pk = _g.State.Party[int.Parse(p[2])];
+                        ItemFlow.UseOn(_g, pk, it, PokeCreator.Pkmn.ItemEffects.Info(_g.Project, it), used => Console.WriteLine("[autotest] used=" + used));
+                        break;
+                    }
+                case "party":
+                    foreach (var pk in _g.State.Party)
+                        Console.WriteLine("[autotest] " + pk.Name(_g.Project) + " (" + pk.Species + ") Lv" + pk.Level + " HP " + pk.HP + "/" + pk.TotalHP(_g.Project) + " item=" + (pk.Item ?? "-") + " moves=" + string.Join(",", pk.Moves.Select(m => m.Id + ":" + m.PP)));
+                    Console.WriteLine("[autotest] bag: " + string.Join(", ", _g.State.Bag.Select(kv => kv.Key + "x" + kv.Value)) + "  seen=" + _g.State.Seen.Count + " caught=" + _g.State.Caught.Count + " repel=" + _g.State.RepelSteps + " name=" + _g.State.PlayerName);
+                    break;
                 case "quit": return false;
             }
             return true;

@@ -48,6 +48,9 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Events: pages and conditions, action/touch/autorun/parallel triggers, move routes, NPC wandering
 - RMXP-compatible event commands: text with Essentials text codes, choices, conditional branches, loops, labels, switches, variables, self switches, money, transfers with fades, audio, screen tone/flash
 - Common events: Call Common Event (and `pbCommonEvent`), autorun and parallel common events while their switch is ON
+- **Bag items work**: Potions, status heals, Revives, Ethers/Elixirs, PP Up, Rare Candy, Exp. Candy, vitamins, feathers, mints, Repels (wild Pokémon weaker than your lead stay away), TMs/HMs, and evolution stones. Give and take held items from the Bag or the party
+- **Evolution** by level, stone, happiness, time of day, held item, known move, party member and more (Essentials' methods that don't need a battle), with the evolution screen (B cancels a level evolution) and "forget a move?" when learning a fifth move
+- **Pokédex** (seen and caught, list and entry pages) in the pause menu once `$player.has_pokedex = true`; **Options** (text speed, music and sound volume); **name entry** for `pbTrainerName` / `pbEnterPlayerName`, and nicknames when receiving a Pokémon
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
 - C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands
 - Location signs, day/night tint on outdoor maps, BGM/SE/ME through SDL_mixer

@@ -102,10 +102,12 @@ namespace PokeCreator.Runtime.UI
         public PauseMenu(Game g) : base(g)
         {
             var labels = new List<string>();
+            if (g.State.HasPokedex) { _ids.Add("dex"); labels.Add("Pokédex"); }
             if (g.State.Party.Count > 0) { _ids.Add("party"); labels.Add("Pokémon"); }
             _ids.Add("bag"); labels.Add("Bag");
             _ids.Add("card"); labels.Add(g.State.PlayerName);
             _ids.Add("save"); labels.Add("Save");
+            _ids.Add("options"); labels.Add("Options");
             _ids.Add("title"); labels.Add("Quit to Title");
             _ids.Add("exit"); labels.Add("Exit");
             _list = new CommandList(labels);
@@ -120,6 +122,8 @@ namespace PokeCreator.Runtime.UI
             Decide();
             switch (_ids[r])
             {
+                case "dex": Game.PushScene(new PokedexScene(Game)); break;
+                case "options": Game.PushScene(new OptionsScene(Game)); break;
                 case "party": Game.PushScene(new PartyScene(Game)); break;
                 case "bag": Game.PushScene(new BagScene(Game)); break;
                 case "card": Game.PushScene(new TrainerCardScene(Game)); break;
@@ -161,8 +165,18 @@ namespace PokeCreator.Runtime.UI
         CommandList _popup;
         string _help = "Choose a Pokémon.";
         List<Pokemon> Party { get { return Game.State.Party; } }
+        // Choose mode (using or giving an item): pick a Pokémon and hand it to the caller
+        readonly Action<int, Action> _onChosen;
+        readonly Action _onCancel;
+        readonly Func<Pokemon, string> _label;
 
         public PartyScene(Game g) : base(g) { Opaque = true; }
+
+        /// <summary>Choose a Pokémon. onChosen gets its index and an action that closes the party screen.</summary>
+        public PartyScene(Game g, string help, Func<Pokemon, string> label, Action<int, Action> onChosen, Action onCancel) : base(g)
+        {
+            Opaque = true; _help = help; _label = label; _onChosen = onChosen; _onCancel = onCancel;
+        }
 
         protected override void Update()
         {
@@ -174,8 +188,12 @@ namespace PokeCreator.Runtime.UI
                 Decide();
                 string cmd = _popup.Items[r];
                 _popup = null;
+                var pk = Party[_index];
                 if (cmd == "Summary") Game.PushScene(new SummaryScene(Game, _index));
                 else if (cmd == "Switch") { _switchFrom = _index; _help = "Move to where?"; }
+                else if (cmd == "Item") _popup = new CommandList(new[] { "Give", "Take", "Cancel" });
+                else if (cmd == "Give") Game.PushScene(new BagScene(Game, id => ItemFlow.Give(Game, pk, id, null)));
+                else if (cmd == "Take") ItemFlow.Take(Game, pk, null);
                 return;
             }
             int last = Party.Count; // index of the Cancel button
@@ -186,20 +204,22 @@ namespace PokeCreator.Runtime.UI
             if (Input.Trigger(Button.Cancel))
             {
                 Cancel();
-                if (_switchFrom >= 0) { _switchFrom = -1; _help = "Choose a Pokémon."; } else Close();
+                if (_switchFrom >= 0) { _switchFrom = -1; _help = "Choose a Pokémon."; }
+                else { Close(); if (_onCancel != null) _onCancel(); }
                 return;
             }
             if (Input.Trigger(Button.Action))
             {
-                if (_index == Party.Count) { Cancel(); Close(); return; }
+                if (_index == Party.Count) { Cancel(); Close(); if (_onCancel != null) _onCancel(); return; }
                 Decide();
+                if (_onChosen != null) { _onChosen(_index, () => Close()); return; }
                 if (_switchFrom >= 0)
                 {
                     var t = Party[_switchFrom]; Party[_switchFrom] = Party[_index]; Party[_index] = t;
                     _switchFrom = -1; _help = "Choose a Pokémon.";
                     return;
                 }
-                _popup = new CommandList(new[] { "Summary", "Switch", "Cancel" });
+                _popup = new CommandList(Party[_index].IsEgg ? new[] { "Summary", "Switch", "Cancel" } : new[] { "Summary", "Switch", "Item", "Cancel" });
             }
         }
 
@@ -223,6 +243,8 @@ namespace PokeCreator.Runtime.UI
                 if (pk.IsEgg) continue;
                 int max = pk.TotalHP(Game.Project);
                 Ui.Text(g, x + 20, y + 46, "Lv." + pk.Level);
+                string lbl = _label != null ? _label(pk) : null;
+                if (lbl != null) { Ui.TextRight(g, x + w - 16, y + 46, lbl); continue; }
                 string st = Ui.StatusAbbrev(pk.Status);
                 if (pk.Fainted) st = "FNT";
                 if (st != "") g.DrawText(x + 20, y + 46, st, new Color(248, 64, 48), Ui.DarkShadow);
@@ -385,8 +407,12 @@ namespace PokeCreator.Runtime.UI
         static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
         int _pocket, _index, _scroll;
         CommandList _popup;
+        readonly Action<string> _choose; // choose mode: picking an item to give
 
         public BagScene(Game g) : base(g) { Opaque = true; }
+
+        /// <summary>Pick an item (e.g. to give to a Pokémon); the bag closes and onChosen gets the item ID.</summary>
+        public BagScene(Game g, Action<string> onChosen) : base(g) { Opaque = true; _choose = onChosen; }
 
         List<KeyValuePair<ItemData, int>> Items()
         {
@@ -416,7 +442,9 @@ namespace PokeCreator.Runtime.UI
                         if (c == 0) { Game.State.Bag.Remove(it.Id); Game.Message.Show("Threw away the " + (it.NamePlural ?? it.Name) + "."); }
                     });
                 }
-                else if (cmd == "Use") Game.Message.Show("Items can't be used from the Bag yet. That's coming with the battle system.");
+                else if (cmd == "Use") ItemFlow.UseFromBag(Game, it.Id, ClampIndex);
+                else if (cmd == "Give")
+                    Game.PushScene(new PartyScene(Game, "Give to which Pokémon?", null, (i, close) => { close(); ItemFlow.Give(Game, Game.State.Party[i], it.Id, ClampIndex); }, null));
                 return;
             }
             if (Input.Repeat(Button.Right)) { _pocket = (_pocket + 1) % 8; _index = 0; _scroll = 0; Cursor(); }
@@ -432,13 +460,22 @@ namespace PokeCreator.Runtime.UI
                 if (_index >= items.Count) { Cancel(); Close(); return; }
                 Decide();
                 var it = items[_index].Key;
+                if (_choose != null)
+                {
+                    if (it.Pocket == 8) { Game.Message.Show("The " + (it.Name ?? it.Id) + " can't be held."); return; }
+                    Close(); _choose(it.Id); return;
+                }
                 var cmds = new List<string>();
-                if (!string.IsNullOrEmpty(it.FieldUse)) cmds.Add("Use");
+                if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None) cmds.Add("Use");
+                if (it.Pocket != 8 && Game.State.Party.Any(pk => !pk.IsEgg)) cmds.Add("Give");
                 if (it.Pocket != 8) cmds.Add("Toss");
                 cmds.Add("Cancel");
                 _popup = new CommandList(cmds);
             }
         }
+
+        /// <summary>Keeps the cursor on the list after an item runs out.</summary>
+        void ClampIndex() { int n = Items().Count; if (_index > n) _index = n; if (_scroll > _index) _scroll = _index; }
 
         public override void Draw(Gfx g)
         {

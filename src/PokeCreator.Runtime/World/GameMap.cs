@@ -24,6 +24,18 @@ namespace PokeCreator.Runtime.World
         public const int MaxParty = 6;
         /// <summary>Pokémon sent to the PC when the party is full (boxes UI comes later).</summary>
         public List<PokeCreator.Pkmn.Pokemon> Storage = new List<PokeCreator.Pkmn.Pokemon>();
+        /// <summary>Player flags set by scripts: has_pokedex, has_running_shoes, has_pokegear...</summary>
+        public readonly HashSet<string> Flags = new HashSet<string>();
+        /// <summary>Pokédex: species seen and caught (owned).</summary>
+        public readonly HashSet<string> Seen = new HashSet<string>();
+        public readonly HashSet<string> Caught = new HashSet<string>();
+        /// <summary>Steps left on a Repel.</summary>
+        public int RepelSteps;
+
+        public bool HasPokedex { get { return Flags.Contains("has_pokedex"); } }
+
+        /// <summary>Marks a species seen and caught in the Pokédex.</summary>
+        public void Register(PokeCreator.Pkmn.Pokemon pk) { if (pk == null || pk.IsEgg) return; Seen.Add(pk.Species); Caught.Add(pk.Species); }
 
         public bool GetSwitch(int id) { bool v; return Switches.TryGetValue(id, out v) && v; }
         public void SetSwitch(int id, bool v) { Switches[id] = v; }

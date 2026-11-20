@@ -32,10 +32,15 @@ namespace PokeCreator.Runtime.World
         public Dictionary<string, int> Bag { get; set; }
         public List<Pokemon> Party { get; set; }
         public List<Pokemon> Storage { get; set; }
+        public List<string> Flags { get; set; }
+        public List<string> Seen { get; set; }
+        public List<string> Caught { get; set; }
+        public int RepelSteps { get; set; }
         public SaveData()
         {
             Version = 1; SwitchesOn = new List<int>(); Variables = new Dictionary<string, int>(); SelfSwitches = new List<string>();
             Bag = new Dictionary<string, int>(); Party = new List<Pokemon>(); Storage = new List<Pokemon>();
+            Flags = new List<string>(); Seen = new List<string>(); Caught = new List<string>();
         }
     }
 
@@ -89,7 +94,9 @@ namespace PokeCreator.Runtime.World
                 Variables = s.Variables.Where(kv => kv.Value != 0).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
                 SelfSwitches = s.SelfSwitches.OrderBy(x => x).ToList(),
                 Bag = new Dictionary<string, int>(s.Bag),
-                Party = s.Party, Storage = s.Storage
+                Party = s.Party, Storage = s.Storage,
+                Flags = s.Flags.OrderBy(x => x).ToList(), Seen = s.Seen.OrderBy(x => x).ToList(), Caught = s.Caught.OrderBy(x => x).ToList(),
+                RepelSteps = s.RepelSteps
             };
             Directory.CreateDirectory(Folder(g.Project));
             string path = FilePath(g.Project), bak = Path.Combine(Folder(g.Project), "Game.bak.json");
@@ -109,6 +116,11 @@ namespace PokeCreator.Runtime.World
             s.Bag.Clear(); foreach (var kv in d.Bag) s.Bag[kv.Key] = kv.Value;
             s.Party = d.Party ?? new List<Pokemon>();
             s.Storage = d.Storage ?? new List<Pokemon>();
+            s.Flags.Clear(); if (d.Flags != null) foreach (var f in d.Flags) s.Flags.Add(f);
+            s.Seen.Clear(); if (d.Seen != null) foreach (var f in d.Seen) s.Seen.Add(f);
+            s.Caught.Clear(); if (d.Caught != null) foreach (var f in d.Caught) s.Caught.Add(f);
+            foreach (var pk in s.Party.Concat(s.Storage)) s.Register(pk); // saves from before the Pokédex
+            s.RepelSteps = d.RepelSteps;
             return d;
         }
     }

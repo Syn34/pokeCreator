@@ -214,6 +214,8 @@ namespace PokeCreator.Studio.Editors
             cmd(party, "Give Item", AddGiveItem);
             cmd(party, "Change Money", AddMoney);
             cmd(party, "Heal Party (Recover All)", () => Insert(new EventCommand(314, 0, 0)));
+            cmd(party, "Enter Player Name", () => Insert(new EventCommand(355, 0, "pbTrainerName")));
+            cmd(party, "Give Pokédex", () => Insert(new EventCommand(355, 0, "$player.has_pokedex = true")));
 
             var map = group("Map && Movement");
             cmd(map, "Transfer Player (Warp)", AddTransfer);

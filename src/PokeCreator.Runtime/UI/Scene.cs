@@ -142,7 +142,14 @@ namespace PokeCreator.Runtime.UI
             string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
             var path = game.Project.FindAsset(folder, id) ?? game.Project.FindAsset("Graphics/Pokemon/Front", pk.Species);
             var tex = game.Gfx.Load(path);
-            if (tex == null) return;
+            if (tex == null)
+            {
+                // No sprite yet: a grey placeholder so the screen isn't empty
+                int sz = Math.Min(96, maxSize / 2);
+                g.FillRect(cx - sz / 2, bottom - sz, sz, sz, new Color(200, 200, 208, 200));
+                g.DrawText(cx - g.TextWidth("?") / 2, bottom - sz / 2 - g.LineHeight / 2, "?", new Color(96, 96, 104), new Color(232, 232, 240));
+                return;
+            }
             int fw = tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width; // animated strips: first frame
             int scale = Math.Max(1, maxSize / Math.Max(fw, tex.Height));
             g.Draw(tex, 0, 0, fw, tex.Height, cx - fw * scale / 2, bottom - tex.Height * scale, fw * scale, tex.Height * scale);

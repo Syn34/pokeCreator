@@ -24,6 +24,8 @@ namespace PokeCreator.Runtime.UI
         const int BoxH = 96, Margin = 4, PadX = 22, PadY = 14;
 
         public bool Busy { get; private set; }
+        /// <summary>Characters revealed per frame (Options: Slow 1, Normal 2, Fast 4, Instant 999).</summary>
+        public int CharsPerFrame = 2;
         public int LastChoice { get; private set; }
 
         public MessageWindow(Game g) { _game = g; }
@@ -88,7 +90,7 @@ namespace PokeCreator.Runtime.UI
             _blink++;
             if (!_pageDone)
             {
-                _shownChars += 2;
+                _shownChars += Math.Max(1, CharsPerFrame);
                 if (Input.Trigger(Button.Action) && _shownChars > 2) _shownChars = PageCharCount();
                 if (_shownChars >= PageCharCount()) { _shownChars = PageCharCount(); _pageDone = true; }
                 return;

@@ -85,6 +85,12 @@ namespace PokeCreator.Runtime.Platform
 
         public string CurrentBgm { get { return _bgmName; } }
 
+        /// <summary>Volume settings from the Options menu (percent).</summary>
+        public int BgmVolume = 100, SeVolume = 100;
+        int _bgmBase = 100;
+
+        public void ApplyVolume() { if (_ok && _music != IntPtr.Zero) SDL.Mix_VolumeMusic(_bgmBase * BgmVolume / 100 * 128 / 100); }
+
         public void PlayBgm(string name, int volume = 100)
         {
             if (!_ok) { _bgmName = name ?? ""; return; }
@@ -95,7 +101,8 @@ namespace PokeCreator.Runtime.Platform
             if (path == null) { Console.WriteLine("BGM not found: " + name); return; }
             _music = SDL.Mix_LoadMUS(SDL.U8(path));
             if (_music == IntPtr.Zero) { Console.WriteLine("Could not play " + path + ": " + SDL.GetError()); return; }
-            SDL.Mix_VolumeMusic(volume * 128 / 100);
+            _bgmBase = volume;
+            SDL.Mix_VolumeMusic(volume * BgmVolume / 100 * 128 / 100);
             SDL.Mix_PlayMusic(_music, -1);
             _bgmName = name;
         }
@@ -129,7 +136,7 @@ namespace PokeCreator.Runtime.Platform
             }
             if (c == IntPtr.Zero) return;
             int ch = SDL.Mix_PlayChannelTimed(-1, c, 0, -1);
-            if (ch >= 0) SDL.Mix_Volume(ch, volume * 128 / 100);
+            if (ch >= 0) SDL.Mix_Volume(ch, volume * SeVolume / 100 * 128 / 100);
         }
 
         public void Dispose()

@@ -270,6 +270,11 @@ namespace PokeCreator.Runtime.World
 
         public void OnStep(int x, int y)
         {
+            if (_game.State.RepelSteps > 0 && --_game.State.RepelSteps == 0)
+            {
+                _game.Message.Show("The repelling effect wore off!");
+                return;
+            }
             if (!Enabled) return;
             if (_cooldown > 0) { _cooldown--; return; }
             var map = _game.Map;
@@ -289,6 +294,12 @@ namespace PokeCreator.Runtime.World
             EncounterSlot slot = m.Slots[0];
             foreach (var s in m.Slots) { if (roll < s.Chance) { slot = s; break; } roll -= s.Chance; }
             int level = _game.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1);
+            // Repel: no wild Pokémon weaker than the first healthy party member
+            if (_game.State.RepelSteps > 0)
+            {
+                var lead = _game.State.Party.FirstOrDefault(pk => !pk.Fainted && !pk.IsEgg);
+                if (lead != null && level < lead.Level) return;
+            }
             var sp = _game.Project.Species.FirstOrDefault(s => s.Id == slot.Species);
             _cooldown = 4;
             _game.StartWildEncounter(sp != null ? sp.Name : slot.Species, level);

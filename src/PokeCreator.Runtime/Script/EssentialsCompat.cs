@@ -147,7 +147,10 @@ namespace PokeCreator.Runtime.Script
             if (e == "$player.money" || e == "$Trainer.money") return _game.State.Money;
             if (e == "$player.name" || e == "$Trainer.name") return _game.State.PlayerName;
             if (Regex.IsMatch(e, @"^\$(player|Trainer)\.(party\.length|pokemon_count|party_count)$")) return _game.Party.Count;
-            if (Regex.IsMatch(e, @"^\$(player|Trainer)\.(has_pokedex|pokedex)$")) return _game.State.GetSwitch(-1000);
+            m = Regex.Match(e, @"^\$(?:player|Trainer)\.(has_\w+|pokedex)\??$");
+            if (m.Success) return _game.State.Flags.Contains(m.Groups[1].Value == "pokedex" ? "has_pokedex" : m.Groups[1].Value);
+            m = Regex.Match(e, @"^\$(?:player|Trainer)\.(?:pokedex\.)?(seen_count|owned_count|pokedexSeen|pokedexOwned)$");
+            if (m.Success) return m.Groups[1].Value.StartsWith("seen") || m.Groups[1].Value == "pokedexSeen" ? _game.State.Seen.Count : _game.State.Caught.Count;
 
             // Method call:  name(args)  or  Obj.name(args)  or bare name
             m = Regex.Match(e, @"^([\$@]?[\w:.]+[?!]?)\s*(?:\((.*)\))?\s*(\{.*\})?$", RegexOptions.Singleline);
@@ -187,6 +190,14 @@ namespace PokeCreator.Runtime.Script
                 _game.State.SetSelf(ToInt(p[0]), ToInt(p[1]), Convert.ToString(p[2]), Truthy(val)); _game.Map.RefreshEvents(); return;
             }
             if (lhs == "$player.money" || lhs == "$Trainer.money") { _game.State.Money = ToInt(val); return; }
+            if (lhs == "$player.name" || lhs == "$Trainer.name") { _game.State.PlayerName = Convert.ToString(val); return; }
+            var fm = Regex.Match(lhs, @"^\$(?:player|Trainer)\.(has_\w+|pokedex)$");
+            if (fm.Success)
+            {
+                string flag = fm.Groups[1].Value == "pokedex" ? "has_pokedex" : fm.Groups[1].Value;
+                if (Truthy(val)) _game.State.Flags.Add(flag); else _game.State.Flags.Remove(flag);
+                return;
+            }
             WarnOnce("Can't assign to " + lhs);
         }
 
@@ -276,6 +287,16 @@ namespace PokeCreator.Runtime.Script
             Register("PBDayNight.isNight?", (c, a) => DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20);
             Register("PBDayNight.isDay?", (c, a) => DateTime.Now.Hour >= 6 && DateTime.Now.Hour < 20);
             Register("pbIsWeekday", (c, a) => true);
+            // Pokédex
+            Register("set_seen", (c, a) => { string sp = Convert.ToString(Arg(a, 0)); if (!string.IsNullOrEmpty(sp)) _game.State.Seen.Add(sp.ToUpperInvariant()); return true; });
+            Register("set_owned", (c, a) => { string sp = Convert.ToString(Arg(a, 0)); if (!string.IsNullOrEmpty(sp)) { _game.State.Seen.Add(sp.ToUpperInvariant()); _game.State.Caught.Add(sp.ToUpperInvariant()); } return true; });
+            Register("seen?", (c, a) => _game.State.Seen.Contains(Convert.ToString(Arg(a, 0)).ToUpperInvariant()));
+            Register("owned?", (c, a) => _game.State.Caught.Contains(Convert.ToString(Arg(a, 0)).ToUpperInvariant()));
+            Register("pbSeenForm", (c, a) => { string sp = Convert.ToString(Arg(a, 0)); if (!string.IsNullOrEmpty(sp)) _game.State.Seen.Add(sp.ToUpperInvariant()); return true; });
+            // Name entry: pbEnterPlayerName / pbTrainerName open the name screen and wait for it
+            Register("pbTrainerName", (c, a) => { _game.AskName("Your name?", _game.State.PlayerName, 12, n => _game.State.PlayerName = n, c); return true; });
+            Register("pbEnterPlayerName", (c, a) => { _game.AskName(Arg(a, 0) != null ? Convert.ToString(Arg(a, 0)) : "Your name?", _game.State.PlayerName, Arg(a, 2) != null ? ToInt(Arg(a, 2)) : 12, n => _game.State.PlayerName = n, c); return true; });
+            Register("pbChangePlayerName", (c, a) => true);
             Register("rand", (c, a) => _game.Rng.Next(Math.Max(1, ToInt(Arg(a, 0)))));
         }
 
@@ -302,10 +323,16 @@ namespace PokeCreator.Runtime.Script
             pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId; pk.MetMap = _game.Map.Id;
             bool toParty = _game.State.Party.Count < GameState.MaxParty;
             if (toParty) _game.State.Party.Add(pk); else _game.State.Storage.Add(pk);
+            _game.State.Register(pk);
             if (announce)
             {
                 _game.Audio.PlayMe("Pkmn get");
-                _game.Message.Show("\\PN obtained " + pk.Name(_game.Project) + "!" + (toParty ? "" : "\\n" + pk.Name(_game.Project) + " was sent to the PC."));
+                string name = pk.Name(_game.Project);
+                _game.Message.Show("\\PN obtained " + name + "!" + (toParty ? "" : "\\n" + name + " was sent to the PC."), null, -1, _ =>
+                    _game.Message.Show("Would you like to give a nickname to " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
+                    {
+                        if (c == 0) _game.AskName(name + "'s nickname?", "", 12, n => pk.Nickname = n, null);
+                    }));
             }
             return true;
         }

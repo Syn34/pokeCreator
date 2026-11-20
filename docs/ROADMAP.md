@@ -19,10 +19,11 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Tileset and autotile image import with 16×16 and wide-sheet conversion
 - [x] Tileset folders: one image per area, maps paint from all of them; default tilesets for new projects
 - [x] Script editor with line numbers and Visual Studio colours
-- [ ] Using items from the Bag (Potions, Repels...), giving held items
-- [ ] Evolution on level up (needs battles for EXP)
-- [ ] Pokédex (seen/caught), Options menu
-- [ ] Intro sequence support (choose character, name entry)
+- [x] Using items from the Bag (Potions, status heals, Revives, Ethers, Rare Candy, Exp. Candy, vitamins, mints, Repels, TMs), giving and taking held items
+- [x] Evolution by level (Rare Candy / Exp. Candy), stone, happiness, held item, known move and more, with the evolution screen and move learning
+- [x] Pokédex (seen/caught, list and entries), Options menu (text speed, volumes)
+- [x] Name entry (pbTrainerName / pbEnterPlayerName) and nicknames when receiving a Pokémon
+- [ ] Intro sequence: choosing the player character
 
 ## v0.3: Battles
 - [ ] Single wild battles: scene, HP bars, move selection, damage formula, type matchups, catching
