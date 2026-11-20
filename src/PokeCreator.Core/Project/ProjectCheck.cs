@@ -90,6 +90,9 @@ namespace PokeCreator.Projects
             if (_p.GetMapInfo(s.StartMap) == null || start == null) Add(ProblemSeverity.Error, "Game Settings", "settings", "The start map (" + s.StartMap + ") doesn't exist, so a new game can't start.");
             else if (s.StartX < 0 || s.StartY < 0 || s.StartX >= start.Width || s.StartY >= start.Height) Add(ProblemSeverity.Error, "Game Settings", "settings", "The start position (" + s.StartX + ", " + s.StartY + ") is outside " + MapName(s.StartMap) + " (" + start.Width + "×" + start.Height + ").");
             CheckFields(s, "Game Settings", "settings");
+            string font = _p.MessageFontFile();
+            if (font == null) Add(ProblemSeverity.Error, "Game Settings", "settings", "There is no font, so message text won't show. Put a .ttf in the project's Fonts folder, or the FireRed font (power green.ttf from Pokémon Essentials) in PokeCreator's BaseData/Fonts folder.");
+            else if (_p.FindAsset("Fonts", s.Font) == null) Add(ProblemSeverity.Info, "Game Settings", "settings", "Message font '" + s.Font + "' isn't in Fonts, so the game uses " + Path.GetFileName(font) + ".");
             if (_p.Players.Count == 0) Add(ProblemSeverity.Error, "Player Characters", "players", "There are no player characters.");
             for (int i = 0; i < _p.Players.Count; i++) CheckFields(_p.Players[i], "Player character " + (i + 1), "players");
         }
@@ -101,6 +104,7 @@ namespace PokeCreator.Projects
             {
                 var f = (FieldAttribute)Attribute.GetCustomAttribute(prop, typeof(FieldAttribute));
                 if (f == null || (f.Ref == null && f.Asset == null)) continue;
+                if (o is GameSettings && prop.Name == "Font") continue; // checked in CheckSettings, with the fallbacks
                 object v = prop.GetValue(o, null);
                 var values = v is string ? new[] { (string)v } : v is IEnumerable ? ((IEnumerable)v).OfType<string>().ToArray() : new string[0];
                 foreach (var val in values.Where(x => !string.IsNullOrEmpty(x)))

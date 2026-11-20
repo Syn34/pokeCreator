@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.3";
+        public const string EngineVersion = "0.3.4";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
@@ -113,9 +113,17 @@ namespace PokeCreator.Projects
         public string FindAsset(string folder, string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
-            string basePath = Path.Combine(Root, folder.Replace('/', Path.DirectorySeparatorChar), name);
+            string found = FindIn(Root, folder, name);
+            // Fonts fall back to the shared defaults next to the programs (BaseData/Fonts) until the project has its own
+            if (found == null && folder == "Fonts" && SharedFontsDir != null) found = FindIn(Path.GetDirectoryName(SharedFontsDir), "Fonts", name);
+            return found;
+        }
+
+        static string FindIn(string root, string folder, string name)
+        {
+            string basePath = Path.Combine(root, folder.Replace('/', Path.DirectorySeparatorChar), name);
             if (File.Exists(basePath)) return basePath;
-            foreach (var ext in new[] { ".png", ".gif", ".bmp", ".jpg", ".ogg", ".wav", ".mp3", ".mid", ".midi", ".ttf" })
+            foreach (var ext in new[] { ".png", ".gif", ".bmp", ".jpg", ".ogg", ".wav", ".mp3", ".mid", ".midi", ".ttf", ".otf" })
                 if (File.Exists(basePath + ext)) return basePath + ext;
             // Case-insensitive fallback (projects copied from Windows to Linux)
             var dir = Path.GetDirectoryName(basePath);
@@ -129,6 +137,37 @@ namespace PokeCreator.Projects
                 }
             }
             return null;
+        }
+
+        /// <summary>BaseData/Fonts next to the programs: the default fonts every project uses until it has its own. Null if missing.</summary>
+        public static string SharedFontsDir
+        {
+            get
+            {
+                string b = BaseData.DefaultFolder;
+                string d = b == null ? null : Path.Combine(b, "Fonts");
+                return d != null && Directory.Exists(d) ? d : null;
+            }
+        }
+
+        static string[] FontFiles(string dir)
+        {
+            if (dir == null || !Directory.Exists(dir)) return new string[0];
+            return Directory.GetFiles(dir).Where(f => f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".otf", StringComparison.OrdinalIgnoreCase)).OrderBy(f => f).ToArray();
+        }
+
+        /// <summary>The project's own fonts (its Fonts folder).</summary>
+        public string[] ProjectFonts { get { return FontFiles(FontsDir); } }
+        /// <summary>The shared default fonts (BaseData/Fonts).</summary>
+        public static string[] SharedFonts { get { return FontFiles(SharedFontsDir); } }
+
+        /// <summary>
+        /// The message font file to use: the one named in Game Settings (project first, then the shared defaults),
+        /// else the project's first font, else the first shared default. Null if there are none at all.
+        /// </summary>
+        public string MessageFontFile()
+        {
+            return FindAsset("Fonts", Settings.Font) ?? ProjectFonts.FirstOrDefault() ?? SharedFonts.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).ToLowerInvariant() == "power green") ?? SharedFonts.FirstOrDefault();
         }
 
         // ------------------------------------------------------------------ create / load / save

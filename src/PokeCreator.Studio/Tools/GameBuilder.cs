@@ -99,6 +99,14 @@ namespace PokeCreator.Studio.Tools
                 Copy(files[i], Path.Combine(GameFolder, rel));
                 if (i % 25 == 0) progress(5 + (int)(80L * i / Math.Max(1, files.Count)), "Copying " + rel);
             }
+            // A project with no fonts of its own uses the shared defaults (BaseData/Fonts): the game needs them too
+            string root = Path.GetFullPath(p.Root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var fonts = new List<string>();
+            if (p.ProjectFonts.Length == 0) fonts.AddRange(Project.SharedFonts);
+            string msgFont = p.MessageFontFile();
+            if (msgFont != null && !Path.GetFullPath(msgFont).StartsWith(root, StringComparison.OrdinalIgnoreCase) && !fonts.Contains(msgFont)) fonts.Add(msgFont);
+            foreach (var f in fonts) Copy(f, Path.Combine(GameFolder, "Fonts", Path.GetFileName(f)));
+
             // Folders the game expects, even if empty
             foreach (var folder in ContentFolders) Directory.CreateDirectory(Path.Combine(GameFolder, folder));
 

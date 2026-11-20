@@ -20,5 +20,6 @@
     <Reference Include="System.IO.Compression.FileSystem" />
     <None Include="..\..\lib\win-x64\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\data\base\Tilesets\README.txt" Link="BaseData\Tilesets\README.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\data\base\Fonts\*" Link="BaseData\Fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

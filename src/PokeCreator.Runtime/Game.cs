@@ -72,10 +72,19 @@ namespace PokeCreator.Runtime
             var s = Project.Settings;
             int scale = _opt.Scale > 0 ? _opt.Scale : Math.Max(1, s.WindowScale);
             Gfx = new Gfx(s.Title ?? Project.Info.Name, s.ScreenWidth > 0 ? s.ScreenWidth : 512, s.ScreenHeight > 0 ? s.ScreenHeight : 384, scale);
-            if (!Gfx.LoadFont(Project.FindAsset("Fonts", s.Font), s.FontSize > 0 ? s.FontSize : 26))
+            int fontSize = s.FontSize > 0 ? s.FontSize : 26;
+            if (!Gfx.LoadFont(Project.MessageFontFile(), fontSize))
             {
-                var any = Directory.Exists(Project.FontsDir) ? Directory.GetFiles(Project.FontsDir, "*.ttf").FirstOrDefault() : null;
-                if (any != null) Gfx.LoadFont(any, s.FontSize > 0 ? s.FontSize : 26);
+                // No font in the project or BaseData/Fonts: use one that comes with the system so text still shows.
+                // System fonts are much larger than the pixel fonts the size is set for, so scale them down.
+                string win = Environment.GetEnvironmentVariable("WINDIR");
+                var system = new List<string>();
+                if (!string.IsNullOrEmpty(win)) foreach (var f in new[] { "segoeui.ttf", "tahoma.ttf", "arial.ttf" }) system.Add(Path.Combine(win, "Fonts", f));
+                system.Add("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+                system.Add("/Library/Fonts/Arial.ttf");
+                var sys = system.FirstOrDefault(File.Exists);
+                if (sys != null && Gfx.LoadFont(sys, Math.Max(10, fontSize * 2 / 3))) Console.WriteLine("No message font found in Fonts or BaseData/Fonts; using " + sys);
+                else Console.WriteLine("No font found: text will not show. Put a .ttf file in the project's Fonts folder.");
             }
             Audio = new Audio(Project);
             Message = new MessageWindow(this);

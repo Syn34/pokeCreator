@@ -24,6 +24,8 @@ if not exist bin\BaseData mkdir bin\BaseData
 copy /y data\base\*.json bin\BaseData\ >nul
 if not exist bin\BaseData\Tilesets mkdir bin\BaseData\Tilesets
 copy /y data\base\Tilesets\README.txt bin\BaseData\Tilesets\ >nul
+if not exist bin\BaseData\Fonts mkdir bin\BaseData\Fonts
+copy /y data\base\Fonts\* bin\BaseData\Fonts\ >nul
 echo.
 echo Build OK. Run bin\PokeCreatorStudio.exe
 exit /b 0

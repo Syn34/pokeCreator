@@ -19,6 +19,8 @@ if [ -d src/PokeCreator.Studio ]; then
 fi
 cp src/PokeCreator.Runtime/Game.exe.config "$OUT"/ 2>/dev/null || true
 if [ -d data/base ]; then mkdir -p "$OUT/BaseData/Tilesets" && cp data/base/*.json "$OUT/BaseData/" && cp data/base/Tilesets/README.txt "$OUT/BaseData/Tilesets/"; fi
+# Default fonts for projects that have none (the font files themselves are supplied by the user, not in git)
+if [ -d data/base/Fonts ]; then mkdir -p "$OUT/BaseData/Fonts" && cp data/base/Fonts/* "$OUT/BaseData/Fonts/"; fi
 if [ -d lib/win-x64 ]; then cp lib/win-x64/*.dll "$OUT"/ 2>/dev/null || true; fi
 # Library licenses ship with every built game (Build Game copies bin/licenses)
 if [ -d lib/win-x64/licenses ]; then mkdir -p "$OUT/licenses"; cp -r lib/win-x64/licenses/. "$OUT/licenses/"; fi

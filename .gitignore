@@ -12,3 +12,7 @@ obj/
 # Default tileset art is added by each user (no Nintendo graphics in the repo)
 data/base/Tilesets/*/
 data/base/Tilesets/default.txt
+
+# Default fonts are supplied by the user (e.g. Power Green from Essentials), not distributed in git
+data/base/Fonts/*.ttf
+data/base/Fonts/*.otf

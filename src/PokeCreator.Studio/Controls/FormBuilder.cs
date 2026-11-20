@@ -213,6 +213,10 @@ namespace PokeCreator.Studio.Controls
                 string dir = Path.Combine(Project.Root, folder.Replace('/', Path.DirectorySeparatorChar));
                 if (Directory.Exists(dir))
                     combo.Items.AddRange(Directory.GetFiles(dir).Select(f => Path.GetFileNameWithoutExtension(f)).Distinct().OrderBy(x => x).Cast<object>().ToArray());
+                // Fonts can also come from the shared defaults (BaseData/Fonts)
+                if (folder == "Fonts")
+                    foreach (var f in Project.SharedFonts.Select(Path.GetFileNameWithoutExtension))
+                        if (!combo.Items.Contains(f)) combo.Items.Add(f);
             }
             panel.Controls.Add(combo);
             _refreshers.Add(() => combo.Text = (string)p.GetValue(target, null) ?? "");
