@@ -317,6 +317,10 @@ namespace PokeCreator.Runtime.Script
                 return def;
             });
 
+            // Game Corner
+            Register("pbSlotMachine", (c, a) => { _game.PushScene(new UI.SlotMachineScene(_game, a.Count > 0 ? ToInt(a[0]) : 1)); return true; });
+            Register("pbVoltorbFlip", (c, a) => { _game.PushScene(new UI.VoltorbFlipScene(_game)); return true; });
+
             // Battle Point shop, Game Corner prizes, lottery
             Register("pbBattlePointShop", (c, a) =>
             {

@@ -31,6 +31,8 @@ namespace PokeCreator.Runtime.World
         public int EncounterVersion { get; set; }
         /// <summary>NPCs following the player.</summary>
         public List<FollowerInfo> Followers { get; set; }
+        /// <summary>Voltorb Flip level reached (1-8).</summary>
+        public int VoltorbLevel { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
         public int PokerusDay { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>
