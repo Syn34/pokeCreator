@@ -50,6 +50,7 @@ namespace PokeCreator.Runtime.World
         public int Coins { get; set; }
         public int BattlePoints { get; set; }
         public List<int> Badges { get; set; }
+        public Dictionary<string, long> EventTimes { get; set; }
         public int DayCareEggSteps { get; set; }
         public bool DayCareEgg { get; set; }
         public SaveData()
@@ -124,6 +125,7 @@ namespace PokeCreator.Runtime.World
                 HallOfFame = s.HallOfFame.Count > 0 ? s.HallOfFame : null,
                 Coins = s.Coins, BattlePoints = s.BattlePoints,
                 Badges = s.Badges.Count > 0 ? s.Badges.OrderBy(b => b).ToList() : null,
+                EventTimes = s.EventTimes.Count > 0 ? new Dictionary<string, long>(s.EventTimes) : null,
                 DayCareEggSteps = s.DayCareEggSteps,
                 DayCareEgg = s.DayCareEgg,
                 PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,
@@ -160,6 +162,7 @@ namespace PokeCreator.Runtime.World
             s.HallOfFame = d.HallOfFame ?? new List<HallOfFameEntry>();
             s.Coins = d.Coins; s.BattlePoints = d.BattlePoints;
             s.Badges.Clear(); if (d.Badges != null) foreach (var b in d.Badges) s.Badges.Add(b);
+            s.EventTimes.Clear(); if (d.EventTimes != null) foreach (var kv in d.EventTimes) s.EventTimes[kv.Key] = kv.Value;
             s.DayCareEggSteps = d.DayCareEggSteps;
             s.DayCareEgg = d.DayCareEgg;
             s.PcItems.Clear(); if (d.PcItems != null) foreach (var kv in d.PcItems) s.PcItems[kv.Key] = kv.Value;

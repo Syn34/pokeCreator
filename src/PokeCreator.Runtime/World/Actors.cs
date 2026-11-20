@@ -36,8 +36,8 @@ namespace PokeCreator.Runtime.World
         bool ConditionsMet(EventPage p)
         {
             var c = p.Condition; var s = Game.State;
-            if (c.Switch1Valid && !s.GetSwitch(c.Switch1Id)) return false;
-            if (c.Switch2Valid && !s.GetSwitch(c.Switch2Id)) return false;
+            if (c.Switch1Valid && !Game.SwitchOn(c.Switch1Id, Owner.Id, Id)) return false;
+            if (c.Switch2Valid && !Game.SwitchOn(c.Switch2Id, Owner.Id, Id)) return false;
             if (c.VariableValid && s.GetVar(c.VariableId) < c.VariableValue) return false;
             if (c.SelfSwitchValid && !s.GetSelf(Owner.Id, Id, c.SelfSwitchCh)) return false;
             return true;

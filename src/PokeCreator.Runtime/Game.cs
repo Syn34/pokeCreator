@@ -110,6 +110,7 @@ namespace PokeCreator.Runtime
                 else Console.WriteLine("No font found: text will not show. Put a .ttf file in the project's Fonts folder.");
             }
             Audio = new Audio(Project);
+            _hasScriptSwitches = Project.System.Switches.Any(n => n != null && n.StartsWith("s:"));
             Message = new MessageWindow(this);
             LoadFrames();
             Options = PlayerOptions.Load(this);
@@ -283,6 +284,7 @@ namespace PokeCreator.Runtime
         {
             StrengthActive = false; // Strength lasts until the player leaves the map
             FlashUsed = false; _darkRadius = 64;
+            TempSwitches.Clear();
             if (State != null) State.Visited.Add(id);
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
@@ -367,6 +369,23 @@ namespace PokeCreator.Runtime
         }
         /// <summary>Strength has been used on this map: boulders can be pushed.</summary>
         public bool StrengthActive;
+        /// <summary>
+        /// A switch's value for an event. Switches named "s:..." are Essentials script switches: the script is evaluated
+        /// for that event (e.g. s:PBDayNight.isNight?, s:tsOff?("A"), s:$player.female?).
+        /// </summary>
+        public bool SwitchOn(int id, int mapId, int eventId)
+        {
+            string name = Project.SwitchName(id);
+            if (name.StartsWith("s:")) return Compat.EvaluateSwitchScript(name.Substring(2), mapId, eventId);
+            return State.GetSwitch(id);
+        }
+
+        /// <summary>True if the project has script switches (their pages are re-checked now and then, as time passes).</summary>
+        bool _hasScriptSwitches;
+        int _scriptSwitchTimer;
+
+        /// <summary>Essentials temp switches (setTempSwitchOn): reset when the player changes map.</summary>
+        public readonly HashSet<string> TempSwitches = new HashSet<string>();
         /// <summary>Flash lights up a dark map until the player leaves it.</summary>
         public bool FlashUsed;
         double _darkRadius = 64;
@@ -589,6 +608,7 @@ namespace PokeCreator.Runtime
             Weather.Update(DisplayX, DisplayY, Gfx.Width, Gfx.Height);
             Pictures.Update();
             UpdateShake();
+            if (_hasScriptSwitches && ++_scriptSwitchTimer >= 120 && !Interpreter.Running) { _scriptSwitchTimer = 0; Map.RefreshEvents(); }
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();

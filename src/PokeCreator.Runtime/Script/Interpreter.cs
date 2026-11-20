@@ -350,7 +350,7 @@ namespace PokeCreator.Runtime.Script
             var s = _game.State;
             switch (c.IntParam(0))
             {
-                case 0: return s.GetSwitch(c.IntParam(1)) == (c.IntParam(2) == 0);
+                case 0: return _game.SwitchOn(c.IntParam(1), MapId, EventId) == (c.IntParam(2) == 0);
                 case 1:
                     {
                         int a = s.GetVar(c.IntParam(1));

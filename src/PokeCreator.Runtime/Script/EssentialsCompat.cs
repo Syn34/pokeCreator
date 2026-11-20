@@ -186,7 +186,7 @@ namespace PokeCreator.Runtime.Script
 
             // Global state
             var m = Regex.Match(e, @"^\$game_switches\[(.+)\]$");
-            if (m.Success) return _game.State.GetSwitch(ToInt(Eval(m.Groups[1].Value, ctx)));
+            if (m.Success) return _game.SwitchOn(ToInt(Eval(m.Groups[1].Value, ctx)), ctx != null ? ctx.MapId : _curMap, ctx != null ? ctx.EventId : _curEvent);
             m = Regex.Match(e, @"^\$game_variables\[(.+)\]$");
             if (m.Success) return _game.State.GetVar(ToInt(Eval(m.Groups[1].Value, ctx)));
             m = Regex.Match(e, @"^\$game_self_switches\[\[(.+)\]\]$");
@@ -221,6 +221,27 @@ namespace PokeCreator.Runtime.Script
                 var idx = Eval(m.Groups[2].Value, ctx);
                 var ivs = coll as List<int>;
                 if (ivs != null) { int s = StatIndex(idx); return s >= 0 && s < ivs.Count ? (object)ivs[s] : null; }
+            }
+
+            // proc { |pkmn| ... }  (filters passed to pbChoosePokemon and friends)
+            var pm = Regex.Match(e, @"^proc\s*(?:\{\s*\|(\w+)\|(.*)\}|do\s*\|(\w+)\|(.*)end)$", RegexOptions.Singleline);
+            if (pm.Success) return new ScriptProc { Param = pm.Groups[1].Success && pm.Groups[1].Value.Length > 0 ? pm.Groups[1].Value : pm.Groups[3].Value, Body = (pm.Groups[2].Success && pm.Groups[2].Value.Length > 0 ? pm.Groups[2].Value : pm.Groups[4].Value).Trim() };
+
+            // Member of a call's result: pbGetPokemon(1).egg?, GameData::Item.get(x).name
+            var cm = Regex.Match(e, @"^[\$@]?[\w:.]+[?!]?\s*\(");
+            if (cm.Success)
+            {
+                int open = cm.Length - 1, close = MatchingParen(e, open);
+                if (close > 0 && close + 1 < e.Length && e[close + 1] == '.')
+                {
+                    var rest = Regex.Match(e.Substring(close + 2), @"^(\w+[?!]?)\s*(?:\((.*)\))?$", RegexOptions.Singleline);
+                    if (rest.Success)
+                    {
+                        object obj = Eval(e.Substring(0, close + 1), ctx);
+                        var margs = rest.Groups[2].Success && rest.Groups[2].Value.Trim().Length > 0 ? SplitTopLevel(rest.Groups[2].Value, ',').Select(x => Eval(x, ctx)).ToList() : new List<object>();
+                        return Member(obj, rest.Groups[1].Value, margs);
+                    }
+                }
             }
 
             // Method call:  name(args)  or  Obj.name(args)  or bare name
@@ -318,8 +339,58 @@ namespace PokeCreator.Runtime.Script
                 return true; // answered asynchronously; conditions default to "yes"
             });
 
-            Register("setTempSwitchOn", (c, a) => { SetSelf(c, Str(a, 0), true); return true; });
-            Register("setTempSwitchOff", (c, a) => { SetSelf(c, Str(a, 0), false); return true; });
+            // Temp switches: like self switches, but forgotten when the player leaves the map
+            Func<Interpreter, string, string> tkey = (c, ch) => (c != null ? c.MapId + "," + c.EventId : _curMap + "," + _curEvent) + "," + ch;
+            Register("setTempSwitchOn", (c, a) => { _game.TempSwitches.Add(tkey(c, Str(a, 0))); if (_game.Map != null) _game.Map.RefreshEvents(); return true; });
+            Register("setTempSwitchOff", (c, a) => { _game.TempSwitches.Remove(tkey(c, Str(a, 0))); if (_game.Map != null) _game.Map.RefreshEvents(); return true; });
+            Register("isTempSwitchOn?", (c, a) => _game.TempSwitches.Contains(tkey(c, Str(a, 0))));
+            Register("isTempSwitchOff?", (c, a) => !_game.TempSwitches.Contains(tkey(c, Str(a, 0))));
+            Register("tsOn?", (c, a) => _game.TempSwitches.Contains(tkey(c, Str(a, 0))));
+            Register("tsOff?", (c, a) => !_game.TempSwitches.Contains(tkey(c, Str(a, 0))));
+            // Time of day (Essentials PBDayNight): day 6-20, morning 6-12, afternoon 12-17, evening 17-20, night 20-6
+            Register("PBDayNight.isDay?", (c, a) => { int h = DateTime.Now.Hour; return h >= 6 && h < 20; });
+            Register("PBDayNight.isNight?", (c, a) => { int h = DateTime.Now.Hour; return h < 6 || h >= 20; });
+            Register("PBDayNight.isMorning?", (c, a) => { int h = DateTime.Now.Hour; return h >= 6 && h < 12; });
+            Register("PBDayNight.isAfternoon?", (c, a) => { int h = DateTime.Now.Hour; return h >= 12 && h < 17; });
+            Register("PBDayNight.isEvening?", (c, a) => { int h = DateTime.Now.Hour; return h >= 17 && h < 20; });
+            Register("pbIsWeekday", (c, a) =>
+            {
+                // pbIsWeekday(variable or -1, day, day...): 0 = Sunday
+                int wd = (int)DateTime.Now.DayOfWeek;
+                int v = a.Count > 0 ? ToInt(a[0]) : -1;
+                if (v > 0) _game.State.SetVar(v, wd);
+                return a.Skip(1).Any(x => ToInt(x) == wd);
+            });
+            // Timed events: pbSetEventTime records now; cooledDown?(seconds) / cooledDownDays?(days) once enough time has passed
+            Func<Interpreter, string> ekey = c => c != null ? c.MapId + "," + c.EventId : _curMap + "," + _curEvent;
+            Register("pbSetEventTime", (c, a) =>
+            {
+                long now = (long)(DateTime.Now - new DateTime(2000, 1, 1)).TotalSeconds;
+                _game.State.EventTimes[ekey(c)] = now;
+                int map = c != null ? c.MapId : _curMap;
+                foreach (var x in a) _game.State.EventTimes[map + "," + ToInt(x)] = now;
+                return true;
+            });
+            Register("cooledDown?", (c, a) =>
+            {
+                long t; if (!_game.State.EventTimes.TryGetValue(ekey(c), out t)) return true;
+                long now = (long)(DateTime.Now - new DateTime(2000, 1, 1)).TotalSeconds;
+                return now >= t + ToInt(Arg(a, 0));
+            });
+            Register("cooledDownDays?", (c, a) =>
+            {
+                long t; if (!_game.State.EventTimes.TryGetValue(ekey(c), out t)) return true;
+                var then = new DateTime(2000, 1, 1).AddSeconds(t).Date;
+                return (DateTime.Now.Date - then).TotalDays >= Math.Max(1, ToInt(Arg(a, 0)));
+            });
+            Register("$player.male?", (c, a) => PlayerGender() != "Female");
+            Register("$player.female?", (c, a) => PlayerGender() == "Female");
+            Register("$Trainer.male?", (c, a) => PlayerGender() != "Female");
+            Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
+            foreach (var n in new[] { "pbInSafari?", "pbBugContestUndecided?", "pbBugContestDecided?", "pbInChallenge?" }) Register(n, (c, a) => false);
+            Register("pbNextMysteryGiftID", (c, a) => 0);
+            Register("$game_player.has_follower?", (c, a) => false);
+            Register("get_event", (c, a) => _game.Map == null ? null : _game.Map.Events.FirstOrDefault(e => e.Id == ToInt(Arg(a, 0))));
             Register("pbSetSelfSwitch", (c, a) =>
             {
                 int ev = ToInt(Arg(a, 0)); string ch = Str(a, 1); bool v = a.Count < 3 || Truthy(a[2]);
@@ -406,6 +477,52 @@ namespace PokeCreator.Runtime.Script
             foreach (var f in new[] { "Followers.hide_followers", "Followers.put_followers_on_player", "Followers.follow_into_door", "Followers.add", "Followers.remove", "Followers.clear", "Followers.toggle", "Followers.update", "Followers.move_followers", "Followers.turn_followers" })
                 Register(f, (c, a) => true);
             Register("pbPokerus?", (c, a) => false);
+            Register("Pokemon::MAX_NAME_SIZE", (c, a) => 10);
+            Register("pbChooseMove", (c, a) =>
+            {
+                // pbChooseMove(pkmn, variable, nameVariable): variable = move index (-1 = cancelled)
+                var pk = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
+                int v = a.Count > 1 ? ToInt(a[1]) : 1, nv = a.Count > 2 ? ToInt(a[2]) : 0;
+                _game.State.SetVar(v, -1);
+                if (pk == null) return true;
+                var names = pk.Moves.Select(m => PokeCreator.Pkmn.ItemEffects.MoveName(_game.Project, m.Id)).ToList();
+                names.Add("Cancel");
+                _game.Message.Show("Which move?", names, names.Count - 1, k =>
+                {
+                    if (k < 0 || k >= pk.Moves.Count) { _game.State.SetVar(v, -1); return; }
+                    _game.State.SetVar(v, k);
+                    if (nv > 0) _game.State.SetStr(nv, names[k]);
+                    if (_game.Map != null) _game.Map.RefreshEvents();
+                });
+                return true;
+            });
+            Register("pbRelearnMoveScreen", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                var pk = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
+                if (pk == null) return false;
+                var moves = RelearnableMoves(pk);
+                if (moves.Count == 0) return false;
+                _game.PromptPending = true;
+                var names = moves.Select(m => PokeCreator.Pkmn.ItemEffects.MoveName(_game.Project, m)).ToList();
+                names.Add("Cancel");
+                _game.Message.Show("Teach which move to " + pk.Name(_game.Project) + "?", names, names.Count - 1, k =>
+                {
+                    if (k < 0 || k >= moves.Count) { _game.SetPrompt(c, false); return; }
+                    UI.ItemFlow.LearnMove(_game, pk, moves[k], learned => _game.SetPrompt(c, learned));
+                });
+                return false;
+            });
+            Register("pbTextEntry", (c, a) =>
+            {
+                // pbTextEntry(help text, min length, max length, variable)
+                int v = a.Count > 3 ? ToInt(a[3]) : 1;
+                int max = a.Count > 2 ? Math.Max(1, ToInt(a[2])) : 10;
+                _game.State.SetStr(v, "");
+                _game.AskName(Str(a, 0), "", max, n => _game.State.SetStr(v, n ?? ""), c);
+                return true;
+            });
             Register("pbCaveEntrance", (c, a) => true);
             Register("pbToneChangeAll", (c, a) =>
             {
@@ -552,7 +669,11 @@ namespace PokeCreator.Runtime.Script
                 else _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1)));
                 _game.Map.RefreshEvents(); return Arg(a, 1);
             });
-            Register("pbGet", (c, a) => _game.State.GetVar(ToInt(Arg(a, 0))));
+            Register("pbGet", (c, a) =>
+            {
+                int id = ToInt(Arg(a, 0)); string s;
+                return _game.State.StringVars.TryGetValue(id, out s) ? (object)s : _game.State.GetVar(id);
+            });
             Register("$bag.remove", (c, a) => { bool had = _game.State.Bag.ContainsKey(Str(a, 0)); _game.State.AddItem(Str(a, 0), -(a.Count > 1 ? ToInt(a[1]) : 1)); return had; });
             Register("$bag.can_add?", (c, a) => true);
             Register("$bag.quantity", (c, a) => { int n; return _game.State.Bag.TryGetValue(Str(a, 0), out n) ? n : 0; });
@@ -785,6 +906,47 @@ namespace PokeCreator.Runtime.Script
         // ------------------------------------------------------------------ parsing helpers
         static object Arg(List<object> a, int i) { return i < a.Count ? a[i] : null; }
 
+        // The event a script switch is being checked for (no interpreter is running then)
+        int _curMap, _curEvent;
+
+        /// <summary>Evaluates an Essentials script switch ("s:" name) for an event.</summary>
+        public bool EvaluateSwitchScript(string script, int mapId, int eventId)
+        {
+            int om = _curMap, oe = _curEvent;
+            _curMap = mapId; _curEvent = eventId;
+            try { return Evaluate(script, null); }
+            finally { _curMap = om; _curEvent = oe; }
+        }
+
+        string PlayerGender()
+        {
+            var look = _game.Player != null ? _game.Player.Look : null;
+            var tt = look != null ? _game.Project.TrainerTypes.FirstOrDefault(t => t.Id == look.TrainerType) : null;
+            return tt != null ? tt.Gender ?? "Male" : "Male";
+        }
+
+        /// <summary>A Ruby proc passed to a script call: proc { |pkmn| pkmn.can_relearn_move? }.</summary>
+        class ScriptProc { public string Param, Body; }
+
+        /// <summary>Calls a proc with one argument (the parameter becomes a local variable).</summary>
+        bool CallProc(ScriptProc p, object arg)
+        {
+            var saved = _locals;
+            _locals = new Dictionary<string, object>(saved);
+            _locals[p.Param] = arg;
+            try { return Truthy(Eval(p.Body, null)); }
+            catch { return true; }
+            finally { _locals = saved; }
+        }
+
+        /// <summary>Moves a Pokémon can relearn: its level-up moves up to its level that it doesn't know.</summary>
+        List<string> RelearnableMoves(PokeCreator.Pkmn.Pokemon pk)
+        {
+            var d = pk.Data(_game.Project);
+            if (d == null || pk.IsEgg) return new List<string>();
+            return d.Moves.Where(m => m.Level <= pk.Level).Select(m => m.Move).Distinct().Where(m => !pk.Moves.Any(x => x.Id == m) && _game.Project.Moves.Any(x => x.Id == m)).ToList();
+        }
+
         static int StatIndex(object key)
         {
             string k = Convert.ToString(key).ToUpperInvariant();
@@ -850,6 +1012,13 @@ namespace PokeCreator.Runtime.Script
                             return true;
                         }
                     case "heal": pk.Heal(P); return true;
+                    case "numMoves": return pk.Moves.Count;
+                    case "shadowPokemon?": return false;
+                    case "foreign?": return pk.OTName != _game.State.PlayerName || pk.OTId != _game.State.TrainerId;
+                    case "can_relearn_move?": return RelearnableMoves(pk).Count > 0;
+                    case "forget_move_at_index": { int i = ToInt(args.Count > 0 ? args[0] : null); if (i >= 0 && i < pk.Moves.Count && pk.Moves.Count > 1) pk.Moves.RemoveAt(i); return true; }
+                    case "forget_move": { string id = Convert.ToString(args.Count > 0 ? args[0] : null); if (pk.Moves.Count > 1) pk.Moves.RemoveAll(x => x.Id == id); return true; }
+                    case "moves": return pk.Moves;
                     case "calc_stats": return true;
                     case "giveRibbon": case "record_first_moves": case "reset_moves": return true;
                 }
@@ -879,7 +1048,7 @@ namespace PokeCreator.Runtime.Script
                 case "item": pk.Item = val == null ? null : Convert.ToString(val); return;
                 case "form": pk.Form = ToInt(val); return;
                 case "level": pk.Level = Math.Max(1, Math.Min(PokeCreator.Pkmn.GrowthRates.MaxLevel, ToInt(val))); return;
-                case "name": pk.Nickname = Convert.ToString(val); return;
+                case "name": pk.Nickname = val == null || Convert.ToString(val).Length == 0 ? null : Convert.ToString(val); return;
                 case "shiny": pk.Shiny = Truthy(val); return;
                 case "nature": pk.Nature = Convert.ToString(val); return;
                 case "happiness": pk.Happiness = ToInt(val); return;
@@ -896,6 +1065,8 @@ namespace PokeCreator.Runtime.Script
         void ChoosePokemon(List<object> a, Func<PokeCreator.Pkmn.Pokemon, bool> allowed)
         {
             int v = a.Count > 0 ? ToInt(a[0]) : 1, nameVar = a.Count > 1 ? ToInt(a[1]) : 0;
+            var proc = a.Count > 2 ? a[2] as ScriptProc : null;
+            if (proc != null) { var basic = allowed; allowed = pk => basic(pk) && CallProc(proc, pk); }
             _game.State.SetVar(v, -1);
             _game.PushScene(new UI.PartyScene(_game, "Choose a Pokémon.", pk => allowed(pk) ? null : "NOT ABLE", (i, close) =>
             {

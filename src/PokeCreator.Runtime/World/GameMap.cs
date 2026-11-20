@@ -35,6 +35,8 @@ namespace PokeCreator.Runtime.World
         public int HealMap, HealX, HealY, HealDir;
         /// <summary>Steps left on a Repel.</summary>
         public int RepelSteps;
+        /// <summary>When timed events last happened (pbSetEventTime), "map,event" -> seconds since 2000.</summary>
+        public readonly Dictionary<string, long> EventTimes = new Dictionary<string, long>();
         /// <summary>Game Corner coins, Battle Points and gym badges (0-based, as $player.badges[n]).</summary>
         public int Coins, BattlePoints;
         public readonly HashSet<int> Badges = new HashSet<int>();
