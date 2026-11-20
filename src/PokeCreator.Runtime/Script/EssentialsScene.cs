@@ -321,6 +321,26 @@ namespace PokeCreator.Runtime.Script
             Register("pbSlotMachine", (c, a) => { _game.PushScene(new UI.SlotMachineScene(_game, a.Count > 0 ? ToInt(a[0]) : 1)); return true; });
             Register("pbVoltorbFlip", (c, a) => { _game.PushScene(new UI.VoltorbFlipScene(_game)); return true; });
 
+            Register("pbMiningGame", (c, a) => { _game.PushScene(new UI.MiningScene(_game)); return true; });
+            Register("pbTilePuzzle", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                _game.PushScene(new UI.TilePuzzleScene(_game, a.Count > 0 ? ToInt(a[0]) : 3, Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0, a.Count > 3 ? ToInt(a[3]) : 0, ok => _game.SetPrompt(c, ok)));
+                return false;
+            });
+            Register("pbDuel", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                var tt = _game.Project.TrainerTypes.FirstOrDefault(t => t.Id == Str(a, 0));
+                string foe = ((tt != null ? tt.Name + " " : "") + Str(a, 1)).Trim();
+                _game.PromptPending = true;
+                _game.PushScene(new UI.DuelScene(_game, foe.Length > 0 ? foe : "Opponent", ok => _game.SetPrompt(c, ok)));
+                return false;
+            });
+
             // Battle Point shop, Game Corner prizes, lottery
             Register("pbBattlePointShop", (c, a) =>
             {

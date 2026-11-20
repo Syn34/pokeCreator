@@ -240,3 +240,291 @@ namespace PokeCreator.Runtime.UI
         }
     }
 }
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>
+    /// Tile puzzles (pbTilePuzzle(game, board, width, height)): the picture Graphics/UI/Tile Puzzle/&lt;board&gt; cut into
+    /// tiles. Games 3 slides tiles into the gap (Mystic Square); 1 and 5 swap tiles; 2, 4, 6 and 7 also rotate them
+    /// (Shift). Cancel gives up. The result is true when solved.
+    /// </summary>
+    public class TilePuzzleScene : Scene
+    {
+        readonly int _w, _h, _game;
+        readonly int[] _tile; readonly int[] _rot;
+        readonly string _board;
+        readonly Action<bool> _done;
+        int _cx, _cy, _held = -1;
+        bool _solved; int _solvedTimer;
+
+        bool Sliding { get { return _game == 3; } }
+        bool Rotating { get { return _game == 2 || _game == 4 || _game == 6 || _game == 7; } }
+
+        public TilePuzzleScene(Game g, int game, string board, int w, int h, Action<bool> done) : base(g)
+        {
+            Opaque = true; _game = Math.Max(1, Math.Min(7, game)); _board = board ?? ""; _done = done;
+            _w = w > 1 ? Math.Min(6, w) : (Sliding ? 4 : 4); _h = h > 1 ? Math.Min(6, h) : 4;
+            int n = _w * _h;
+            _tile = Enumerable.Range(0, n).ToArray(); _rot = new int[n];
+            var rng = new Random(g.Rng.Next());
+            if (Sliding)
+            {
+                // Random legal slides keep the puzzle solvable; the last tile is the gap
+                int gap = n - 1;
+                for (int k = 0; k < 200; k++)
+                {
+                    int gx = gap % _w, gy = gap / _w;
+                    var opts = new List<int>();
+                    if (gx > 0) opts.Add(gap - 1); if (gx < _w - 1) opts.Add(gap + 1); if (gy > 0) opts.Add(gap - _w); if (gy < _h - 1) opts.Add(gap + _w);
+                    int o = opts[rng.Next(opts.Count)];
+                    _tile[gap] = _tile[o]; _tile[o] = n - 1; gap = o;
+                }
+            }
+            else
+            {
+                for (int i = n - 1; i > 0; i--) { int j = rng.Next(i + 1); int t = _tile[i]; _tile[i] = _tile[j]; _tile[j] = t; }
+                if (Rotating) for (int i = 0; i < n; i++) _rot[i] = rng.Next(4);
+            }
+            if (Solved()) { int t = _tile[0]; _tile[0] = _tile[1]; _tile[1] = t; }
+        }
+
+        bool Solved() { for (int i = 0; i < _tile.Length; i++) if (_tile[i] != i || _rot[i] != 0) return false; return true; }
+
+        protected override void Update()
+        {
+            if (_solved) { if (++_solvedTimer > 60 || Input.Trigger(Button.Action)) { Close(); _done(true); } return; }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); _done(false); return; }
+            if (Input.Repeat(Button.Left)) { _cx = (_cx + _w - 1) % _w; Cursor(); }
+            if (Input.Repeat(Button.Right)) { _cx = (_cx + 1) % _w; Cursor(); }
+            if (Input.Repeat(Button.Up)) { _cy = (_cy + _h - 1) % _h; Cursor(); }
+            if (Input.Repeat(Button.Down)) { _cy = (_cy + 1) % _h; Cursor(); }
+            int i = _cy * _w + _cx, n = _tile.Length;
+            if (Rotating && Input.Trigger(Button.Run)) { _rot[i] = (_rot[i] + 1) % 4; Cursor(); }
+            if (Input.Trigger(Button.Action))
+            {
+                if (Sliding)
+                {
+                    int gap = Array.IndexOf(_tile, n - 1);
+                    int gx = gap % _w, gy = gap / _w;
+                    if (Math.Abs(gx - _cx) + Math.Abs(gy - _cy) == 1) { _tile[gap] = _tile[i]; _tile[i] = n - 1; Decide(); }
+                    else Buzz();
+                }
+                else if (_held < 0) { _held = i; Decide(); }
+                else
+                {
+                    int t = _tile[_held]; _tile[_held] = _tile[i]; _tile[i] = t;
+                    int r = _rot[_held]; _rot[_held] = _rot[i]; _rot[i] = r;
+                    _held = -1; Decide();
+                }
+            }
+            if (Solved()) { _solved = true; Game.Audio.PlayMe("Puzzle solved"); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(104, 88, 64), new Color(48, 40, 32));
+            var tex = g.Load(Game.Project.FindAsset("Graphics/UI/Tile Puzzle", _board) ?? Game.Project.FindAsset("Graphics/Pictures", _board));
+            int size = Math.Min((g.Width - 40) / _w, (g.Height - 90) / _h), x0 = (g.Width - size * _w) / 2, y0 = 16;
+            int n = _tile.Length;
+            for (int y = 0; y < _h; y++)
+                for (int x = 0; x < _w; x++)
+                {
+                    int i = y * _w + x, t = _tile[i];
+                    int px = x0 + x * size, py = y0 + y * size;
+                    if (Sliding && t == n - 1 && !_solved) { g.FillRect(px, py, size - 2, size - 2, new Color(32, 24, 16)); continue; }
+                    if (tex != null)
+                    {
+                        int tw = tex.Width / _w, th = tex.Height / _h;
+                        g.DrawEx(tex, (t % _w) * tw, (t / _w) * th, tw, th, px + size / 2.0, py + size / 2.0, (size - 2.0) / tw, (size - 2.0) / th, -90 * _rot[i], false, 255, 0);
+                    }
+                    else
+                    {
+                        g.FillRect(px, py, size - 2, size - 2, new Color((byte)(150 + (t * 53) % 100), (byte)(150 + (t * 97) % 100), (byte)(150 + (t * 31) % 100)));
+                        string label = (t + 1).ToString();
+                        g.DrawText(px + size / 2 - g.TextWidth(label) / 2, py + size / 2 - 14, label, Ui.Dark, Ui.DarkShadow);
+                        if (_rot[i] != 0) g.FillRect(px + (_rot[i] == 1 ? size - 10 : 2), py + (_rot[i] == 2 ? size - 10 : 2), 6, 6, new Color(200, 40, 40));
+                    }
+                    if (i == _held) g.FillRect(px, py, size - 2, 4, new Color(64, 200, 255));
+                    if (x == _cx && y == _cy && !_solved)
+                    {
+                        var c = new Color(248, 64, 48);
+                        g.FillRect(px - 2, py - 2, size + 2, 3, c); g.FillRect(px - 2, py + size - 3, size + 2, 3, c);
+                        g.FillRect(px - 2, py, 3, size - 2, c); g.FillRect(px + size - 3, py, 3, size - 2, c);
+                    }
+                }
+            Ui.Box(g, 4, g.Height - 64, g.Width - 8, 60);
+            Ui.Text(g, 18, g.Height - 52, _solved ? "Puzzle solved!" : Sliding ? "Action: slide  Cancel: give up" : Rotating ? "Action: swap  Shift: turn  Cancel: give up" : "Action: swap  Cancel: give up");
+        }
+    }
+
+    /// <summary>
+    /// The mining game (pbMiningGame): dig into a wall with the pickaxe or the hammer (Shift switches) to uncover the
+    /// items buried in it before the wall collapses. Everything fully uncovered is yours.
+    /// </summary>
+    public class MiningScene : Scene
+    {
+        const int W = 13, H = 10;
+        readonly int[,] _rock = new int[W, H];
+        readonly List<Buried> _items = new List<Buried>();
+        int _cx = 6, _cy = 5, _wall = 0;
+        bool _hammer, _over;
+        string _msg = "Action: dig  Shift: tool  Cancel: stop";
+        class Buried { public string Item; public int X, Y, W, H; public bool Found; }
+        static readonly string[][] Treasure =
+        {
+            new[] { "HELIXFOSSIL", "4", "4" }, new[] { "DOMEFOSSIL", "5", "4" }, new[] { "ROOTFOSSIL", "4", "4" }, new[] { "CLAWFOSSIL", "4", "4" }, new[] { "OLDAMBER", "4", "4" },
+            new[] { "FIRESTONE", "3", "3" }, new[] { "WATERSTONE", "3", "3" }, new[] { "THUNDERSTONE", "3", "3" }, new[] { "LEAFSTONE", "3", "3" }, new[] { "MOONSTONE", "4", "2" }, new[] { "SUNSTONE", "3", "3" },
+            new[] { "REDSHARD", "3", "3" }, new[] { "BLUESHARD", "3", "3" }, new[] { "YELLOWSHARD", "3", "3" }, new[] { "GREENSHARD", "3", "3" },
+            new[] { "HEARTSCALE", "2", "2" }, new[] { "HEARTSCALE", "2", "2" }, new[] { "HARDSTONE", "2", "2" }, new[] { "EVERSTONE", "4", "2" }, new[] { "STARPIECE", "3", "3" },
+            new[] { "REVIVE", "3", "3" }, new[] { "MAXREVIVE", "3", "3" }, new[] { "LIGHTCLAY", "4", "4" }, new[] { "DAMPROCK", "3", "3" }, new[] { "HEATROCK", "4", "3" }, new[] { "ICYROCK", "4", "4" }, new[] { "SMOOTHROCK", "4", "4" },
+        };
+
+        public MiningScene(Game g) : base(g)
+        {
+            Opaque = true;
+            var rng = new Random(g.Rng.Next());
+            for (int x = 0; x < W; x++) for (int y = 0; y < H; y++) _rock[x, y] = 2 + rng.Next(5);
+            var pool = Treasure.Where(t => g.Project.Items.Any(i => i.Id == t[0])).ToList();
+            int count = 2 + rng.Next(3);
+            for (int k = 0; k < count * 20 && _items.Count < count && pool.Count > 0; k++)
+            {
+                var t = pool[rng.Next(pool.Count)];
+                int w = int.Parse(t[1]), h = int.Parse(t[2]);
+                int x = rng.Next(W - w + 1), y = rng.Next(H - h + 1);
+                if (_items.Any(b => x < b.X + b.W && b.X < x + w && y < b.Y + b.H && b.Y < y + h)) continue;
+                _items.Add(new Buried { Item = t[0], X = x, Y = y, W = w, H = h });
+            }
+        }
+
+        void Hit(int x, int y, int amount) { if (x >= 0 && y >= 0 && x < W && y < H) _rock[x, y] = Math.Max(0, _rock[x, y] - amount); }
+
+        protected override void Update()
+        {
+            if (_over) { if (Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel)) Close(); return; }
+            if (Input.Repeat(Button.Left) && _cx > 0) { _cx--; Cursor(); }
+            if (Input.Repeat(Button.Right) && _cx < W - 1) { _cx++; Cursor(); }
+            if (Input.Repeat(Button.Up) && _cy > 0) { _cy--; Cursor(); }
+            if (Input.Repeat(Button.Down) && _cy < H - 1) { _cy++; Cursor(); }
+            if (Input.Trigger(Button.Run)) { _hammer = !_hammer; Cursor(); }
+            if (Input.Trigger(Button.Cancel)) { Finish("You stopped digging."); return; }
+            if (!Input.Trigger(Button.Action)) return;
+            Game.Audio.PlaySe(_hammer ? "Mining hammer" : "Mining pick");
+            if (_hammer)
+            {
+                Hit(_cx, _cy, 2);
+                for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) if (dx != 0 || dy != 0) Hit(_cx + dx, _cy + dy, 1);
+                _wall += 4 + Game.Rng.Next(2);
+            }
+            else
+            {
+                Hit(_cx, _cy, 2);
+                Hit(_cx - 1, _cy, 1); Hit(_cx + 1, _cy, 1); Hit(_cx, _cy - 1, 1); Hit(_cx, _cy + 1, 1);
+                _wall += 2 + Game.Rng.Next(2);
+            }
+            foreach (var b in _items.Where(b => !b.Found))
+            {
+                bool clear = true;
+                for (int x = b.X; x < b.X + b.W && clear; x++) for (int y = b.Y; y < b.Y + b.H; y++) if (_rock[x, y] > 0) { clear = false; break; }
+                if (clear) { b.Found = true; Game.Audio.PlaySe("Mining found all"); }
+            }
+            if (_items.All(b => b.Found)) Finish("Everything was dug up!");
+            else if (_wall >= 100) Finish("The wall collapsed!");
+        }
+
+        void Finish(string why)
+        {
+            _over = true;
+            var found = _items.Where(b => b.Found).ToList();
+            foreach (var b in found) Game.State.AddItem(b.Item, 1);
+            var names = found.Select(b => { var it = Game.Project.Items.FirstOrDefault(i => i.Id == b.Item); return it != null ? it.Name : b.Item; }).ToList();
+            _msg = why + (names.Count > 0 ? " You found: " + string.Join(", ", names) + "." : " You didn't find anything.");
+            Game.Message.Show(_msg);
+        }
+
+        public override void Draw(Gfx g)
+        {
+            g.FillRect(0, 0, g.Width, g.Height, new Color(56, 40, 32));
+            int s = 28, x0 = (g.Width - W * s) / 2, y0 = 30;
+            // Wall meter
+            g.FillRect(x0, 8, W * s, 16, new Color(40, 24, 16));
+            g.FillRect(x0 + 2, 10, Math.Min(W * s - 4, (W * s - 4) * _wall / 100), 12, _wall > 75 ? new Color(232, 64, 48) : new Color(232, 176, 64));
+            foreach (var b in _items)
+                for (int x = b.X; x < b.X + b.W; x++) for (int y = b.Y; y < b.Y + b.H; y++)
+                    g.FillRect(x0 + x * s, y0 + y * s, s, s, b.Found ? new Color(120, 220, 160) : new Color(200, 200, 216));
+            for (int x = 0; x < W; x++)
+                for (int y = 0; y < H; y++)
+                {
+                    int r = _rock[x, y];
+                    if (r <= 0) continue;
+                    int shade = 150 - r * 16;
+                    g.FillRect(x0 + x * s, y0 + y * s, s - 1, s - 1, new Color((byte)shade, (byte)(shade * 3 / 4), (byte)(shade / 2)));
+                }
+            var c = _hammer ? new Color(64, 160, 255) : new Color(248, 64, 48);
+            int cx = x0 + _cx * s, cy = y0 + _cy * s;
+            g.FillRect(cx, cy, s, 3, c); g.FillRect(cx, cy + s - 3, s, 3, c); g.FillRect(cx, cy, 3, s, c); g.FillRect(cx + s - 3, cy, 3, s, c);
+            Ui.Box(g, 4, g.Height - 50, g.Width - 8, 46);
+            g.DrawText(18, g.Height - 40, (_hammer ? "Hammer. " : "Pickaxe. ") + (_over ? "Action: leave" : "Action: dig  Shift: tool  Cancel: stop"), Ui.Dark, Ui.DarkShadow);
+        }
+    }
+
+    /// <summary>
+    /// A duel (pbDuel(trainerType, name)): both fighters have 10 HP and pick a move each turn. Attack beats Rest, Defend
+    /// blocks Attack, Precise Attack gets through Defend, Fierce Attack hits hard but leaves you open, Jump dodges.
+    /// The result is true if the player wins.
+    /// </summary>
+    public class DuelScene : Scene
+    {
+        static readonly string[] Moves = { "Attack", "Defend", "Precise Attack", "Fierce Attack", "Rest", "Jump", "Surrender" };
+        readonly string _foe; readonly Action<bool> _done;
+        int _hp = 10, _foeHp = 10, _sel;
+        bool _foeOpen, _meOpen, _over;
+        string _log = "Choose your move.";
+
+        public DuelScene(Game g, string foe, Action<bool> done) : base(g) { Opaque = true; _foe = foe; _done = done; }
+
+        int Damage(int move, int other, bool otherOpen)
+        {
+            int d;
+            switch (move)
+            {
+                case 0: d = other == 1 ? 0 : other == 5 ? 0 : 2; break;
+                case 2: d = other == 5 ? 0 : 1; break;
+                case 3: d = other == 1 ? 1 : other == 5 ? 0 : 4; break;
+                default: d = 0; break;
+            }
+            return d > 0 && otherOpen ? d + 1 : d;
+        }
+
+        protected override void Update()
+        {
+            if (_over) { if (Input.Trigger(Button.Action)) { Close(); _done(_foeHp <= 0 && _hp > 0); } return; }
+            if (Input.Repeat(Button.Down)) { _sel = (_sel + 1) % Moves.Length; Cursor(); }
+            if (Input.Repeat(Button.Up)) { _sel = (_sel + Moves.Length - 1) % Moves.Length; Cursor(); }
+            if (!Input.Trigger(Button.Action)) return;
+            Decide();
+            if (_sel == 6) { _hp = 0; _log = "You surrendered."; _over = true; return; }
+            int foe = Game.Rng.Next(6);
+            if (_foeHp <= 3 && Game.Rng.Next(2) == 0) foe = 4;
+            int dealt = Damage(_sel, foe, _foeOpen), taken = Damage(foe, _sel, _meOpen);
+            if (_sel == 4) _hp = Math.Min(10, _hp + 2);
+            if (foe == 4) _foeHp = Math.Min(10, _foeHp + 2);
+            _foeHp -= dealt; _hp -= taken;
+            _meOpen = _sel == 3; _foeOpen = foe == 3;
+            _log = Moves[_sel] + " vs " + Moves[foe] + " (" + dealt + "/" + taken + ")";
+            if (_hp <= 0 || _foeHp <= 0) { _over = true; _log += _foeHp <= 0 && _hp > 0 ? "  You win!" : "  You lost..."; Game.Audio.PlayMe(_foeHp <= 0 && _hp > 0 ? "Duel win" : "Duel lose"); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(200, 160, 96), new Color(96, 64, 32));
+            Ui.Panel(g, 12, 12, 230, 70, new Color(248, 248, 248), new Color(80, 56, 32));
+            Ui.Text(g, 24, 18, Game.State.PlayerName); Ui.Text(g, 24, 46, "HP " + Math.Max(0, _hp) + "/10");
+            Ui.Panel(g, g.Width - 242, 12, 230, 70, new Color(248, 248, 248), new Color(80, 56, 32));
+            Ui.Text(g, g.Width - 230, 18, _foe); Ui.Text(g, g.Width - 230, 46, "HP " + Math.Max(0, _foeHp) + "/10");
+            Ui.Panel(g, 12, 96, 230, Moves.Length * 28 + 12, new Color(248, 248, 248), new Color(80, 56, 32));
+            for (int i = 0; i < Moves.Length; i++) { if (i == _sel) Ui.Arrow(g, 22, 108 + i * 28); Ui.Text(g, 42, 102 + i * 28, Moves[i]); }
+            Ui.Box(g, 4, g.Height - 64, g.Width - 8, 60);
+            g.DrawText(18, g.Height - 52, _log, Ui.Dark, Ui.DarkShadow);
+        }
+    }
+}
