@@ -68,6 +68,9 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Animation editor for battle animations (preview, frames, cels, sheet palette, sounds, import from Essentials)
 - [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 
+- [x] Held items in battle: every berry (HP, status, pinch, type-resist, Kee/Maranga/Jaboca/Rowap/Enigma/Custap/Micle), herbs, Weakness Policy, Air Balloon, Eject Button/Pack, Red Card, Black Sludge, orbs, gems, Quick Claw, Metronome, Loaded Dice, seeds, Room Service, Booster Energy, Utility Umbrella, Ring Target, Clear Amulet...
+- [x] Gluttony, Ripen, Cud Chew, Symbiosis, Pickup, Honey Gather, Ball Fetch, Stall, Quick Draw, Mycelium Might order
+
 ## Later
 - Plugin system for sharing scripts between projects
 - Localization (message tables)

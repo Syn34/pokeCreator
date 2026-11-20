@@ -545,6 +545,9 @@ namespace PokeCreator.Runtime.UI
         void EndBattle()
         {
             _b.RevertForms();
+            // Pickup / Honey Gather: Pokémon holding nothing may find an item after the battle
+            if (_b.Outcome == BattleOutcome.Win || _b.Outcome == BattleOutcome.Escaped || _b.Outcome == BattleOutcome.Caught)
+                Battle.PostBattlePickup(Game.Project, _party, new Random());
             _mode = Mode.Ending;
             var o = _b.Outcome;
             var steps = new List<Action<Action>>();

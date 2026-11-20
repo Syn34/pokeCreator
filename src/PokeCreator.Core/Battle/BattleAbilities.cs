@@ -122,7 +122,7 @@ namespace PokeCreator.Battles
             if ((type == "FAIRY" && OnField.Any(b => HasAbility(b, "FAIRYAURA"))) || (type == "DARK" && OnField.Any(b => HasAbility(b, "DARKAURA"))))
                 m *= auraBreak ? 0.75 : 4.0 / 3;
             if (HasAbility(user, "SUPREMEOVERLORD")) m *= 1 + 0.1 * Math.Min(5, Parties[user.Side].Count(p => p.Fainted));
-            return m;
+            return m * ItemPowerMod(user, target, md, type);
         }
 
         double MoreAttackMod(Battler user, Battler target, bool physical, string type)
@@ -144,7 +144,7 @@ namespace PokeCreator.Battles
             if (physical && TargetHas(user, target, "GRASSPELT") && Terrain == "Grassy") m *= 1.5;
             int bs = BoostedStat(target);
             if ((bs == S.Defense && physical) || (bs == S.SpDef && !physical)) m *= 1.3;
-            return m;
+            return m * ItemDefenseMod(target, physical);
         }
 
         double MoreFinalMod(Battler user, Battler target, MoveData md, string type, double typeMod)
@@ -267,7 +267,7 @@ namespace PokeCreator.Battles
                     break;
                 case "CUTECHARM":
                     if (contact && !user.Pk.Fainted && user.AttractedTo == null && Rng.Next(100) < 30 && user.Pk.Gender != "" && target.Pk.Gender != "" && user.Pk.Gender != target.Pk.Gender)
-                    { Splash(target); user.AttractedTo = target; Say(Name(user) + " fell in love!"); }
+                    { Splash(target); user.AttractedTo = target; Say(Name(user) + " fell in love!"); DestinyKnot(user, target); }
                     break;
             }
             // The attacker's own contact abilities

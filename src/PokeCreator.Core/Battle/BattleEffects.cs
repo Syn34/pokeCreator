@@ -136,6 +136,7 @@ namespace PokeCreator.Battles
                             || HasAbility(f, "INNERFOCUS") || HasAbility(f, "OBLIVIOUS") || HasAbility(f, "OWNTEMPO") || HasAbility(f, "SCRAPPY"))
                             Say(Name(f) + "'s " + AbilityName(f) + " prevents its Attack from being lowered!");
                         else ChangeStat(f, PokeCreator.Pkmn.Stat.Attack, -1, b);
+                        Intimidated(f);
                     }
                     break;
                 case "DRIZZLE": if (Weather != Rain) { Splash(b); StartWeather(Rain, b); } break;
@@ -153,6 +154,7 @@ namespace PokeCreator.Battles
             }
             MoreSwitchInAbilities(b);
             if (_heroPending.Remove(b.Pk)) { Splash(b); Say(Name(b) + " underwent a heroic transformation!"); }
+            ItemsOnSwitchIn(b);
         }
 
         /// <summary>Natural Cure and Regenerator when a Pokémon is withdrawn.</summary>
@@ -320,6 +322,7 @@ namespace PokeCreator.Battles
         {
             double m = 1;
             string w = EffWeather;
+            if (Holds(target, "UTILITYUMBRELLA")) w = NoWeather;
             if (w == Rain) { if (type == "WATER") m *= 1.5; else if (type == "FIRE") m *= 0.5; }
             if (w == Sun) { if (type == "FIRE") m *= 1.5; else if (type == "WATER") m *= 0.5; }
             if (typeMod > 1 && (TargetHas(user, target, "FILTER") || TargetHas(user, target, "SOLIDROCK") || HasAbility(target, "PRISMARMOR"))) m *= 0.75;
@@ -348,6 +351,8 @@ namespace PokeCreator.Battles
             if (TargetHas(user, target, "TANGLEDFEET") && target.Confusion > 0) m *= 0.5;
             if (target.Pk.Item == "BRIGHTPOWDER" || target.Pk.Item == "LAXINCENSE") m *= 0.9;
             if (user.Pk.Item == "WIDELENS") m *= 1.1;
+            if (Holds(user, "ZOOMLENS") && target.ActedThisTurn) m *= 1.2;
+            if (user.MicleBoost) { m *= 1.2; user.MicleBoost = false; }
             return m;
         }
 

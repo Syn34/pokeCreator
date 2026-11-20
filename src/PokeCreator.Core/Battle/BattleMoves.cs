@@ -85,6 +85,7 @@ namespace PokeCreator.Battles
             double tWeight = tw != null && tw.Weight > 0 ? tw.Weight : 30, uWeight = uw != null && uw.Weight > 0 ? uw.Weight : 30;
             if (HasAbility(target, "HEAVYMETAL")) tWeight *= 2; if (HasAbility(target, "LIGHTMETAL")) tWeight /= 2;
             if (HasAbility(user, "HEAVYMETAL")) uWeight *= 2; if (HasAbility(user, "LIGHTMETAL")) uWeight /= 2;
+            if (Holds(target, "FLOATSTONE")) tWeight /= 2; if (Holds(user, "FLOATSTONE")) uWeight /= 2;
             switch (code)
             {
                 case "PowerHigherWithUserHappiness": return Math.Max(1, user.Pk.Happiness * 2 / 5);
@@ -284,7 +285,7 @@ namespace PokeCreator.Battles
                     {
                         bool opposite = (user.Pk.Gender == "M" && target.Pk.Gender == "F") || (user.Pk.Gender == "F" && target.Pk.Gender == "M");
                         if (!opposite || target.AttractedTo != null || TargetHas(user, target, "OBLIVIOUS")) { Say("But it failed!"); return true; }
-                        target.AttractedTo = user; Say(tn + " fell in love!"); return true;
+                        target.AttractedTo = user; Say(tn + " fell in love!"); DestinyKnot(target, user); return true;
                     }
                 case "StartNegateTargetEvasionStatStageAndGhostImmunity":
                 case "StartNegateTargetEvasionStatStageAndDarkImmunity":
@@ -643,7 +644,7 @@ namespace PokeCreator.Battles
                     if (!user.Pk.Fainted && !HasAbility(user, "MAGICGUARD")) { int f = user.Pk.HP; user.Pk.HP = Math.Max(0, user.Pk.HP - (user.Pk.TotalHP(P) + 1) / 2); Hp(user, f); }
                     break;
                 case "SwitchOutUserDamagingMove":
-                    if (!user.Pk.Fainted && Bench(user.Side).Count > 0) user.SwitchOutPending = true;
+                    if (!user.Pk.Fainted && Bench(user.Side).Count > 0) { if (user.Side == 1 && !IsWild) SwitchOutNow(user); else user.SwitchOutPending = true; }
                     break;
                 case "SwitchOutTargetDamagingMove":
                     if (!target.Pk.Fainted && target.SubstituteHP == 0 && !HasAbility(target, "SUCTIONCUPS") && !target.Ingrain)
@@ -720,6 +721,27 @@ namespace PokeCreator.Battles
         }
 
         /// <summary>U-turn / Volt Switch: the AI switches at once; the player picks a Pokémon after the turn (PlayerSlotsToFill).</summary>
+        /// <summary>
+        /// Switches a Pokémon out mid-turn (Eject Button, Eject Pack, Emergency Exit, U-turn): an opponent is replaced at once;
+        /// the player's Pokémon stops acting this turn and the player picks its replacement after the turn.
+        /// </summary>
+        void SwitchOutNow(Battler b)
+        {
+            if (b.Pk.Fainted) return;
+            if (b.Side == 1)
+            {
+                var bench = FoeBench(b.Slot);
+                if (bench.Count == 0) return;
+                SwitchOutAbility(b);
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 1, Party = b.PartyIndex, Slot = b.Slot });
+                var nb = Place(1, b.Slot, AINextPokemon(b.Slot));
+                Say(TrainerLabel(nb.PartyIndex) + " sent out " + nb.Pk.Name(P) + "!");
+                SendOutEvent(nb); MarkParticipant(); SwitchInAbility(nb);
+                return;
+            }
+            b.SwitchOutPending = true; b.Ejected = true;
+        }
+
         void ResolveSwitchOuts()
         {
             foreach (var b in OnField.Where(x => x.SwitchOutPending && !x.Pk.Fainted).ToList())
@@ -745,7 +767,7 @@ namespace PokeCreator.Battles
             {
                 int max = b.Pk.TotalHP(P);
                 // Wish
-                int k = b.Side * 2 + b.Slot, turns;
+                int k = b.Side * 3 + b.Slot, turns;
                 if (_wishTurns.TryGetValue(k, out turns) && --turns <= 0)
                 {
                     _wishTurns.Remove(k);
