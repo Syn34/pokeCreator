@@ -43,6 +43,11 @@ namespace PokeCreator.Runtime.UI
         readonly int[] _faintDrop = new int[4];
         readonly int[] _blink = new int[4];
         readonly double[] _shownExp = new double[2];
+        // Simple move effects: the user lunges, a burst in the move type's colour hits the target, arrows on stat changes
+        readonly int[] _lunge = new int[4];
+        int _burstKey = -1, _burstFrames, _statKey = -1, _statFrames, _statDir;
+        Color _burstColor = new Color(248, 248, 248);
+        string _lastCategory = "Physical";
         bool _trainerVisible, _ballVisible, _ballCaught;
         int _ballShakes, _ballSlot;
         int _introSlide = 120;
@@ -143,9 +148,22 @@ namespace PokeCreator.Runtime.UI
                 case BattleEventKind.Hp: return true;
                 case BattleEventKind.Hit:
                     Game.Audio.PlaySe(e.Value > 100 ? "Battle damage super" : e.Value < 100 ? "Battle damage weak" : "Battle damage normal");
-                    _blink[Key(e.Side, SlotOf(e.Side, e.Party))] = 16; return true;
+                    _blink[Key(e.Side, SlotOf(e.Side, e.Party))] = 16;
+                    _burstKey = Key(e.Side, SlotOf(e.Side, e.Party)); _burstFrames = 18;
+                    return true;
+                case BattleEventKind.MoveUsed:
+                    {
+                        var md = Game.Project.Moves.FirstOrDefault(m => m.Id == e.Text);
+                        _burstColor = TypeColor(md != null ? md.Type : "NORMAL");
+                        _lastCategory = md != null ? md.Category ?? "Physical" : "Physical";
+                        if (_lastCategory == "Physical") { _lunge[Key(e.Side, SlotOf(e.Side, e.Party))] = 12; return true; }
+                        return false;
+                    }
                 case BattleEventKind.Faint: Game.Audio.PlaySe("Pkmn faint"); return true;
-                case BattleEventKind.StatChange: Game.Audio.PlaySe(e.Value > 0 ? "Battle stat up" : "Battle stat down"); return true;
+                case BattleEventKind.StatChange:
+                    Game.Audio.PlaySe(e.Value > 0 ? "Battle stat up" : "Battle stat down");
+                    _statKey = Key(e.Side, SlotOf(e.Side, e.Party)); _statFrames = 24; _statDir = e.Value > 0 ? 1 : -1;
+                    return true;
                 case BattleEventKind.Exp:
                     if (_shownParty[Key(0, SlotOf(0, e.Party))] != e.Party) return false;
                     Game.Audio.PlaySe("Pkmn exp gain"); return true;
@@ -193,6 +211,7 @@ namespace PokeCreator.Runtime.UI
                         return false;
                     }
                 case BattleEventKind.Hit: return _anim >= 16;
+                case BattleEventKind.MoveUsed: return _anim >= 12;
                 case BattleEventKind.Faint:
                     {
                         int k = Key(e.Side, e.Slot);
@@ -202,7 +221,7 @@ namespace PokeCreator.Runtime.UI
                     }
                 case BattleEventKind.SendOut: return _anim >= 12;
                 case BattleEventKind.Withdraw: return _anim >= 10;
-                case BattleEventKind.StatChange: return _anim >= 14;
+                case BattleEventKind.StatChange: return _anim >= 24;
                 case BattleEventKind.Exp:
                     {
                         var pk = _party[e.Party];
@@ -539,11 +558,14 @@ namespace PokeCreator.Runtime.UI
                     int x, bottom; Pos(side, slot, out x, out bottom);
                     if (_blink[k] > 0 && (_blink[k]-- / 2) % 2 == 0) continue;
                     var pk = _b.Parties[side][_shownParty[k]];
+                    // Lunge toward the other side
+                    if (_lunge[k] > 0) { int t = _lunge[k]--; int off = (int)(Math.Sin((12 - t) / 12.0 * Math.PI) * 24); x += side == 0 ? off : -off; bottom += side == 0 ? -off / 3 : off / 3; }
                     DrawPokemon(g, pk, side == 0, x, bottom + _faintDrop[k]);
                     if (_mode == Mode.Target && _targets.Count > _target && _targets[_target].Side == side && _targets[_target].Slot == slot && (Frame / 8) % 2 == 0)
                         Ellipse(g, x, bottom - 2, 30, 6, new Color(248, 232, 80));
                 }
             if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
+            DrawEffects(g);
             // Databoxes
             for (int slot = 0; slot < (_b.IsDouble ? 2 : 1); slot++)
             {
@@ -558,6 +580,61 @@ namespace PokeCreator.Runtime.UI
                 else if (_mode == Mode.Fight) DrawFight(g);
                 else if (_mode == Mode.Target) DrawTarget(g);
                 else MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
+            }
+        }
+
+        static Color TypeColor(string type)
+        {
+            switch (type)
+            {
+                case "FIRE": return new Color(240, 128, 48); case "WATER": return new Color(104, 144, 240); case "ELECTRIC": return new Color(248, 208, 48);
+                case "GRASS": return new Color(120, 200, 80); case "ICE": return new Color(152, 216, 216); case "FIGHTING": return new Color(192, 48, 40);
+                case "POISON": return new Color(160, 64, 160); case "GROUND": return new Color(224, 192, 104); case "FLYING": return new Color(168, 144, 240);
+                case "PSYCHIC": return new Color(248, 88, 136); case "BUG": return new Color(168, 184, 32); case "ROCK": return new Color(184, 160, 56);
+                case "GHOST": return new Color(112, 88, 152); case "DRAGON": return new Color(112, 56, 248); case "DARK": return new Color(112, 88, 72);
+                case "STEEL": return new Color(184, 184, 208); case "FAIRY": return new Color(238, 153, 172); default: return new Color(232, 232, 216);
+            }
+        }
+
+        /// <summary>Hit bursts and stat arrows over the battlers.</summary>
+        void DrawEffects(Gfx g)
+        {
+            if (_burstFrames > 0 && _burstKey >= 0)
+            {
+                int x, bottom; Pos(_burstKey / 2, _burstKey % 2, out x, out bottom);
+                int cy = bottom - 56, t = 18 - _burstFrames;
+                var rng = new Random(_burstKey * 31 + 7);
+                byte a = (byte)Math.Max(0, 255 - t * 12);
+                var c = new Color(_burstColor.R, _burstColor.G, _burstColor.B, a);
+                int n = _lastCategory == "Special" ? 18 : 12;
+                for (int i = 0; i < n; i++)
+                {
+                    double ang = rng.NextDouble() * Math.PI * 2, sp = 3 + rng.NextDouble() * 4;
+                    int px = x + (int)(Math.Cos(ang) * sp * t), py = cy + (int)(Math.Sin(ang) * sp * t);
+                    int sz = _lastCategory == "Special" ? 11 : 8;
+                    g.FillRect(px - sz / 2, py - sz / 2, sz, sz, c);
+                    g.FillRect(px - sz / 4, py - sz / 4, sz / 2, sz / 2, new Color(255, 255, 255, a));
+                }
+                if (t < 4) g.FillRect(x - 24 + t * 2, cy - 24 + t * 2, 48 - t * 4, 48 - t * 4, new Color(255, 255, 255, (byte)(160 - t * 40)));
+                _burstFrames--;
+            }
+            if (_statFrames > 0 && _statKey >= 0)
+            {
+                int x, bottom; Pos(_statKey / 2, _statKey % 2, out x, out bottom);
+                int t = 24 - _statFrames;
+                var c = _statDir > 0 ? new Color(248, 136, 48, 200) : new Color(72, 120, 232, 200);
+                for (int i = 0; i < 5; i++)
+                {
+                    int ax = x - 48 + i * 24, ay = bottom - 30 - ((t * 4 + i * 20) % 90) * _statDir;
+                    if (_statDir < 0) ay = bottom - 120 + ((t * 4 + i * 20) % 90);
+                    for (int r = 0; r < 8; r++)
+                    {
+                        int w = _statDir > 0 ? r * 2 + 2 : (8 - r) * 2;
+                        g.FillRect(ax - w / 2, ay + r, w, 1, c);
+                    }
+                    g.FillRect(ax - 3, ay + (_statDir > 0 ? 8 : -8), 6, 8, c);
+                }
+                _statFrames--;
             }
         }
 
