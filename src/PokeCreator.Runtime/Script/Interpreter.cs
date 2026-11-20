@@ -155,7 +155,6 @@ namespace PokeCreator.Runtime.Script
                 case 102: return ShowChoices(c, null);
                 case 402: if (_branch.ContainsKey(c.Indent) && _branch[c.Indent] == c.IntParam(0)) { _branch.Remove(c.Indent); return true; } return Skip();
                 case 403: if (_branch.ContainsKey(c.Indent) && _branch[c.Indent] == 4) { _branch.Remove(c.Indent); return true; } return Skip();
-                case 103: _game.State.SetVar(c.IntParam(0), 0); Warn(103, "Input Number"); return true;
                 case 106: Wait(c.IntParam(0) * 3); _index++; return false;
 
                 case 111:
@@ -248,20 +247,50 @@ namespace PokeCreator.Runtime.Script
                         return true;
                     }
                 case 224: _game.Flash(c.IntParam(1) * 3 / 2); return true;
-                case 225: return true;
-                case 231: case 232: case 233: case 234: case 235: Warn(231, "Pictures"); return true;
+                case 225: _game.Shake(c.IntParam(0), c.IntParam(1), c.IntParam(2)); return true;
+                case 231:
+                    {
+                        // Show Picture: number, name, origin, by variables?, x, y, zoom x, zoom y, opacity, blend
+                        double x = c.IntParam(3) == 0 ? c.IntParam(4) : _game.State.GetVar(c.IntParam(4));
+                        double y = c.IntParam(3) == 0 ? c.IntParam(5) : _game.State.GetVar(c.IntParam(5));
+                        _game.Pictures.Get(c.IntParam(0)).Show(c.StrParam(1), c.IntParam(2), x, y, c.IntParam(6), c.IntParam(7), c.IntParam(8), c.IntParam(9));
+                        return true;
+                    }
+                case 232:
+                    {
+                        // Move Picture: number, duration, origin, by variables?, x, y, zoom x, zoom y, opacity, blend
+                        double x = c.IntParam(3) == 0 ? c.IntParam(4) : _game.State.GetVar(c.IntParam(4));
+                        double y = c.IntParam(3) == 0 ? c.IntParam(5) : _game.State.GetVar(c.IntParam(5));
+                        _game.Pictures.Get(c.IntParam(0)).Move(c.IntParam(1), c.IntParam(2), x, y, c.IntParam(6), c.IntParam(7), c.IntParam(8), c.IntParam(9));
+                        return true;
+                    }
+                case 233: _game.Pictures.Get(c.IntParam(0)).RotateSpeed = c.IntParam(1); return true;
+                case 234: return true; // picture tone: not drawn yet
+                case 235: _game.Pictures.Erase(c.IntParam(0)); return true;
+                case 103:
+                    {
+                        // Input Number: variable, digits
+                        int v = c.IntParam(0), digits = Math.Max(1, Math.Min(8, c.IntParam(1)));
+                        _game.PushScene(new UI.NumberInputScene(_game, digits, _game.State.GetVar(v), n => { _game.State.SetVar(v, n); _game.Map.RefreshEvents(); }));
+                        _index++;
+                        return false;
+                    }
+                case 104: UI.MessageWindow.DefaultPosition = Math.Max(0, Math.Min(2, c.IntParam(0))); UI.MessageWindow.FrameHidden = c.IntParam(1) == 1; return true;
 
                 case 241: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayBgm(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
                 case 242: _game.Audio.FadeOutBgm(c.IntParam(0)); return true;
                 case 245: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayBgs(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
-                case 246: case 247: case 248: case 251: return true;
+                case 247: _game.MemorizedBgm = _game.Audio.CurrentBgm; return true;
+                case 248: if (!string.IsNullOrEmpty(_game.MemorizedBgm)) _game.Audio.PlayBgm(_game.MemorizedBgm); return true;
+                case 246: case 251: return true;
                 case 249: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayMe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
                 case 250: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlaySe(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }
 
                 case 301: Warn(301, "RPG Maker troop battles aren't used in Pokémon games; use TrainerBattle.start"); return true;
                 case 601: case 602: case 603: return BattleBranch(c);
                 case 314: foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; // Recover All
-                case 351: case 352: case 353: case 354: return true;
+                case 354: _game.ReturnToTitle(); return false;
+                case 351: case 352: case 353: return true;
 
                 case 355: return RunScript();
                 case 655: return true;

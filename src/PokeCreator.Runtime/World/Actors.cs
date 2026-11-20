@@ -144,7 +144,14 @@ namespace PokeCreator.Runtime.World
 
         public Player(Game game) : base(game) { MoveSpeed = 4; }
 
-        public string WalkCharset { get { return Look != null && !string.IsNullOrEmpty(Look.WalkCharset) ? Look.WalkCharset : "trainer_POKEMONTRAINER_Red"; } }
+        public string WalkCharset
+        {
+            get
+            {
+                if (Look == null && Game.State != null && Game.State.PlayerCharacter < 0) return ""; // not chosen yet (Essentials intro)
+                return Look != null && !string.IsNullOrEmpty(Look.WalkCharset) ? Look.WalkCharset : "trainer_POKEMONTRAINER_Red";
+            }
+        }
         public string RunCharset { get { return Look != null && !string.IsNullOrEmpty(Look.RunCharset) ? Look.RunCharset : WalkCharset; } }
         public string SurfCharset { get { return Look != null && !string.IsNullOrEmpty(Look.SurfCharset) ? Look.SurfCharset : WalkCharset; } }
         public string CycleCharset { get { return Look != null && !string.IsNullOrEmpty(Look.CycleCharset) ? Look.CycleCharset : WalkCharset; } }

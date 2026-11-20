@@ -407,6 +407,14 @@ namespace PokeCreator.Runtime.Script
                 Register(f, (c, a) => true);
             Register("pbPokerus?", (c, a) => false);
             Register("pbCaveEntrance", (c, a) => true);
+            Register("pbToneChangeAll", (c, a) =>
+            {
+                var t = Arg(a, 0) as List<object>;
+                if (t != null) _game.SetScreenTone(t, a.Count > 1 ? ToInt(a[1]) * 3 / 2 : 0);
+                return true;
+            });
+            Register("Tone.new", (c, a) => a.Select(x => (object)ToInt(x)).ToList());
+            Register("pbEventScreen", (c, a) => true);
             Register("pbCaveExit", (c, a) => true);
             Register("pbCaveEntranceEx", (c, a) => true);
             Register("pbCaveExitEx", (c, a) => true);

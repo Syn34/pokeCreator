@@ -42,6 +42,7 @@ namespace PokeCreator.Import
             _p.Info.ImportedFrom = "Pokémon Essentials: " + _src;
             _p.Settings.Title = _p.Info.Name;
             _p.Settings.RunningShoesRequired = true; // Essentials games give the Running Shoes in an event
+            _p.Settings.PlayerChosenInIntro = true;  // and pick the player character in the intro (pbChangePlayer)
 
             Step("types", ImportTypes);
             Step("abilities", ImportAbilities);

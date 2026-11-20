@@ -43,6 +43,26 @@ namespace PokeCreator.Runtime
         MapRenderer _renderer;
 
         public int DisplayX, DisplayY;
+        /// <summary>Pictures shown by Show Picture (drawn over the map).</summary>
+        public readonly World.PictureSet Pictures = new World.PictureSet();
+        public string MemorizedBgm;
+        int _shakePower, _shakeSpeed, _shakeFrames, _shakeDir = 1;
+        double _shake;
+
+        /// <summary>Screen Shake (RMXP): power and speed 1-9, duration in RMXP frames.</summary>
+        public void Shake(int power, int speed, int duration) { _shakePower = power; _shakeSpeed = speed; _shakeFrames = duration * 3 / 2; }
+
+        void UpdateShake()
+        {
+            if (_shakeFrames <= 0 && _shake == 0) return;
+            double delta = _shakePower * _shakeSpeed * _shakeDir / 15.0;
+            if (_shakeFrames <= 1 && _shake * (_shake + delta) < 0) _shake = 0;
+            else _shake += delta;
+            if (_shake > _shakePower * 2) _shakeDir = -1;
+            if (_shake < -_shakePower * 2) _shakeDir = 1;
+            if (_shakeFrames > 0) _shakeFrames--;
+        }
+
         /// <summary>Overworld weather (map metadata "Weather" or the Set Weather Effects command).</summary>
         public readonly World.WeatherSystem Weather = new World.WeatherSystem();
         public int FrameCount;
@@ -134,9 +154,9 @@ namespace PokeCreator.Runtime
             State.Money = s.StartMoney;
             State.PlayerName = string.IsNullOrEmpty(s.DefaultPlayerName) ? "Red" : s.DefaultPlayerName;
             State.TrainerId = Rng.Next(65536);
-            State.PlayerCharacter = Math.Max(0, s.DefaultPlayer);
+            State.PlayerCharacter = s.PlayerChosenInIntro ? -1 : Math.Max(0, s.DefaultPlayer);
             Player = new Player(this);
-            Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, s.DefaultPlayer), Project.Players.Count - 1)] : null;
+            Player.Look = Project.Players.Count > 0 && State.PlayerCharacter >= 0 ? Project.Players[Math.Min(State.PlayerCharacter, Project.Players.Count - 1)] : null;
             Player.CharacterName = Player.WalkCharset;
             int map = _opt.StartMap > 0 ? _opt.StartMap : s.StartMap;
             int x = _opt.StartMap > 0 ? _opt.StartX : s.StartX;
@@ -152,7 +172,7 @@ namespace PokeCreator.Runtime
             State = new GameState();
             var d = SaveSystem.Load(Project, State);
             Player = new Player(this);
-            Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, State.PlayerCharacter), Project.Players.Count - 1)] : null;
+            Player.Look = Project.Players.Count > 0 && State.PlayerCharacter >= 0 ? Project.Players[Math.Min(State.PlayerCharacter, Project.Players.Count - 1)] : null;
             Player.CharacterName = Player.WalkCharset;
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
             Player.Surfing = d.Surfing;
@@ -246,6 +266,7 @@ namespace PokeCreator.Runtime
             _scenes.Clear();
             Interpreter.Setup(null, 0);
             Audio.StopBgm();
+            Pictures.Clear(); MessageWindow.DefaultPosition = 2; MessageWindow.FrameHidden = false;
             Map = null;
             PushScene(new TitleScene(this));
         }
@@ -514,6 +535,8 @@ namespace PokeCreator.Runtime
             }
             if (_signTimer > 0) _signTimer--;
             Weather.Update(DisplayX, DisplayY, Gfx.Width, Gfx.Height);
+            Pictures.Update();
+            UpdateShake();
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
@@ -591,10 +614,11 @@ namespace PokeCreator.Runtime
             if (Map != null && firstOpaque < 0)
             {
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
-                _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
+                _renderer.Draw(Map, DisplayX - (int)_shake, DisplayY, chars, FrameCount);
                 DrawTone();
                 DrawDarkness();
                 Weather.Draw(Gfx);
+                Pictures.Draw(Gfx, this);
                 DrawExclaim();
                 DrawLocationSign();
             }

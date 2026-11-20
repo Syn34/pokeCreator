@@ -304,6 +304,7 @@ namespace PokeCreator.Data
         [Field("Start Y", Group = "New game")] public int StartY { get; set; }
         [Field("Start direction", Help = "2 down, 4 left, 6 right, 8 up", Group = "New game")] public int StartDirection { get; set; }
         [Field("Default player", Help = "Index into Players", Group = "New game")] public int DefaultPlayer { get; set; }
+        [Field("Player is chosen in the intro", Help = "On: a new game starts with no player character (nothing is drawn) until an event calls Change Player Character / pbChangePlayer, as in Essentials' intro. Off: the Default player is used from the start.", Group = "New game")] public bool PlayerChosenInIntro { get; set; }
         [Field("Player name", Group = "New game")] public string DefaultPlayerName { get; set; }
         [Field("Starting money", Group = "New game")] public int StartMoney { get; set; }
         [Field("Running needs Running Shoes", Help = "On: the player can only run after an event sets $player.has_running_shoes = true (as in Essentials). Off: running works from the start.", Group = "New game")] public bool RunningShoesRequired { get; set; }

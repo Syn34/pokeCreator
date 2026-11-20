@@ -55,6 +55,10 @@ namespace PokeCreator.Runtime.UI
         const int Margin = 4, PadX = 22, PadY = 14;
 
         public bool Busy { get; private set; }
+        /// <summary>Window position set by Change Text Options (0 top, 1 middle, 2 bottom).</summary>
+        public static int DefaultPosition = 2;
+        /// <summary>Change Text Options "frame: transparent": text is drawn without the window.</summary>
+        public static bool FrameHidden;
         /// <summary>Characters revealed per frame (Options: Slow 1, Normal 2, Fast 4, Instant 999).</summary>
         public int CharsPerFrame = 2;
         /// <summary>Autotest: print every message to the console.</summary>
@@ -68,7 +72,7 @@ namespace PokeCreator.Runtime.UI
         {
             text = text ?? "";
             if (Echo) Console.WriteLine("[msg] " + Expand(text).Replace("\n", " / "));
-            _linesPerPage = 2; _framesPerChar = 0; _noKeyAtEnd = false; _autoClose = -1; _position = 2; _showGold = false; _speaker = null;
+            _linesPerPage = 2; _framesPerChar = 0; _noKeyAtEnd = false; _autoClose = -1; _position = DefaultPosition; _showGold = false; _speaker = null;
             _waitFrames = 0; _waitingKey = false; _charTimer = 0;
             var tokens = Parse(text);
             int width = _game.Gfx.Width - Margin * 2 - PadX * 2;
@@ -173,7 +177,7 @@ namespace PokeCreator.Runtime.UI
                             case "wu": _position = 0; break;
                             case "wm": _position = 1; break;
                             case "wd": _position = 2; break;
-                            case "l": { int n; if (arg != null && int.TryParse(arg, out n)) _linesPerPage = Math.Max(1, Math.Min(4, n)); break; }
+                            case "l": { int n; if (arg != null && int.TryParse(arg, out n)) _linesPerPage = Math.Max(1, Math.Min(6, n)); break; }
                             case "xn": case "dxn": _speaker = arg; break;
                             case "\\": list.Add(new Token { Kind = TokKind.Char, C = '\\', Base = b, Shadow = sh }); break;
                             // \i, \g, \op, \cl, \pm, \pg, \cn, \w[..], \fs[..], \fn[..], \ff[..]: accepted, no effect yet
@@ -241,7 +245,12 @@ namespace PokeCreator.Runtime.UI
                     continue;
                 }
                 if (t.Kind == TokKind.Char && t.C == '\n') { flushWord(); lines.Add(line); line = new Line { Align = align }; continue; }
-                if (t.Kind == TokKind.Char && t.C == ' ') { flushWord(); word.Add(t); continue; }
+                if (t.Kind == TokKind.Char && t.C == ' ')
+                {
+                    flushWord();
+                    if (!line.Tokens.Any(x => x.Kind == TokKind.Char)) continue; // no spaces at the start of a line
+                    word.Add(t); continue;
+                }
                 word.Add(t);
             }
             flushWord();
@@ -390,7 +399,7 @@ namespace PokeCreator.Runtime.UI
             int bh = BoxHeight(g);
             int bx = Margin, bw = g.Width - Margin * 2;
             int by = _position == 0 ? Margin : _position == 1 ? (g.Height - bh) / 2 : g.Height - bh - Margin;
-            DrawSpeechBox(g, bx, by, bw, bh);
+            if (!FrameHidden) DrawSpeechBox(g, bx, by, bw, bh);
             if (!string.IsNullOrEmpty(_speaker))
             {
                 string sp = Expand(_speaker);

@@ -566,4 +566,48 @@ namespace PokeCreator.Runtime.UI
             }
         }
     }
+
+    /// <summary>Input Number (RMXP command 103): digits changed with Up/Down, Left/Right to move between them.</summary>
+    public class NumberInputScene : Scene
+    {
+        readonly int[] _digits;
+        int _pos;
+        readonly Action<int> _done;
+
+        public NumberInputScene(Game g, int digits, int start, Action<int> done) : base(g)
+        {
+            _digits = new int[digits];
+            start = Math.Max(0, start);
+            for (int i = digits - 1; i >= 0; i--) { _digits[i] = start % 10; start /= 10; }
+            _done = done;
+        }
+
+        protected override void Update()
+        {
+            if (Input.Repeat(Button.Up)) { _digits[_pos] = (_digits[_pos] + 1) % 10; Cursor(); }
+            if (Input.Repeat(Button.Down)) { _digits[_pos] = (_digits[_pos] + 9) % 10; Cursor(); }
+            if (Input.Repeat(Button.Right) && _pos < _digits.Length - 1) { _pos++; Cursor(); }
+            if (Input.Repeat(Button.Left) && _pos > 0) { _pos--; Cursor(); }
+            if (Input.Trigger(Button.Action))
+            {
+                Decide();
+                int n = 0; foreach (var d in _digits) n = n * 10 + d;
+                Close();
+                if (_done != null) _done(n);
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            int cw = 28, w = _digits.Length * cw + 40, h = 60;
+            int x = g.Width - w - 4, y = g.Height - 96 - 4 - h - 2;
+            MessageWindow.DrawBox(g, x, y, w, h);
+            for (int i = 0; i < _digits.Length; i++)
+            {
+                int dx = x + 20 + i * cw;
+                if (i == _pos) g.FillRect(dx - 2, y + 14, cw - 4, 32, new Color(248, 232, 160));
+                Ui.Text(g, dx + 4, y + 16, _digits[i].ToString());
+            }
+        }
+    }
 }
