@@ -163,6 +163,17 @@ namespace PokeCreator.Runtime.World
         /// <summary>On the bicycle (from the Bag, or maps that are "Always on bicycle").</summary>
         public bool Cycling;
         bool _debugThrough;
+
+        /// <summary>F5: use the registered key item (or choose between several).</summary>
+        void UseRegisteredItem()
+        {
+            var reg = (Game.State.Extras.Registered ?? new List<string>()).Where(id => Game.State.ItemCount(id) > 0).ToList();
+            if (reg.Count == 0) { Game.Message.Show("An item in the Bag can be registered to this key for instant use."); return; }
+            if (reg.Count == 1) { PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[0], null); return; }
+            var names = reg.Select(id => { var it = Game.Project.Items.FirstOrDefault(i => i.Id == id); return it != null ? it.Name : id; }).ToList();
+            names.Add("Cancel");
+            Game.Message.Show("Use which item?", names, names.Count - 1, k => { if (k >= 0 && k < reg.Count) PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[k], null); });
+        }
         /// <summary>Underwater after Dive.</summary>
         public bool Diving;
         public string DiveCharset { get { return Look != null && !string.IsNullOrEmpty(Look.DiveCharset) ? Look.DiveCharset : SurfCharset; } }
@@ -240,6 +251,7 @@ namespace PokeCreator.Runtime.World
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Action)) CheckActionTrigger();
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Menu) && !Game.State.Flags.Contains("menu_disabled")) Game.PushScene(new PokeCreator.Runtime.UI.PauseMenu(Game));
             if (canControl && !Moving && !Jumping && Game.DebugMode && Input.KeyTrigger(Scancode.F9)) PokeCreator.Runtime.UI.DebugMenu.Open(Game);
+            if (canControl && !Moving && !Jumping && Input.KeyTrigger(Scancode.F5)) UseRegisteredItem();
             if (Game.DebugMode)
             {
                 bool ctrl = Input.KeyPress(Scancode.LCtrl) || Input.KeyPress(228);

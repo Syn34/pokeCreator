@@ -62,6 +62,8 @@ namespace PokeCreator.Runtime.World
         public int FluteMap { get; set; }
         /// <summary>Music chosen on the Pokégear jukebox (plays instead of map music until turned off).</summary>
         public string JukeboxBgm { get; set; }
+        /// <summary>Key items registered for the F5 key.</summary>
+        public List<string> Registered { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>

@@ -591,10 +591,31 @@ namespace PokeCreator.Runtime.UI
                 var it = items[_index].Key;
                 if (cmd == "Toss")
                 {
-                    Game.Message.Show("Throw away all " + (it.NamePlural ?? it.Name) + "?", new List<string> { "Yes", "No" }, 1, c =>
+                    int have = Game.State.ItemCount(it.Id);
+                    Action<int> toss = qty =>
                     {
-                        if (c == 0) { Game.State.Bag.Remove(it.Id); Game.Message.Show("Threw away the " + (it.NamePlural ?? it.Name) + "."); }
-                    });
+                        qty = Math.Max(0, Math.Min(have, qty)); if (qty == 0) return;
+                        Game.Message.Show("Throw away " + qty + " " + (qty > 1 ? (it.NamePlural ?? it.Name) : it.Name) + "?", new List<string> { "Yes", "No" }, 1, c =>
+                        {
+                            if (c == 0) { Game.State.AddItem(it.Id, -qty); ClampIndex(); Game.Message.Show("Threw away " + qty + " " + (qty > 1 ? (it.NamePlural ?? it.Name) : it.Name) + "."); }
+                        });
+                    };
+                    if (have <= 1) toss(1); else Game.AskNumber("Toss how many?", 1, have >= 100 ? 3 : 2, toss);
+                }
+                else if (cmd == "Register" || cmd == "Deregister")
+                {
+                    var reg = Game.State.Extras.Registered ?? (Game.State.Extras.Registered = new List<string>());
+                    if (cmd == "Register") { if (!reg.Contains(it.Id)) reg.Add(it.Id); Game.Message.Show(it.Name + " was registered. Press F5 to use it."); }
+                    else reg.Remove(it.Id);
+                }
+                else if (cmd == "Sort")
+                {
+                    // Sort this pocket by name (the Bag keeps its order)
+                    var mine = Items().Select(kv => kv.Key.Id).ToList();
+                    var others = Game.State.Bag.Where(kv => !mine.Contains(kv.Key)).ToList();
+                    var sorted = Items().OrderBy(kv => kv.Key.Name ?? kv.Key.Id).Select(kv => new KeyValuePair<string, int>(kv.Key.Id, kv.Value)).ToList();
+                    Game.State.Bag.Clear();
+                    foreach (var kv in others.Concat(sorted)) Game.State.Bag[kv.Key] = kv.Value;
                 }
                 else if (cmd == "Use") ItemFlow.UseFromBag(Game, it.Id, ClampIndex);
                 else if (cmd == "Give")
@@ -623,6 +644,9 @@ namespace PokeCreator.Runtime.UI
                 if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None || Array.IndexOf(FieldMoves.Rods, it.Id) >= 0 || Array.IndexOf(FieldMoves.DirectKeyItems, it.Id) >= 0) cmds.Add("Use");
                 if (it.Pocket != 8 && Game.State.Party.Any(pk => !pk.IsEgg)) cmds.Add("Give");
                 if (it.Pocket != 8) cmds.Add("Toss");
+                if (it.Pocket == 8 && (Array.IndexOf(FieldMoves.Rods, it.Id) >= 0 || Array.IndexOf(FieldMoves.DirectKeyItems, it.Id) >= 0 || ItemEffects.Info(Game.Project, it).Kind != ItemKind.None))
+                    cmds.Add(Game.State.Extras.Registered != null && Game.State.Extras.Registered.Contains(it.Id) ? "Deregister" : "Register");
+                if (items.Count > 1) cmds.Add("Sort");
                 cmds.Add("Cancel");
                 _popup = new CommandList(cmds);
             }
