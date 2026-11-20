@@ -287,7 +287,7 @@ namespace PokeCreator.Runtime.UI
             switch (_cmd)
             {
                 case 0:
-                    if (Me.Charging != null || Me.MustRecharge || !_b.HasUsableMove(Me)) { Commit(BattleCommand.Fight(-1)); return; }
+                    if (Me.Charging != null || Me.MustRecharge || Me.LockedMove != null || !_b.HasUsableMove(Me)) { Commit(BattleCommand.Fight(-1)); return; }
                     _mode = Mode.Fight; if (_move >= Me.Pk.Moves.Count) _move = 0; break;
                 case 1: OpenBag(); break;
                 case 2: OpenParty(); break;
@@ -307,6 +307,8 @@ namespace PokeCreator.Runtime.UI
             if (Input.Trigger(Button.Cancel)) { Cancel(); _mode = Mode.Command; return; }
             if (!Input.Trigger(Button.Action)) return;
             if (Me.Pk.Moves[_move].PP <= 0) { Buzz(); Game.Message.Show("There's no PP left for this move!"); return; }
+            var why = _b.CannotSelectReason(Me, _move);
+            if (why != null) { Buzz(); Game.Message.Show(why); return; }
             Decide();
             // Double battles: pick a target for single-target moves
             var md = Game.Project.Moves.FirstOrDefault(x => x.Id == Me.Pk.Moves[_move].Id);

@@ -31,7 +31,9 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Move effects read from Essentials function code names (stat changes, status, confusion, flinch, multi-hit, recoil, draining, healing, fixed damage, OHKO, two-turn, Protect, binding...)
 - [x] Status conditions and stat stages; Leftovers and healing berries
 - [x] Battle weather, ~90 common abilities, common held items
-- [ ] Remaining abilities and items, terrain, entry hazards (incremental)
+- [x] Screens (Reflect, Light Screen, Aurora Veil), Tailwind, Safeguard, Mist, Trick Room, Gravity, terrains, entry hazards (Stealth Rock, Spikes, Toxic Spikes, Sticky Web) with Rapid Spin / Defog
+- [x] Taunt, Encore, Disable, Substitute, Leech Seed, Curse, Perish Song, Destiny Bond, Attract, Wish, Baton Pass, U-turn / Volt Switch, Roar / Dragon Tail in trainer battles, Metronome, Sleep Talk, Outrage / Rollout locks, Counter, Future Sight, Knock Off, variable power and type (Low Kick, Gyro Ball, Hex, Hidden Power...)
+- [ ] Remaining abilities and items, about 85 rarer move effects (Pledges, Fling, Pursuit, type-changing moves...)
 - [ ] Battle animations for moves
 - [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
 
@@ -41,13 +43,16 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Waterfall, Dive, Flash with dark maps, ice
 - [ ] Berry planting and growth
 - [x] Pokémon Centers, Poké Marts, PC storage, Day Care and Eggs
-- [ ] Trainer line-of-sight (`Trainer(n)` events), rematches
+- [x] Trainer line-of-sight (`Trainer(n)` events)
+- [ ] Trainer rematches
 - [x] Fishing (Old/Good/Super Rod), Repel
 - [x] Bicycle, Escape Rope, Town Map
-- [ ] Running shoes toggle, Itemfinder
+- [x] Running shoes toggle
+- [ ] Itemfinder
 - [x] Overworld weather (map Weather property and Set Weather command)
 - [x] Essentials text codes: colours, pauses, speed, sounds, money window, positions, speaker names, alignment
-- [ ] Fog/panorama images, flash/darkness maps, windowskins and font codes
+- [x] Flash/darkness maps, windowskins and text codes
+- [ ] Fog/panorama images
 
 ## v0.5: Studio power features
 - [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves

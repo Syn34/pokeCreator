@@ -94,7 +94,7 @@ namespace PokeCreator.Battles
         }
 
         // ------------------------------------------------------------------ abilities
-        public string AbilityOf(Battler b) { return b == null || b.Pk == null ? "" : (b.Pk.AbilityId(P) ?? ""); }
+        public string AbilityOf(Battler b) { return b == null || b.Pk == null ? "" : (b.AbilityOverride ?? b.Pk.AbilityId(P) ?? ""); }
         bool HasAbility(Battler b, string id) { return b != null && !b.AbilitySuppressed && AbilityOf(b) == id; }
         string AbilityName(Battler b)
         {
@@ -113,6 +113,8 @@ namespace PokeCreator.Battles
         void SwitchInAbility(Battler b)
         {
             if (b == null || b.Pk.Fainted) return;
+            EntryHazards(b);
+            if (b.Pk.Fainted) return;
             var foe = Live(1 - b.Side).FirstOrDefault();
             switch (AbilityOf(b))
             {
@@ -170,6 +172,8 @@ namespace PokeCreator.Battles
             {
                 switch (EffWeather) { case Sun: return "FIRE"; case Rain: return "WATER"; case Sandstorm: return "ROCK"; case Hail: return "ICE"; }
             }
+            var special = SpecialType(user, md, code);
+            if (special != null) return special;
             if (HasAbility(user, "NORMALIZE")) return "NORMAL";
             return md.Type;
         }
