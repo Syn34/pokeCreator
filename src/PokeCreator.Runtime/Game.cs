@@ -501,8 +501,11 @@ namespace PokeCreator.Runtime
         /// <summary>A Battle Frontier battle; rule "palace" or "arena" changes how it's fought.</summary>
         public void StartFacilityBattle(PokeCreator.Data.TrainerTypeData tt, string name, List<PokeCreator.Pkmn.Pokemon> foes, bool dbl, string rule, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
-            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, dbl && rule != "arena")
+            int seed = Rng.Next(1, int.MaxValue);
+            var rec = new World.BattleRecord { Seed = seed, Double = dbl && rule != "arena", Rule = rule == "palace" || rule == "arena" ? rule : null, TrainerName = name, TrainerType = tt != null ? tt.Id : "", Backdrop = Backdrop(), PlayerName = State.PlayerName, Player = World.BattleRecorder.Copy(State.Party), Foes = World.BattleRecorder.Copy(foes) };
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, new Random(seed), dbl && rule != "arena")
             {
+                Recording = rec.Steps,
                 FacilityRule = rule == "palace" || rule == "arena" ? rule : null,
                 PlayerName = State.PlayerName, TrainerName = name,
                 TrainerTypeName = tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name : "Trainer", TrainerSkill = 100, NoExp = true,
@@ -510,7 +513,8 @@ namespace PokeCreator.Runtime
             var tr = new PokeCreator.Data.TrainerData { TrainerType = tt != null ? tt.Id : "", Name = name };
             var ttNoMoney = tt != null ? Json.Json.Deserialize<PokeCreator.Data.TrainerTypeData>(Json.Json.Write(tt)) : null;
             if (ttNoMoney != null) ttNoMoney.BaseMoney = 0;
-            StartBattle(b, new BattleSetup { Wild = false, Trainer = tr, TrainerType = ttNoMoney, Backdrop = Backdrop(), CanLose = true, OnEnd = onEnd, Facility = true });
+            StartBattle(b, new BattleSetup { Wild = false, Trainer = tr, TrainerType = ttNoMoney, Backdrop = rec.Backdrop, CanLose = true, OnEnd = o => { World.BattleRecorder.Last = rec; if (onEnd != null) onEnd(o); }, Facility = true });
+            rec.Weather = b.InitialWeather; rec.SwitchStyle = b.SwitchStyle; rec.MegaRing = b.PlayerHasMegaRing;
         }
 
         /// <summary>A wild battle against a Pokémon made by the caller (Poké Radar, shiny patches...).</summary>

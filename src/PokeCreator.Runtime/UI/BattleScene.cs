@@ -31,6 +31,8 @@ namespace PokeCreator.Runtime.UI
         public bool Facility;
         /// <summary>A link battle: no Bag, no running, no prize money; LinkUpdate runs every frame (network).</summary>
         public bool Link;
+        /// <summary>Plays back a recorded battle: the recorded decisions are made instead of asking the player.</summary>
+        public List<List<int>> Replay;
         public Action LinkUpdate;
         public string LinkOpponent;
     }
@@ -79,7 +81,7 @@ namespace PokeCreator.Runtime.UI
         public BattleScene(Game g, Battle battle, BattleSetup setup) : base(g)
         {
             Opaque = true; _b = battle; _setup = setup; _party = battle.Parties[0];
-            battle.PlayerHasMegaRing = Battle.MegaRings.Any(r => g.State.ItemCount(r) > 0);
+            if (setup.Replay == null) battle.PlayerHasMegaRing = Battle.MegaRings.Any(r => g.State.ItemCount(r) > 0);
             battle.BagHas = r => g.State.ItemCount(r) > 0;
             _trainerVisible = !setup.Wild;
             foreach (var e in battle.Start()) _queue.Enqueue(e);
@@ -136,9 +138,26 @@ namespace PokeCreator.Runtime.UI
             // All played: what next?
             if (ExternalWait) return;
             if (_b.Outcome != BattleOutcome.Ongoing) { EndBattle(); return; }
+            if (_setup.Replay != null) { ReplayNext(); return; }
             if (_b.NeedPlayerSwitch) { ChooseReplacement(); return; }
             if (_b.PendingFoeSendOut) { AskShift(); return; }
             StartCommands();
+        }
+
+        int _replayAt;
+        void ReplayNext()
+        {
+            if (_replayAt >= _setup.Replay.Count) { _b.SetOutcome(BattleOutcome.Loss); EndBattle(); return; }
+            var step = _setup.Replay[_replayAt++];
+            switch (step[0])
+            {
+                case 1: Run(_b.SwitchAfterFaint(step[1], step[2])); return;
+                case 2: Run(_b.FinishFoeSendOut(step[1])); return;
+                default:
+                    var cmds = new List<BattleCommand>();
+                    for (int k = 1; k + 6 <= step.Count; k += 6) cmds.Add(Battle.DecodeCommand(step.GetRange(k, 6)));
+                    Run(_b.DoTurn(cmds)); return;
+            }
         }
 
         void StartCommands()

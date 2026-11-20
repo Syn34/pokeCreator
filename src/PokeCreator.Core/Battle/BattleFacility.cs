@@ -13,6 +13,11 @@ namespace PokeCreator.Battles
     /// </summary>
     public partial class Battle
     {
+        /// <summary>When set, every player decision is added here (0 = turn + encoded commands, 1 = switch after faint, 2 = shift) so the battle can be played back.</summary>
+        public List<List<int>> Recording;
+        /// <summary>The weather when the battle began (before abilities), for playing it back.</summary>
+        public string InitialWeather;
+
         /// <summary>"palace", "arena" or null.</summary>
         public string FacilityRule;
 

@@ -139,6 +139,7 @@ namespace PokeCreator.Battles
         /// <summary>Completes a held-back send-out; switchTo = the player's new Pokémon (party index) or -1 to keep it.</summary>
         public List<BattleEvent> FinishFoeSendOut(int switchTo)
         {
+            if (Recording != null) Recording.Add(new List<int> { 2, switchTo });
             _ev = new List<BattleEvent>();
             if (_pendingFoe < 0) return _ev;
             if (switchTo >= 0 && Field[0][0] != null) SwitchPlayer(0, switchTo);
@@ -230,6 +231,7 @@ namespace PokeCreator.Battles
         /// <summary>Starts the battle: send-out messages. Call once.</summary>
         public List<BattleEvent> Start()
         {
+            InitialWeather = Weather;
             if (StartOverride != null) return StartOverride();
             _ev = new List<BattleEvent>();
             var foes = new List<Battler>();
@@ -312,6 +314,12 @@ namespace PokeCreator.Battles
         public List<BattleEvent> DoTurn(List<BattleCommand> commands)
         {
             if (TurnOverride != null) return TurnOverride(commands);
+            if (Recording != null)
+            {
+                var step = new List<int> { 0 };
+                foreach (var c in commands.Where(x => x != null)) step.AddRange(EncodeCommand(c));
+                Recording.Add(step);
+            }
             _ev = new List<BattleEvent>();
             Turn++;
             foreach (var b in OnField) { b.SwitchedIn = false; b.MovedLast = false; }
@@ -1616,6 +1624,7 @@ namespace PokeCreator.Battles
 
         public List<BattleEvent> SwitchAfterFaint(int slot, int party)
         {
+            if (Recording != null) Recording.Add(new List<int> { 1, slot, party });
             if (SwitchAfterFaintOverride != null) return SwitchAfterFaintOverride(slot, party);
             _ev = new List<BattleEvent>();
             PlayerSlotsToFill.Remove(slot);

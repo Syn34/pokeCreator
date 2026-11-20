@@ -414,10 +414,29 @@ namespace PokeCreator.Runtime.Script
                 if (ev != null && _game.Project.FindAsset("Graphics/Characters", gfx) != null) ev.CharacterName = gfx;
                 return true;
             });
-            Register("$game_temp.last_battle_record", (c, a) => null);
-            Register("$PokemonGlobal.lastbattle", (c, a) => null);
-            Register("pbRecordLastBattle", (c, a) => true);
-            Register("pbPlayLastBattle", (c, a) => { _game.Message.Show("There's no recorded battle."); return true; });
+            Register("$game_temp.last_battle_record", (c, a) => World.BattleRecorder.Last);
+            Register("$PokemonGlobal.lastbattle", (c, a) => _game.State.Extras.SavedBattle);
+            Register("pbRecordLastBattle", (c, a) => { if (World.BattleRecorder.Last != null) _game.State.Extras.SavedBattle = World.BattleRecorder.Last; return true; });
+            Register("pbPlayLastBattle", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                var rec = _game.State.Extras.SavedBattle;
+                if (rec == null) { _game.Message.Show("There's no recorded battle."); return false; }
+                _game.PromptPending = true;
+                World.BattleRecorder.Play(_game, rec, () => _game.SetPrompt(c, true));
+                return false;
+            });
+            Register("pbPlayBattle", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                var rec = (a.Count > 0 ? a[0] : null) as World.BattleRecord ?? World.BattleRecorder.Last;
+                if (rec == null) return false;
+                _game.PromptPending = true;
+                World.BattleRecorder.Play(_game, rec, () => _game.SetPrompt(c, true));
+                return false;
+            });
 
             // Triple Triad
             Register("pbCanTriadDuel?", (c, a) => UI.TriadCards.Count(_game) >= 5);

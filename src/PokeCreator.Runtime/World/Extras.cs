@@ -43,6 +43,8 @@ namespace PokeCreator.Runtime.World
         public DungeonState Dungeon { get; set; }
         public string DungeonArea { get; set; }
         public int DungeonVersion { get; set; }
+        /// <summary>The battle kept with pbRecordLastBattle (watched with pbPlayLastBattle).</summary>
+        public BattleRecord SavedBattle { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>

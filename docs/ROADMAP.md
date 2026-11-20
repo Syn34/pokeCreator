@@ -82,6 +82,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Play statistics ($stats): steps, battles, catches, hatches, evolutions, money spent, Pokémon Center visits, time to badges / Hall of Fame; Trainer Card back shows the play record
 - [x] Bug-Catching Contest judging calls (pbStartJudging, pbGetPlaceInfo, place, pbContestHeld?) and moved-event memory ($PokemonMap.addMovedEvent), $player.last_party
 - [x] Ruby control flow in event scripts: if/elsif/else/unless, case/when, while/until, for…in, .each/.each_with_index/.times/loop do blocks, one-line { |x| } blocks (map, select, count, any?, sum, sort_by…), begin/rescue, break/next/return, statement modifiers, ternaries, ranges, script globals, rename_choice / hide_choice
+- [x] Battle Palace (Pokémon choose moves by nature) and Battle Arena (no switching, judged after 3 turns) rules; Battle Factory rental choice and swaps
+- [x] Battle recording: Frontier battles are recorded (seed, teams, decisions); pbRecordLastBattle keeps one, pbPlayLastBattle plays it back
 - [x] Essentials Battle Frontier calls: pbBattleChallenge.set / start / pbEnd / pbCancel / pbAddWin / pbMatchOver? / setDecision / pbGoToStart / pbRest / pbGoOn / getMaxWins, tower/factory/palace/arena/cup rules, pbEntryScreen, pbHasEligible?, pbBattleChallengeBattle / Graphic / BeginSpeech, Factory rentals
 - [x] Mystery Gift (Database → Mystery Gifts: Pokémon or items, open to everyone or unlocked by a code on the title screen; pbReceiveMysteryGift / pbNextMysteryGiftID for the delivery person)
 - [x] Shadow Pokémon (trainer Pokémon with the Shadow flag, Shadow type and moves, Snag Machine catching from trainers, heart gauge opened by walking, battling and scents, EXP saved until purified at a Relic Stone)
