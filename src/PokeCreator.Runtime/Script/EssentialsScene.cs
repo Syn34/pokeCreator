@@ -317,6 +317,48 @@ namespace PokeCreator.Runtime.Script
                 return def;
             });
 
+            // Battle Point shop, Game Corner prizes, lottery
+            Register("pbBattlePointShop", (c, a) =>
+            {
+                var stock = Arg(a, 0) as List<object>;
+                _game.PushScene(new UI.MartScene(_game, stock == null ? new List<string>() : stock.Select(x => Convert.ToString(x)).ToList(), true) { BattlePoints = true });
+                return true;
+            });
+            Register("pbBuyPrize", (c, a) =>
+            {
+                string id = Str(a, 0); int qty = a.Count > 1 ? Math.Max(1, ToInt(a[1])) : 1;
+                if (_game.Project.Species.Any(s => s.Id == id)) return Call("pbAddPokemon", new List<object> { id, a.Count > 1 ? ToInt(a[1]) : 5 }, c);
+                if (!_game.Project.Items.Any(i => i.Id == id)) return false;
+                _game.State.AddItem(id, qty); return true;
+            });
+            Register("pbSetLotteryNumber", (c, a) =>
+            {
+                // The day's lucky number: the same all day
+                var now = DateTime.Now;
+                int n = new Random(now.Year * 1000 + now.DayOfYear + _game.State.TrainerId).Next(65536);
+                _game.State.SetVar(a.Count > 0 ? ToInt(a[0]) : 1, n);
+                return n;
+            });
+            Register("pbLottery", (c, a) =>
+            {
+                // pbLottery(number, nameVar, whereVar, matchedVar): the Pokémon whose ID No. matches the most last digits
+                string win = (ToInt(Arg(a, 0)) % 100000).ToString("00000");
+                int nameVar = a.Count > 1 ? ToInt(a[1]) : 2, whereVar = a.Count > 2 ? ToInt(a[2]) : 3, matchVar = a.Count > 3 ? ToInt(a[3]) : 4;
+                int best = 0; string bestName = ""; int where = 0;
+                Action<IEnumerable<PokeCreator.Pkmn.Pokemon>, int> check = (list, w) =>
+                {
+                    foreach (var pk in list.Where(p => p != null && !p.IsEgg))
+                    {
+                        string id = (pk.OTId % 100000).ToString("00000");
+                        int m = 0; while (m < 5 && id[4 - m] == win[4 - m]) m++;
+                        if (m > best) { best = m; bestName = pk.Name(_game.Project); where = w; }
+                    }
+                };
+                check(_game.State.Party, 1); check(_game.State.Storage, 2);
+                _game.State.SetStr(nameVar, bestName); _game.State.SetVar(whereVar, where); _game.State.SetVar(matchVar, best);
+                return best;
+            });
+
             Register("pbCanDoubleBattle?", (c, a) => _game.State.Party.Count(PokeCreator.Battles.Battle.Able) >= 2 || _game.State.Extras.Partner != null);
             Register("pbCanTripleBattle?", (c, a) => _game.State.Party.Count(PokeCreator.Battles.Battle.Able) >= 3);
 

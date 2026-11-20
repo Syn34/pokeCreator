@@ -22,6 +22,12 @@ namespace PokeCreator.Runtime.UI
         bool _selling;
         const int Rows = 7;
 
+        /// <summary>Battle Point shop (pbBattlePointShop): prices in BP, nothing to sell.</summary>
+        public bool BattlePoints;
+        int Funds { get { return BattlePoints ? Game.State.BattlePoints : Game.State.Money; } set { if (BattlePoints) Game.State.BattlePoints = value; else Game.State.Money = value; } }
+        int Cost(ItemData it) { return BattlePoints ? (it.BPPrice > 0 ? it.BPPrice : Math.Max(1, it.Price / 500)) : it.Price; }
+        string Fmt(int v) { return BattlePoints ? v + " BP" : "$" + v; }
+
         public MartScene(Game g, IEnumerable<string> stock, bool cantSell) : base(g)
         {
             _stock = stock.Where(id => g.Project.Items.Any(i => i.Id == id)).Distinct().ToList();
@@ -35,7 +41,7 @@ namespace PokeCreator.Runtime.UI
         void Welcome(string text)
         {
             _mode = Mode.Busy; Opaque = false;
-            var options = _cantSell ? new List<string> { "Buy", "Quit" } : new List<string> { "Buy", "Sell", "Quit" };
+            var options = _cantSell || BattlePoints ? new List<string> { "Buy", "Quit" } : new List<string> { "Buy", "Sell", "Quit" };
             Game.Message.Show(text, options, options.Count - 1, c =>
             {
                 string pick = options[c];
@@ -73,7 +79,7 @@ namespace PokeCreator.Runtime.UI
             if (Input.Trigger(Button.Cancel) || (Input.Trigger(Button.Action) && _index == _stock.Count)) { Cancel(); Welcome("Is there anything else I can do for you?"); return; }
             if (!Input.Trigger(Button.Action)) return;
             var it = Item(_stock[_index]);
-            if (Game.State.Money < it.Price) { Buzz(); _mode = Mode.Busy; Game.Message.Show("You don't have enough money.", null, -1, _ => _mode = Mode.Buy); return; }
+            if (Funds < Cost(it)) { Buzz(); _mode = Mode.Busy; Game.Message.Show(BattlePoints ? "You don't have enough BP." : "You don't have enough money.", null, -1, _ => _mode = Mode.Buy); return; }
             Decide();
             _item = it; _selling = false; _qty = 1;
             if (it.Pocket == 8 || it.FieldUse == "HM") { Confirm(); return; } // key items: just one
@@ -83,7 +89,7 @@ namespace PokeCreator.Runtime.UI
         int MaxQty()
         {
             if (_selling) return Math.Max(1, Have(_item.Id));
-            int byMoney = _item.Price > 0 ? Game.State.Money / _item.Price : 99;
+            int byMoney = Cost(_item) > 0 ? Funds / Cost(_item) : 99;
             return Math.Max(1, Math.Min(99, Math.Min(byMoney, 999 - Have(_item.Id))));
         }
 
@@ -117,14 +123,14 @@ namespace PokeCreator.Runtime.UI
                 });
                 return;
             }
-            int cost = _item.Price * _qty;
-            Game.Message.Show(name + ", and you want " + _qty + ". That will be $" + cost + ". OK?", new List<string> { "Yes", "No" }, 1, c =>
+            int cost = Cost(_item) * _qty;
+            Game.Message.Show(name + ", and you want " + _qty + ". That will be " + Fmt(cost) + ". OK?", new List<string> { "Yes", "No" }, 1, c =>
             {
                 if (c != 0) { _mode = Mode.Buy; return; }
-                if (Game.State.Money < cost) { Game.Message.Show("You don't have enough money.", null, -1, _ => _mode = Mode.Buy); return; }
-                Game.State.Money -= cost; Game.State.AddItem(_item.Id, _qty);
+                if (Funds < cost) { Game.Message.Show(BattlePoints ? "You don't have enough BP." : "You don't have enough money.", null, -1, _ => _mode = Mode.Buy); return; }
+                Funds -= cost; Game.State.AddItem(_item.Id, _qty);
                 Game.Audio.PlaySe("Mart buy item");
-                bool bonus = _item.Id == "POKEBALL" && _qty >= 10 && Item("PREMIERBALL") != null;
+                bool bonus = !BattlePoints && _item.Id == "POKEBALL" && _qty >= 10 && Item("PREMIERBALL") != null;
                 if (bonus) Game.State.AddItem("PREMIERBALL", 1);
                 Game.Message.Show("Here you are! Thank you!" + (bonus ? "\\nI'll throw in a Premier Ball, too." : ""), null, -1, _ => _mode = Mode.Buy);
             });
@@ -141,8 +147,8 @@ namespace PokeCreator.Runtime.UI
             }
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(120, 184, 248), new Color(56, 104, 192));
             Ui.Panel(g, 8, 8, 176, 60, new Color(248, 248, 248), new Color(40, 64, 120));
-            Ui.Text(g, 20, 10, "Money");
-            Ui.TextRight(g, 172, 36, "$" + Game.State.Money);
+            Ui.Text(g, 20, 10, BattlePoints ? "Battle Points" : "Money");
+            Ui.TextRight(g, 172, 36, Fmt(Funds));
             Ui.Panel(g, 8, 76, 176, 200, new Color(248, 248, 248), new Color(40, 64, 120));
             if (_index < _stock.Count)
             {
@@ -158,12 +164,12 @@ namespace PokeCreator.Runtime.UI
                 if (i == _stock.Count) { Ui.Text(g, 222, y, "Cancel"); continue; }
                 var it = Item(_stock[i]);
                 Ui.Text(g, 222, y, it.Name ?? it.Id);
-                Ui.TextRight(g, g.Width - 24, y, "$" + it.Price);
+                Ui.TextRight(g, g.Width - 24, y, Fmt(Cost(it)));
             }
             Ui.Box(g, 4, 284, g.Width - 8, 96);
             string desc = _index < _stock.Count ? Item(_stock[_index]).Description ?? "" : "Quit shopping.";
             DrawWrapped(g, desc, 22, 298, g.Width - 48);
-            if (_mode == Mode.Quantity) DrawQuantity(g, _item.Price);
+            if (_mode == Mode.Quantity) DrawQuantity(g, Cost(_item));
         }
 
         void DrawQuantity(Gfx g, int unit)
@@ -171,7 +177,7 @@ namespace PokeCreator.Runtime.UI
             int w = 230, h = 64, x = g.Width - w - 8, y = 284 - h - 6;
             Ui.Panel(g, x, y, w, h, new Color(248, 248, 248), new Color(40, 64, 120));
             Ui.Text(g, x + 16, y + 6, "×" + _qty.ToString("00"));
-            Ui.TextRight(g, x + w - 16, y + 6, "$" + unit * _qty);
+            Ui.TextRight(g, x + w - 16, y + 6, _selling ? "$" + unit * _qty : Fmt(unit * _qty));
             g.DrawText(x + 16, y + 34, "▲▼ 1   ◀▶ 10", new Color(120, 120, 136));
             if (_selling) { Ui.Box(g, 4, 284, g.Width - 8, 96); Ui.Text(g, 22, 298, "How many " + (_item.NamePlural ?? _item.Name) + " would you like to sell?"); }
         }
