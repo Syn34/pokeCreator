@@ -38,6 +38,7 @@ namespace PokeCreator.Runtime.World
         public int RepelSteps { get; set; }
         public List<int> HealPoint { get; set; }
         public Dictionary<string, int> PcItems { get; set; }
+        public bool Surfing { get; set; }
         public SaveData()
         {
             Version = 1; SwitchesOn = new List<int>(); Variables = new Dictionary<string, int>(); SelfSwitches = new List<string>();
@@ -99,6 +100,7 @@ namespace PokeCreator.Runtime.World
                 Party = s.Party, Storage = s.Storage,
                 Flags = s.Flags.OrderBy(x => x).ToList(), Seen = s.Seen.OrderBy(x => x).ToList(), Caught = s.Caught.OrderBy(x => x).ToList(),
                 RepelSteps = s.RepelSteps,
+                Surfing = g.Player != null && g.Player.Surfing,
                 PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,
                 HealPoint = s.HealMap > 0 ? new List<int> { s.HealMap, s.HealX, s.HealY, s.HealDir } : null
             };

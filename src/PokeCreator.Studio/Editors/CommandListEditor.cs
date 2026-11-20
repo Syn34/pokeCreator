@@ -227,6 +227,15 @@ namespace PokeCreator.Studio.Editors
             cmd(battle, "Trainer Battle", AddTrainerBattle);
             cmd(battle, "Wild Battle", AddWildBattle);
 
+            var field = group("Field Moves");
+            cmd(field, "Cut Tree (asks to use Cut)", () => Insert(new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0)));
+            cmd(field, "Rock Smash Rock (asks to use Rock Smash)", () => Insert(new EventCommand(111, 0, 12, "pbRockSmash"), new EventCommand(355, 1, "pbSmashThisEvent"),
+                new EventCommand(355, 1, "pbRockSmashRandomEncounter"), new EventCommand(0, 1), new EventCommand(412, 0)));
+            cmd(field, "Headbutt Tree", () => Insert(new EventCommand(355, 0, "pbHeadbutt")));
+            cmd(field, "Push This Boulder (Strength)", () => Insert(new EventCommand(355, 0, "pbPushThisBoulder")));
+            cmd(field, "Pick Berry", AddPickBerry);
+            cmd(field, "Remove This Event (until the map is re-entered)", () => Insert(new EventCommand(355, 0, "pbSmashThisEvent")));
+
             var map = group("Map && Movement");
             cmd(map, "Transfer Player (Warp)", AddTransfer);
             cmd(map, "Set Event Location", AddEventLocation);
@@ -409,6 +418,15 @@ namespace PokeCreator.Studio.Editors
             int k = ChoiceDialog.Ask(FindForm(), "Wild battle against", ids, true); if (k < 0) return;
             int lv = NumberDialog.Ask(FindForm(), "Level", 5); if (lv < 1) return;
             Insert(new EventCommand(355, 0, "WildBattle.start(:" + ids[k] + ", " + Math.Min(100, lv) + ")"));
+        }
+
+        void AddPickBerry()
+        {
+            var ids = _p.Items.Where(it => it.Pocket == 5).Select(it => it.Id).ToArray();
+            if (ids.Length == 0) ids = _p.Items.Select(it => it.Id).ToArray();
+            int k = ChoiceDialog.Ask(FindForm(), "Which berry grows here?", ids, true); if (k < 0) return;
+            int n = NumberDialog.Ask(FindForm(), "How many berries?", 2); if (n < 1) return;
+            Insert(new EventCommand(355, 0, "pbPickBerry(:" + ids[k] + ", " + n + ")"));
         }
 
         void AddGiveItem()

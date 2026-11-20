@@ -819,6 +819,13 @@ namespace PokeCreator.Studio.Editors
                 menu.Items.Add("New Trainer (battles when they see you)…", null, (s, a) => QuickTrainer(cell));
                 menu.Items.Add("New Nurse (heals the party)…", null, (s, a) => QuickNurse(cell));
                 menu.Items.Add("New Poké Mart Clerk…", null, (s, a) => QuickMart(cell));
+                var fieldMenu = new ToolStripMenuItem("New Field Object");
+                fieldMenu.DropDownItems.Add("Cut Tree", null, (s, a) => QuickFieldObject(cell, "CutTree"));
+                fieldMenu.DropDownItems.Add("Rock Smash Rock", null, (s, a) => QuickFieldObject(cell, "SmashRock"));
+                fieldMenu.DropDownItems.Add("Strength Boulder", null, (s, a) => QuickFieldObject(cell, "StrengthBoulder"));
+                fieldMenu.DropDownItems.Add("Headbutt Tree", null, (s, a) => QuickFieldObject(cell, "HeadbuttTree"));
+                fieldMenu.DropDownItems.Add("Berry Plant…", null, (s, a) => QuickFieldObject(cell, "BerryPlant"));
+                menu.Items.Add(fieldMenu);
                 if (_clipboard != null) menu.Items.Add("Paste Event", null, (s, a) => PasteEvent(cell));
             }
             else
@@ -1095,6 +1102,58 @@ namespace PokeCreator.Studio.Editors
         /// A character sprite for a template event: the preferred one if the project has it, else any character
         /// sprite, so the event is visible and can be talked to from the front.
         /// </summary>
+        /// <summary>Cut trees, smashable rocks, Strength boulders, Headbutt trees and berry plants, set up as in Essentials.</summary>
+        void QuickFieldObject(Point cell, string kind)
+        {
+            string berry = null; int count = 2;
+            if (kind == "BerryPlant")
+            {
+                var ids = _p.Items.Where(it => it.Pocket == 5).Select(it => it.Id).ToArray();
+                if (ids.Length == 0) ids = _p.Items.Select(it => it.Id).ToArray();
+                int k = ChoiceDialog.Ask(FindForm(), "Which berry grows here?", ids, true); if (k < 0) return;
+                berry = ids[k];
+                count = NumberDialog.Ask(FindForm(), "How many berries?", 2); if (count < 1) return;
+            }
+            var ev = NewEvent(cell); ev.Name = kind;
+            var pg = ev.Pages[0];
+            pg.Trigger = Triggers.Action;
+            switch (kind)
+            {
+                case "CutTree":
+                    pg.Graphic.CharacterName = FieldSprite("Object tree 1");
+                    pg.List = new List<EventCommand> { new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0), new EventCommand(0, 0) };
+                    break;
+                case "SmashRock":
+                    pg.Graphic.CharacterName = FieldSprite("Object rock");
+                    pg.List = new List<EventCommand> { new EventCommand(111, 0, 12, "pbRockSmash"), new EventCommand(355, 1, "pbSmashThisEvent"),
+                        new EventCommand(355, 1, "pbRockSmashRandomEncounter"), new EventCommand(0, 1), new EventCommand(412, 0), new EventCommand(0, 0) };
+                    break;
+                case "StrengthBoulder":
+                    pg.Graphic.CharacterName = FieldSprite("Object boulder");
+                    pg.Trigger = Triggers.PlayerTouch; // pushed by walking into it; pressing A offers Strength
+                    pg.List = new List<EventCommand> { new EventCommand(355, 0, "pbPushThisBoulder"), new EventCommand(0, 0) };
+                    break;
+                case "HeadbuttTree":
+                    pg.Graphic.CharacterName = FieldSprite("Object tree 2");
+                    pg.List = new List<EventCommand> { new EventCommand(355, 0, "pbHeadbutt"), new EventCommand(0, 0) };
+                    break;
+                case "BerryPlant":
+                    pg.Graphic.CharacterName = FieldSprite("berrytree_" + berry);
+                    pg.Graphic.Direction = 8; pg.DirectionFix = true; pg.StepAnime = true; pg.WalkAnime = false;
+                    pg.List = new List<EventCommand> { new EventCommand(355, 0, "pbPickBerry(:" + berry + ", " + count + ")"), new EventCommand(0, 0) };
+                    var soil = new EventPage();
+                    soil.Condition.SelfSwitchValid = true; soil.Condition.SelfSwitchCh = "A";
+                    soil.Trigger = Triggers.Action;
+                    soil.List = new List<EventCommand> { new EventCommand(355, 0, "pbBerryPlant"), new EventCommand(0, 0) };
+                    ev.Pages.Add(soil);
+                    break;
+            }
+            _ed.EditEvent(ev);
+        }
+
+        /// <summary>The Essentials object graphic if the project has it; otherwise left for the user to pick.</summary>
+        string FieldSprite(string name) { return _p.FindAsset("Graphics/Characters", name) != null ? name : TemplateSprite(name); }
+
         string TemplateSprite(string preferred)
         {
             if (_p.FindAsset("Graphics/Characters", preferred) != null) return preferred;

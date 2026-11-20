@@ -94,6 +94,14 @@ namespace PokeCreator.Studio.Editors
                         if (wb.Success) return "◆ Wild Battle: " + wb.Groups[1].Value + " Lv. " + wb.Groups[2].Value;
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
                         if (gm.Success) return "◆ Give Item: " + gm.Groups[1].Value + (gm.Groups[2].Success ? " ×" + gm.Groups[2].Value : "");
+                        if (sc == "pbSmashThisEvent") return "◆ Remove This Event (until the map is re-entered)";
+                        if (sc == "pbRockSmashRandomEncounter") return "◆ Maybe a Wild Pokémon (Rock Smash encounters)";
+                        if (sc == "pbHeadbutt") return "◆ Headbutt Tree (Headbutt encounters)";
+                        if (sc == "pbPushThisBoulder") return "◆ Push This Boulder (after Strength)";
+                        if (sc == "pbStrength") return "◆ Offer Strength";
+                        if (sc == "pbBerryPlant") return "◆ Berry Soil";
+                        gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbPickBerry\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
+                        if (gm.Success) return "◆ Pick Berry: " + gm.Groups[1].Value + " ×" + (gm.Groups[2].Success ? gm.Groups[2].Value : "1");
                         return "◆ Script: " + sc;
                     }
                 case 655: return "    " + c.StrParam(0);
@@ -127,6 +135,9 @@ namespace PokeCreator.Studio.Editors
                         string sc = c.StrParam(1).Trim();
                         var tb = System.Text.RegularExpressions.Regex.Match(sc, @"^(?:TrainerBattle\.start|pbTrainerBattle)\(\s*:(\w+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+))?");
                         if (tb.Success) return "won Trainer Battle against " + tb.Groups[1].Value + " " + tb.Groups[2].Value + (tb.Groups[3].Success && tb.Groups[3].Value != "0" ? " (version " + tb.Groups[3].Value + ")" : "");
+                        if (sc == "pbCut") return "the player uses Cut";
+                        if (sc == "pbRockSmash") return "the player uses Rock Smash";
+                        if (sc.StartsWith("pbItemBall(")) return "the player picks up " + sc.Substring(11).Trim(')', ' ', ':');
                         return "Script: " + sc;
                     }
             }

@@ -151,8 +151,9 @@ namespace PokeCreator.Runtime.Script
 
                 case 111:
                     {
-                        _game.BattleJustStarted = false;
+                        _game.BattleJustStarted = false; _game.PromptPending = false;
                         bool result = Condition(c);
+                        if (_game.PromptPending) { _game.PromptPending = false; return false; } // asked Yes/No: check again after the answer
                         if (_game.BattleJustStarted)
                         {
                             // The condition started a battle: wait, then check again (the battle call then returns its result)

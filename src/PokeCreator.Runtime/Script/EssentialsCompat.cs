@@ -258,6 +258,18 @@ namespace PokeCreator.Runtime.Script
                 return true;
             });
             Register("pbTrainerEnd", (c, a) => { _game.RestoreMapBgm(); return true; });
+            // Field moves and overworld objects
+            Register("pbCut", (c, a) => FieldMoves.Cut(_game, c));
+            Register("pbRockSmash", (c, a) => FieldMoves.RockSmash(_game, c));
+            Register("pbSmashThisEvent", (c, a) => { FieldMoves.SmashThisEvent(_game, c); return true; });
+            Register("pbRockSmashRandomEncounter", (c, a) => { FieldMoves.RockSmashEncounter(_game); return true; });
+            Register("pbHeadbutt", (c, a) => { FieldMoves.Headbutt(_game); return true; });
+            Register("pbStrength", (c, a) => { FieldMoves.Strength(_game, null); return true; });
+            Register("pbPushThisBoulder", (c, a) => { FieldMoves.PushThisBoulder(_game, c); return true; });
+            Register("pbSurf", (c, a) => { FieldMoves.OfferSurf(_game); return true; });
+            Register("pbPickBerry", (c, a) => { FieldMoves.PickBerry(_game, c, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1); return true; });
+            Register("pbBerryPlant", (c, a) => { FieldMoves.BerryPlant(_game, c); return true; });
+            Register("pbCanUseHiddenMove?", (c, a) => true);
             Register("pbNoticePlayer", (c, a) =>
             {
                 if (c == null) return true;

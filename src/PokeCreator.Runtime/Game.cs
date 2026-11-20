@@ -152,6 +152,7 @@ namespace PokeCreator.Runtime
             Player.Look = Project.Players.Count > 0 ? Project.Players[Math.Min(Math.Max(0, State.PlayerCharacter), Project.Players.Count - 1)] : null;
             Player.CharacterName = Player.WalkCharset;
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
+            Player.Surfing = d.Surfing;
             if (!string.IsNullOrEmpty(d.Bgm) && string.IsNullOrEmpty(Audio.CurrentBgm)) Audio.PlayBgm(d.Bgm);
         }
 
@@ -206,6 +207,7 @@ namespace PokeCreator.Runtime
         // ------------------------------------------------------------------ maps
         public void SetupMap(int id, int x, int y, int dir)
         {
+            StrengthActive = false; // Strength lasts until the player leaves the map
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
             Map = new GameMap(Project, data, this, true);
@@ -271,6 +273,22 @@ namespace PokeCreator.Runtime
         public PokeCreator.Battles.BattleOutcome? ResumeOutcome;
         /// <summary>Set when a battle starts during an event command, so the event waits for it.</summary>
         public bool BattleJustStarted;
+        /// <summary>A Yes/No field-move question is open for an event's Conditional Branch (see FieldMoves.Ask).</summary>
+        public bool PromptPending;
+        object _promptResult, _promptOwner;
+        public void SetPrompt(object owner, object result) { _promptOwner = owner; _promptResult = result; }
+        public bool TakePrompt(object owner, out object result)
+        {
+            result = null;
+            if (_promptResult == null || owner == null || _promptOwner != owner) return false;
+            result = _promptResult; _promptResult = null; _promptOwner = null;
+            return true;
+        }
+        /// <summary>Strength has been used on this map: boulders can be pushed.</summary>
+        public bool StrengthActive;
+
+        /// <summary>Closes every open screen (e.g. to fish after choosing a rod in the Bag).</summary>
+        public void CloseAllScenes() { foreach (var sc in _scenes.ToList()) sc.Close(); }
         /// <summary>The event waiting for ResumeOutcome (only it may take the result).</summary>
         public object ResumeOwner;
         public PokeCreator.Battles.BattleOutcome LastOutcome;
@@ -628,6 +646,7 @@ namespace PokeCreator.Runtime
                         ItemFlow.UseOn(_g, pk, it, PokeCreator.Pkmn.ItemEffects.Info(_g.Project, it), used => Console.WriteLine("[autotest] used=" + used));
                         break;
                     }
+                case "fish": World.FieldMoves.Fish(_g, p[1]); break;
                 case "party":
                     foreach (var pk in _g.State.Party)
                         Console.WriteLine("[autotest] " + pk.Name(_g.Project) + " (" + pk.Species + ") Lv" + pk.Level + " HP " + pk.HP + "/" + pk.TotalHP(_g.Project) + " item=" + (pk.Item ?? "-") + " moves=" + string.Join(",", pk.Moves.Select(m => m.Id + ":" + m.PP)));

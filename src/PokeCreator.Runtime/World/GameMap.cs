@@ -159,6 +159,27 @@ namespace PokeCreator.Runtime.World
             return true;
         }
 
+        /// <summary>
+        /// Passability for a surfing player (as Essentials' playerPassable?): surfable water tiles count as open
+        /// whatever their passage flags; anything above the water still blocks.
+        /// </summary>
+        public bool SurfPassable(int x, int y, int d)
+        {
+            if (!Valid(x, y)) return false;
+            int bit = (1 << (d / 2 - 1)) & 0x0f;
+            for (int z = 2; z >= 0; z--)
+            {
+                int id = Tile(x, y, z);
+                if (id <= 0) continue;
+                int tag = Tileset.TerrainTag(id);
+                if (Array.IndexOf(WaterTags, tag) >= 0 && tag != 8) return true; // not up a waterfall
+                int pass = Tileset.Passage(id);
+                if ((pass & bit) != 0 || (pass & 0x0f) == 0x0f) return false;
+                if (Tileset.Priority(id) == 0) return true;
+            }
+            return true;
+        }
+
         public IEnumerable<GameEvent> EventsAt(int x, int y)
         {
             foreach (var e in Events) if (!e.Erased && e.X == x && e.Y == y) yield return e;

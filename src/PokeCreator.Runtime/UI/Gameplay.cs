@@ -62,6 +62,13 @@ namespace PokeCreator.Runtime.UI
         public static void UseFromBag(Game g, string itemId, Action refresh)
         {
             var item = Item(g, itemId);
+            if (Array.IndexOf(FieldMoves.Rods, itemId) >= 0)
+            {
+                // Rods: close the menus and fish
+                g.CloseAllScenes();
+                FieldMoves.Fish(g, itemId);
+                return;
+            }
             var info = ItemEffects.Info(g.Project, item);
             if (info.Kind == ItemKind.None) { Say(g, "Can't use that here.", refresh); return; }
             if (info.Kind == ItemKind.Repel)

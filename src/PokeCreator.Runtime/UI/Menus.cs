@@ -476,7 +476,7 @@ namespace PokeCreator.Runtime.UI
                     Close(); _choose(it.Id); return;
                 }
                 var cmds = new List<string>();
-                if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None) cmds.Add("Use");
+                if (ItemEffects.Info(Game.Project, it).Kind != ItemKind.None || Array.IndexOf(FieldMoves.Rods, it.Id) >= 0) cmds.Add("Use");
                 if (it.Pocket != 8 && Game.State.Party.Any(pk => !pk.IsEgg)) cmds.Add("Give");
                 if (it.Pocket != 8) cmds.Add("Toss");
                 cmds.Add("Cancel");

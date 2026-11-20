@@ -146,6 +146,19 @@ namespace PokeCreator.Runtime.World
 
         public string WalkCharset { get { return Look != null && !string.IsNullOrEmpty(Look.WalkCharset) ? Look.WalkCharset : "trainer_POKEMONTRAINER_Red"; } }
         public string RunCharset { get { return Look != null && !string.IsNullOrEmpty(Look.RunCharset) ? Look.RunCharset : WalkCharset; } }
+        public string SurfCharset { get { return Look != null && !string.IsNullOrEmpty(Look.SurfCharset) ? Look.SurfCharset : WalkCharset; } }
+
+        /// <summary>On the water (Surf). Moving onto land ends it.</summary>
+        public bool Surfing;
+
+        public void StartSurfing()
+        {
+            int fx = X + Dx(Direction), fy = Y + Dy(Direction);
+            Surfing = true;
+            string bgm = Game.Project.Settings.SurfBGM;
+            if (!string.IsNullOrEmpty(bgm)) Game.Audio.PlayBgm(bgm);
+            Jump(Dx(Direction), Dy(Direction));
+        }
 
         public override void Update()
         {
@@ -158,7 +171,8 @@ namespace PokeCreator.Runtime.World
                 if (d != 0) Move(d);
             }
             bool running = MoveSpeed >= 5 && (Moving || Input.Dir4 != 0);
-            CharacterName = running && Game.Project.FindAsset("Graphics/Characters", RunCharset) != null ? RunCharset : WalkCharset;
+            if (Surfing) { MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", SurfCharset) != null ? SurfCharset : WalkCharset; }
+            else CharacterName = running && Game.Project.FindAsset("Graphics/Characters", RunCharset) != null ? RunCharset : WalkCharset;
 
             base.Update();
 
@@ -200,8 +214,19 @@ namespace PokeCreator.Runtime.World
                 }
             }
 
-            bool ok = map.TilePassable(X, Y, d, null) && target.TilePassable(lx, ly, 10 - d, null);
-            if (ok && Array.IndexOf(GameMap.WaterTags, target.TerrainTag(lx, ly)) >= 0) ok = false; // needs Surf
+            bool water = Array.IndexOf(GameMap.WaterTags, target.TerrainTag(lx, ly)) >= 0;
+            bool ok;
+            if (Surfing && water) ok = map.SurfPassable(X, Y, d) && target.SurfPassable(lx, ly, 10 - d);
+            else ok = (Surfing ? map.SurfPassable(X, Y, d) : map.TilePassable(X, Y, d, null)) && target.TilePassable(lx, ly, 10 - d, null);
+            if (ok && water && !Surfing) ok = false; // needs Surf
+            if (ok && Surfing && !water && target == map && !map.EventsAt(nx, ny).Any(e => !e.Through && e.CharacterName.Length > 0))
+            {
+                // Hop back onto land
+                Surfing = false;
+                Game.RestoreMapBgm();
+                Jump(Dx(d), Dy(d));
+                return true;
+            }
             if (ok && target == map)
             {
                 foreach (var e in map.EventsAt(nx, ny))
@@ -252,12 +277,18 @@ namespace PokeCreator.Runtime.World
             int fx = X + Dx(Direction), fy = Y + Dy(Direction);
             foreach (var e in map.EventsAt(fx, fy))
                 if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
+            foreach (var e in map.EventsAt(fx, fy))
+                if (FieldMoves.IsBoulder(e) && e.CharacterName.Length > 0) { FieldMoves.Strength(Game, null); return; }
             if (map.IsCounter(fx, fy))
             {
                 fx += Dx(Direction); fy += Dy(Direction);
                 foreach (var e in map.EventsAt(fx, fy))
                     if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
+                return;
             }
+            // Facing water: offer Surf
+            if (!Surfing && FieldMoves.IsWater(Game, fx, fy) && map.SurfPassable(fx, fy, 10 - Direction)
+                && !map.EventsAt(fx, fy).Any(e => !e.Through && e.CharacterName.Length > 0)) FieldMoves.OfferSurf(Game);
         }
     }
 
@@ -281,7 +312,8 @@ namespace PokeCreator.Runtime.World
             var map = _game.Map;
             int tag = map.TerrainTag(x, y);
             string method;
-            if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) method = "Land";
+            if (_game.Player.Surfing && Array.IndexOf(GameMap.WaterTags, tag) >= 0) method = "Water";
+            else if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) method = "Land";
             else if (map.Tileset != null && _game.Project.Encounters.Any(en => en.Map == map.Id && en.Methods.Any(mt => mt.Type.StartsWith("Cave")))) method = "Cave";
             else return;
             var table = _game.Project.Encounters.FirstOrDefault(en => en.Map == map.Id && en.Version == 0);
