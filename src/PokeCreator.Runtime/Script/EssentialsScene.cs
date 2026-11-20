@@ -123,6 +123,11 @@ namespace PokeCreator.Runtime.Script
                 return route;
             });
 
+            // Partner trainer
+            Register("pbRegisterPartner", (c, a) => _game.RegisterPartner(Str(a, 0), Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0));
+            Register("pbDeregisterPartner", (c, a) => { _game.State.Extras.Partner = null; return true; });
+            Register("$PokemonGlobal.partner", (c, a) => _game.State.Extras.Partner != null);
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

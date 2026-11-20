@@ -46,6 +46,8 @@ namespace PokeCreator.Runtime.World
         public readonly HashSet<int> Badges = new HashSet<int>();
         /// <summary>Teams entered into the Hall of Fame, newest last.</summary>
         public List<HallOfFameEntry> HallOfFame = new List<HallOfFameEntry>();
+        /// <summary>Partner, roamers, Safari Zone, Bug-Catching Contest, Mystery Gift and other optional systems.</summary>
+        public GameExtras Extras = new GameExtras();
         /// <summary>Pokémon left at the Day Care, its egg counter and whether an Egg is waiting.</summary>
         public List<DayCareSlot> DayCare = new List<DayCareSlot>();
         public int DayCareEggSteps;

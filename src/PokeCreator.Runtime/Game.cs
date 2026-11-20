@@ -545,6 +545,15 @@ namespace PokeCreator.Runtime
         void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
         {
             var end = setup.OnEnd;
+            // A registered partner fights alongside the player (the battle becomes a double battle)
+            var partner = State.Extras.Partner;
+            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple)
+            {
+                var ptt = Project.TrainerTypes.FirstOrDefault(t => t.Id == partner.TrainerType);
+                b.AddPartner(partner.Party, partner.Name, ptt != null && !string.IsNullOrEmpty(ptt.Name) ? ptt.Name : partner.TrainerType, ptt != null ? Math.Max(32, ptt.SkillLevel) : 32);
+                var endWithPartner = end;
+                end = o => { foreach (var pk in partner.Party) pk.Heal(Project); if (endWithPartner != null) endWithPartner(o); };
+            }
             // Rain, snow, sandstorm and sun on the map carry into the battle (as Essentials)
             b.SwitchStyle = Options == null || !Options.BattleStyleSet;
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
@@ -554,6 +563,18 @@ namespace PokeCreator.Runtime
             Audio.PlaySe("Encounter");
             Flash(20);
             PushScene(new BattleScene(this, b, setup));
+        }
+
+        /// <summary>pbRegisterPartner: a trainer from trainers.json joins the player's battles.</summary>
+        public bool RegisterPartner(string type, string name, int version)
+        {
+            var tr = Project.Trainers.FirstOrDefault(t => t.TrainerType == type && t.Name == name && t.Version == version)
+                  ?? Project.Trainers.FirstOrDefault(t => t.TrainerType == type && t.Name == name);
+            if (tr == null) { Console.WriteLine("Partner trainer not found: " + type + " " + name); return false; }
+            var info = new World.PartnerInfo { TrainerType = type, Name = name, Version = version };
+            info.Party.AddRange(tr.Pokemon.Select(tp => PokeCreator.Pkmn.Pokemon.FromTrainer(Project, tp, Rng)));
+            State.Extras.Partner = info;
+            return true;
         }
 
         /// <summary>Battle backdrop: the map's metadata, else by time of day.</summary>

@@ -325,7 +325,7 @@ namespace PokeCreator.Runtime.Script
             Handler noop = (c, a) => true;
             foreach (var n in new[] { "pbCallBub", "pbFadeOutIn",
                                       "pbUpdateSceneMap", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
-                                      "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
+                                      "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw",
                                       "pbUnlockWallpaper" })
                 Register(n, noop);
             RegisterSceneCalls();

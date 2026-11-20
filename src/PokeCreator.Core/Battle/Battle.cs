@@ -210,7 +210,7 @@ namespace PokeCreator.Battles
         }
 
         /// <summary>The next able party members not already on the field.</summary>
-        List<int> Bench(int side) { return Enumerable.Range(0, Parties[side].Count).Where(i => Able(Parties[side][i]) && !OnFieldParty(side, i)).ToList(); }
+        List<int> Bench(int side) { return Enumerable.Range(0, Parties[side].Count).Where(i => Able(Parties[side][i]) && !OnFieldParty(side, i) && !(side == 0 && IsPartnerIndex(i))).ToList(); }
         /// <summary>The bench for one foe slot: with two trainers, slot 0 is the first trainer's and slot 1 the second's.</summary>
         List<int> FoeBench(int slot) { var b = Bench(1); return TwoTrainers ? b.Where(i => i < FoeOwner.Length && FoeOwner[i] == slot).ToList() : b; }
 
@@ -256,9 +256,13 @@ namespace PokeCreator.Battles
                 foreach (var b in foes) SendOutEvent(b);
             }
             var mine = new List<Battler>();
-            var myBench = Bench(0);
-            for (int i = 0; i < SlotsPerSide && i < myBench.Count; i++) mine.Add(Place(0, i, myBench[i]));
-            Say("Go! " + Names(mine) + "!");
+            if (HasPartner) mine = PlacePlayerSideWithPartner();
+            else
+            {
+                var myBench = Bench(0);
+                for (int i = 0; i < SlotsPerSide && i < myBench.Count; i++) mine.Add(Place(0, i, myBench[i]));
+                Say("Go! " + Names(mine) + "!");
+            }
             foreach (var b in mine) SendOutEvent(b);
             MarkParticipant();
             if (Weather != NoWeather) Say(WeatherFieldText(Weather));
@@ -296,6 +300,11 @@ namespace PokeCreator.Battles
             var orders = new List<KeyValuePair<Battler, BattleCommand>>();
             foreach (var me in Live(0))
             {
+                if (IsPartner(me))
+                {
+                    orders.Add(new KeyValuePair<Battler, BattleCommand>(me, me.Charging != null || me.MustRecharge ? BattleCommand.Fight(me.ChargingSlot) : ChooseAI(me)));
+                    continue;
+                }
                 var cmd = commands.FirstOrDefault(c => c != null && c.Slot == me.Slot) ?? BattleCommand.Fight(-1);
                 // A charging or recharging Pokémon has its command decided for it
                 if (me.Charging != null || me.MustRecharge) cmd = new BattleCommand { Kind = BattleCommandKind.Fight, Index = me.ChargingSlot, Slot = me.Slot, TargetSide = cmd.TargetSide, TargetSlot = cmd.TargetSlot };
@@ -503,7 +512,8 @@ namespace PokeCreator.Battles
             var usable = Enumerable.Range(0, me.Pk.Moves.Count).Where(i => me.Pk.Moves[i].PP > 0 && CanSelect(me, i)).ToList();
             if (usable.Count == 0) usable = Enumerable.Range(0, me.Pk.Moves.Count).Where(i => me.Pk.Moves[i].PP > 0).ToList();
             if (usable.Count == 0) return BattleCommand.Fight(-1);
-            if (IsWild || TrainerSkill <= 0) return BattleCommand.Fight(usable[Rng.Next(usable.Count)]);
+            int skill = IsPartner(me) ? PartnerSkill : TrainerSkill;
+            if ((IsWild && me.Side == 1) || skill <= 0) return BattleCommand.Fight(usable[Rng.Next(usable.Count)]);
             // Smarter trainers: favour the move that does the most damage, with some variety and status moves now and then
             int best = usable[0]; double bestScore = -1;
             foreach (int i in usable)
@@ -1488,6 +1498,7 @@ namespace PokeCreator.Battles
                     {
                         var me = Field[0][slot];
                         if (me == null || !me.Pk.Fainted || PlayerSlotsToFill.Contains(slot)) continue;
+                        if (IsPartner(me)) { PartnerReplace(me); continue; }
                         if (bench > 0) { PlayerSlotsToFill.Add(slot); bench--; }
                         else Field[0][slot] = null;
                     }
@@ -1516,7 +1527,7 @@ namespace PokeCreator.Battles
         {
             HashSet<int> set;
             if (!_participants.TryGetValue(foe.PartyIndex, out set)) return;
-            var who = set.Where(i => i < Parties[0].Count && Able(Parties[0][i])).ToList();
+            var who = set.Where(i => i < Parties[0].Count && Able(Parties[0][i]) && !IsPartnerIndex(i)).ToList();
             if (who.Count == 0) return;
             var fd = foe.Pk.Data(P);
             int baseExp = fd != null && fd.BaseExp > 0 ? fd.BaseExp : 50;

@@ -120,7 +120,8 @@ namespace PokeCreator.Runtime.UI
         {
             _briefText = null;
             _pending.Clear();
-            var live = _b.Live(0);
+            var live = _b.PlayerControlled();
+            if (live.Count == 0 && _b.Live(0).Count > 0) { Run(_b.DoTurn(new List<BattleCommand>())); return; } // only the partner is left
             _cmdSlot = live.Count > 0 ? live[0].Slot : 0;
             _mode = Mode.Command;
             if (_cmd < 0 || _cmd > 3) _cmd = 0;
@@ -134,7 +135,7 @@ namespace PokeCreator.Runtime.UI
             _megaOn = false;
             _pending.RemoveAll(x => x.Slot == _cmdSlot);
             _pending.Add(c);
-            var next = _b.Live(0).FirstOrDefault(x => x.Slot > _cmdSlot);
+            var next = _b.PlayerControlled().FirstOrDefault(x => x.Slot > _cmdSlot);
             if (next != null && c.Kind != BattleCommandKind.Run) { _cmdSlot = next.Slot; _cmd = 0; _move = 0; _mode = Mode.Command; return; }
             Run(_b.DoTurn(new List<BattleCommand>(_pending)));
         }
@@ -391,7 +392,7 @@ namespace PokeCreator.Runtime.UI
             if (Input.Trigger(Button.Cancel))
             {
                 // Double battles: back to the first Pokémon's command
-                var prev = _b.Live(0).LastOrDefault(x => x.Slot < _cmdSlot);
+                var prev = _b.PlayerControlled().LastOrDefault(x => x.Slot < _cmdSlot);
                 if (prev != null) { Cancel(); _pending.RemoveAll(x => x.Slot == prev.Slot); _cmdSlot = prev.Slot; return; }
                 if (_cmd != 3) { _cmd = 3; Cursor(); }
                 return;
@@ -406,7 +407,7 @@ namespace PokeCreator.Runtime.UI
                 case 1: OpenBag(); break;
                 case 2: OpenParty(); break;
                 case 3:
-                    if (_cmdSlot != (_b.Live(0).FirstOrDefault() ?? Me).Slot) { Game.Message.Show("Only the first Pokémon can choose to run."); return; }
+                    if (_cmdSlot != (_b.PlayerControlled().FirstOrDefault() ?? Me).Slot) { Game.Message.Show("Only the first Pokémon can choose to run."); return; }
                     Commit(BattleCommand.Run()); break;
             }
         }
