@@ -151,6 +151,36 @@ namespace PokeCreator.Runtime.World
 
         /// <summary>On the bicycle (from the Bag, or maps that are "Always on bicycle").</summary>
         public bool Cycling;
+        /// <summary>Underwater after Dive.</summary>
+        public bool Diving;
+        public string DiveCharset { get { return Look != null && !string.IsNullOrEmpty(Look.DiveCharset) ? Look.DiveCharset : SurfCharset; } }
+        bool _sliding;
+
+        /// <summary>Climbs (up = true) or slides down a waterfall while surfing.</summary>
+        public void ClimbWaterfall(bool up)
+        {
+            int d = up ? 8 : 2;
+            if (up) Turn(8);
+            var map = Game.Map;
+            int n = 0, x = X, y = Y;
+            while (true)
+            {
+                y += up ? -1 : 1;
+                if (!map.Valid(x, y)) break;
+                int tag = map.TerrainTag(x, y);
+                n++;
+                if (tag != GameMap.TagWaterfall && tag != GameMap.TagWaterfallCrest) break;
+            }
+            if (n == 0) return;
+            var route = new PokeCreator.Maps.MoveRoute { Repeat = false };
+            route.List.Add(new PokeCreator.Maps.EventCommand(37, 0));                 // Through ON
+            route.List.Add(new PokeCreator.Maps.EventCommand(29, 0, up ? 3 : 4));     // slower going up
+            for (int i = 0; i < n; i++) route.List.Add(new PokeCreator.Maps.EventCommand(up ? 4 : 1, 0));
+            route.List.Add(new PokeCreator.Maps.EventCommand(38, 0));                 // Through OFF
+            route.List.Add(new PokeCreator.Maps.EventCommand(29, 0, 4));
+            route.List.Add(new PokeCreator.Maps.EventCommand(0, 0));
+            ForceMoveRoute(route);
+        }
 
         /// <summary>On the water (Surf). Moving onto land ends it.</summary>
         public bool Surfing;
@@ -167,6 +197,12 @@ namespace PokeCreator.Runtime.World
         public override void Update()
         {
             bool canControl = !Game.InterpreterRunning && !Game.MessageBusy && !Game.Transferring && !RouteForced;
+            // Ice: keep sliding until something stops the player
+            if (_sliding && !Moving && !Jumping)
+            {
+                if (Game.Map.TerrainTag(X, Y) != GameMap.TagIce || Surfing || !Move(Direction, false)) _sliding = false;
+                canControl = false;
+            }
             if (canControl && !Moving && !Jumping)
             {
                 int d = Input.Dir4;
@@ -176,7 +212,8 @@ namespace PokeCreator.Runtime.World
                 if (d != 0) Move(d);
             }
             bool running = MoveSpeed >= 5 && !Cycling && (Moving || Input.Dir4 != 0);
-            if (Cycling && !Surfing) CharacterName = Game.Project.FindAsset("Graphics/Characters", CycleCharset) != null ? CycleCharset : WalkCharset;
+            if (Diving) { SpeedScale = 1; MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", DiveCharset) != null ? DiveCharset : WalkCharset; }
+            else if (Cycling && !Surfing) CharacterName = Game.Project.FindAsset("Graphics/Characters", CycleCharset) != null ? CycleCharset : WalkCharset;
             else if (Surfing) { SpeedScale = 1; MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", SurfCharset) != null ? SurfCharset : WalkCharset; }
             else CharacterName = running && Game.Project.FindAsset("Graphics/Characters", RunCharset) != null ? RunCharset : WalkCharset;
 
@@ -225,6 +262,8 @@ namespace PokeCreator.Runtime.World
             if (Surfing && water) ok = map.SurfPassable(X, Y, d) && target.SurfPassable(lx, ly, 10 - d);
             else ok = (Surfing ? map.SurfPassable(X, Y, d) : map.TilePassable(X, Y, d, null)) && target.TilePassable(lx, ly, 10 - d, null);
             if (ok && water && !Surfing) ok = false; // needs Surf
+            // Going down a waterfall while surfing
+            if (Surfing && d == 2 && target == map && target.TerrainTag(lx, ly) == GameMap.TagWaterfall) { ClimbWaterfall(false); return true; }
             if (ok && Surfing && !water && target == map && !map.EventsAt(nx, ny).Any(e => !e.Through && e.CharacterName.Length > 0))
             {
                 // Hop back onto land
@@ -262,6 +301,7 @@ namespace PokeCreator.Runtime.World
             }
             Game.State.Steps++;
             DayCare.OnStep(Game);
+            if (Game.Map.TerrainTag(X, Y) == GameMap.TagIce && !Surfing && !RouteForced) _sliding = true;
             // Player touch / event touch on the tile we stepped onto
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
                 if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
@@ -293,8 +333,11 @@ namespace PokeCreator.Runtime.World
                     if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
                 return;
             }
+            // Dive (deep water / underwater) and Waterfall
+            if ((Surfing || Diving) && FieldMoves.TryDive(Game)) return;
+            if (Surfing && map.TerrainTag(fx, fy) == GameMap.TagWaterfall) { FieldMoves.OfferWaterfall(Game); return; }
             // Facing water: offer Surf
-            if (!Surfing && FieldMoves.IsWater(Game, fx, fy) && map.SurfPassable(fx, fy, 10 - Direction)
+            if (!Surfing && !Diving && FieldMoves.IsWater(Game, fx, fy) && map.SurfPassable(fx, fy, 10 - Direction)
                 && !map.EventsAt(fx, fy).Any(e => !e.Through && e.CharacterName.Length > 0)) FieldMoves.OfferSurf(Game);
         }
     }

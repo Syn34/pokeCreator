@@ -157,6 +157,7 @@ namespace PokeCreator.Runtime
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
             Player.Surfing = d.Surfing;
             Player.Cycling = d.Cycling && !d.Surfing;
+            Player.Diving = d.Diving;
             if (d.Weather != null && d.Weather.Count >= 2) Weather.Set(d.Weather[0], d.Weather[1], 0);
             if (!string.IsNullOrEmpty(d.Bgm) && string.IsNullOrEmpty(Audio.CurrentBgm)) Audio.PlayBgm(d.Bgm);
         }
@@ -258,6 +259,7 @@ namespace PokeCreator.Runtime
         public void SetupMap(int id, int x, int y, int dir)
         {
             StrengthActive = false; // Strength lasts until the player leaves the map
+            FlashUsed = false; _darkRadius = 64;
             if (State != null) State.Visited.Add(id);
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
@@ -342,6 +344,9 @@ namespace PokeCreator.Runtime
         }
         /// <summary>Strength has been used on this map: boulders can be pushed.</summary>
         public bool StrengthActive;
+        /// <summary>Flash lights up a dark map until the player leaves it.</summary>
+        public bool FlashUsed;
+        double _darkRadius = 64;
 
         /// <summary>Closes every open screen (e.g. to fish after choosing a rod in the Bag).</summary>
         public void CloseAllScenes() { foreach (var sc in _scenes.ToList()) sc.Close(); }
@@ -588,6 +593,7 @@ namespace PokeCreator.Runtime
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
                 _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
                 DrawTone();
+                DrawDarkness();
                 Weather.Draw(Gfx);
                 DrawExclaim();
                 DrawLocationSign();
@@ -616,6 +622,33 @@ namespace PokeCreator.Runtime
             }
             double light = (Math.Max(0, r) + Math.Max(0, g) + Math.Max(0, b)) / 3.0;
             if (light > 1) Gfx.FillRect(0, 0, Gfx.Width, Gfx.Height, new Color((byte)Math.Min(255, 128 + Math.Max(0, r)), (byte)Math.Min(255, 96 + Math.Max(0, g)), (byte)Math.Min(255, 64 + Math.Max(0, b)), (byte)Math.Min(120, light)));
+        }
+
+        /// <summary>Dark maps (needs Flash): black except for a circle around the player, which Flash widens.</summary>
+        void DrawDarkness()
+        {
+            if (!World.FieldMoves.IsDark(this)) return;
+            double target = FlashUsed ? 176 : 64;
+            if (_darkRadius < target) _darkRadius = Math.Min(target, _darkRadius + 4);
+            int cx = (int)(Player.RealX / 4.0) - DisplayX + 16, cy = (int)(Player.RealY / 4.0) - DisplayY + 16;
+            int r = (int)_darkRadius, w = Gfx.Width, h = Gfx.Height;
+            var black = new Color(0, 0, 0);
+            for (int y = 0; y < h; y += 2)
+            {
+                int dy = y - cy;
+                if (Math.Abs(dy) >= r) { Gfx.FillRect(0, y, w, 2, black); continue; }
+                int half = (int)Math.Sqrt(r * r - dy * dy);
+                Gfx.FillRect(0, y, Math.Max(0, cx - half), 2, black);
+                Gfx.FillRect(cx + half, y, Math.Max(0, w - cx - half), 2, black);
+                // Soft edge
+                int soft = Math.Min(16, half);
+                for (int k = 0; k < soft; k += 4)
+                {
+                    byte a = (byte)(200 - k * 12);
+                    Gfx.FillRect(cx - half + k, y, 4, 2, new Color(0, 0, 0, a));
+                    Gfx.FillRect(cx + half - k - 4, y, 4, 2, new Color(0, 0, 0, a));
+                }
+            }
         }
 
         void DrawLocationSign()
@@ -713,6 +746,7 @@ namespace PokeCreator.Runtime
                 case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
                 case "steps": for (int k = int.Parse(p[1]); k > 0; k--) World.DayCare.OnStep(_g); break;
                 case "gender": _g.State.Party[int.Parse(p[1])].Gender = p[2]; break;
+                case "surf": _g.Player.Surfing = true; break;
                 case "visit": foreach (var v in p[1].Split(',')) _g.State.Visited.Add(int.Parse(v)); break;
                 case "party":
                     foreach (var pk in _g.State.Party)

@@ -277,10 +277,10 @@ namespace PokeCreator.Runtime.World
         }
 
         /// <summary>Gets off the bike/water before warping somewhere else.</summary>
-        public static void StopRiding(Game g) { g.Player.Cycling = false; g.Player.Surfing = false; }
+        public static void StopRiding(Game g) { g.Player.Cycling = false; g.Player.Surfing = false; g.Player.Diving = false; }
 
         // ------------------------------------------------------------------ field moves from the party screen
-        public static readonly string[] PartyMoves = { "CUT", "FLY", "SURF", "STRENGTH", "ROCKSMASH", "HEADBUTT", "TELEPORT", "DIG", "SWEETSCENT" };
+        public static readonly string[] PartyMoves = { "CUT", "FLY", "SURF", "STRENGTH", "ROCKSMASH", "HEADBUTT", "FLASH", "WATERFALL", "DIVE", "TELEPORT", "DIG", "SWEETSCENT" };
 
         public static List<string> FieldMovesOf(Pokemon pk)
         {
@@ -306,6 +306,16 @@ namespace PokeCreator.Runtime.World
                 case "TELEPORT": Teleport(g, pk); return;
                 case "DIG": Escape(g, name + " used Dig!"); return;
                 case "SWEETSCENT": SweetScent(g, pk); return;
+                case "FLASH": Flash(g, pk); return;
+                case "DIVE": g.CloseAllScenes(); if (!TryDive(g)) g.Message.Show("Can't use that here."); return;
+                case "WATERFALL":
+                    {
+                        var p = g.Player; int fx = p.X + (p.Direction == 4 ? -1 : p.Direction == 6 ? 1 : 0), fy = p.Y + (p.Direction == 8 ? -1 : p.Direction == 2 ? 1 : 0);
+                        if (!p.Surfing || g.Map.TerrainTag(fx, fy) != GameMap.TagWaterfall) { g.Message.Show("Can't use that here."); return; }
+                        g.CloseAllScenes();
+                        g.Message.Show(name + " used Waterfall!", null, -1, _ => p.ClimbWaterfall(true));
+                        return;
+                    }
                 case "SURF":
                     {
                         var p = g.Player; int fx = p.X + (p.Direction == 4 ? -1 : p.Direction == 6 ? 1 : 0), fy = p.Y + (p.Direction == 8 ? -1 : p.Direction == 2 ? 1 : 0);
@@ -350,6 +360,84 @@ namespace PokeCreator.Runtime.World
                         return;
                     }
             }
+        }
+
+        // ------------------------------------------------------------------ Flash, Waterfall, Dive
+        public static bool IsDark(Game g) { return g.Map != null && g.Map.Data.Properties != null && g.Map.Data.Properties.DarkMap; }
+
+        public static void Flash(Game g, Pokemon pk)
+        {
+            if (!IsDark(g) || g.FlashUsed) { g.Message.Show("Can't use that here."); return; }
+            g.CloseAllScenes();
+            g.Message.Show(pk.Name(g.Project) + " used Flash!", null, -1, _ => { g.FlashUsed = true; g.Audio.PlaySe("Flash"); });
+        }
+
+        /// <summary>Surfing and facing a waterfall: climb it with Waterfall.</summary>
+        public static void OfferWaterfall(Game g)
+        {
+            var pk = WithMove(g, "WATERFALL");
+            if (pk == null) { g.Message.Show("A wall of water is crashing down with a mighty roar."); return; }
+            g.Message.Show("It's a large waterfall. Would you like to use Waterfall?", new List<string> { "Yes", "No" }, 1, c =>
+            {
+                if (c != 0) return;
+                g.Message.Show(pk.Name(g.Project) + " used Waterfall!", null, -1, _ => g.Player.ClimbWaterfall(true));
+            });
+        }
+
+        /// <summary>The map this deep water dives to, or 0.</summary>
+        static int DiveMap(Game g) { var p = g.Map == null ? null : g.Map.Data.Properties; return p != null ? p.DiveMap : 0; }
+
+        /// <summary>The map above this underwater map (one whose "Dive map ID" points here), or 0.</summary>
+        static int SurfaceMap(Game g)
+        {
+            if (g.Map == null) return 0;
+            int here = g.Map.Id;
+            foreach (var info in g.Project.MapInfos)
+            {
+                try { var md = g.Project.LoadMap(info.Id); if (md != null && md.Properties != null && md.Properties.DiveMap == here) return info.Id; } catch { }
+            }
+            return 0;
+        }
+
+        /// <summary>Pressing A while surfing on deep water (dive down) or while underwater (surface).</summary>
+        public static bool TryDive(Game g)
+        {
+            var p = g.Player;
+            if (p.Diving)
+            {
+                int up = SurfaceMap(g);
+                if (up <= 0) return false;
+                var above = g.Project.LoadMap(up);
+                var tmp = new GameMap(g.Project, above, g, false);
+                if (!tmp.Valid(p.X, p.Y) || tmp.TerrainTag(p.X, p.Y) != GameMap.TagDeepWater) return false;
+                var pk = WithMove(g, "DIVE");
+                if (pk == null) { g.Message.Show("Light is filtering down from above. A Pokémon may be able to surface here."); return true; }
+                g.Message.Show("Light is filtering down from above. Would you like to use Dive?", new List<string> { "Yes", "No" }, 1, c =>
+                {
+                    if (c != 0) return;
+                    g.Message.Show(pk.Name(g.Project) + " used Dive!", null, -1, _ =>
+                    {
+                        p.Diving = false; p.Surfing = true;
+                        g.RequestTransfer(up, p.X, p.Y, p.Direction, true);
+                    });
+                });
+                return true;
+            }
+            if (!p.Surfing || g.Map.TerrainTag(p.X, p.Y) != GameMap.TagDeepWater) return false;
+            int down = DiveMap(g);
+            if (down <= 0) return false;
+            var diver = WithMove(g, "DIVE");
+            if (diver == null) { g.Message.Show("The sea is deep here. A Pokémon may be able to go underwater."); return true; }
+            g.Message.Show("The sea is deep here. Would you like to use Dive?", new List<string> { "Yes", "No" }, 1, c =>
+            {
+                if (c != 0) return;
+                g.Message.Show(diver.Name(g.Project) + " used Dive!", null, -1, _ =>
+                {
+                    p.Surfing = false; p.Diving = true;
+                    g.RequestTransfer(down, p.X, p.Y, p.Direction, true);
+                });
+            });
+            return true;
         }
 
         // ------------------------------------------------------------------ berries

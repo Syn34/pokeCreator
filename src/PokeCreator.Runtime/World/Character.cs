@@ -164,6 +164,22 @@ namespace PokeCreator.Runtime.World
 
         public void MoveRandom() { Move(new[] { 2, 4, 6, 8 }[Game.Rng.Next(4)], true); }
 
+        /// <summary>Where the character started (for move_random_range).</summary>
+        public int HomeX = int.MinValue, HomeY = int.MinValue;
+
+        /// <summary>Random step that stays within xRange / yRange tiles of where the character started.</summary>
+        public void MoveRandomRange(int xRange, int yRange)
+        {
+            if (HomeX == int.MinValue) { HomeX = X; HomeY = Y; }
+            var dirs = new List<int>();
+            if (yRange > 0 && Y + 1 - HomeY <= yRange) dirs.Add(2);
+            if (yRange > 0 && HomeY - (Y - 1) <= yRange) dirs.Add(8);
+            if (xRange > 0 && HomeX - (X - 1) <= xRange) dirs.Add(4);
+            if (xRange > 0 && X + 1 - HomeX <= xRange) dirs.Add(6);
+            if (dirs.Count == 0) return;
+            Move(dirs[Game.Rng.Next(dirs.Count)], true);
+        }
+
         public void MoveToward(Character c)
         {
             int sx = X - c.X, sy = Y - c.Y;
@@ -202,7 +218,8 @@ namespace PokeCreator.Runtime.World
         protected void UpdateRoute()
         {
             if (Route == null || Moving || Jumping) return;
-            while (true)
+            int guard = Route.List.Count + 2; // a repeating route with no moves must not loop forever in one frame
+            while (guard-- > 0)
             {
                 if (RouteIndex >= Route.List.Count) { EndRoute(); return; }
                 var cmd = Route.List[RouteIndex];
@@ -287,7 +304,20 @@ namespace PokeCreator.Runtime.World
                         if (a != null) Game.Audio.PlaySe(a.GetString("Name"), a.GetInt("Volume", 100));
                         break;
                     }
-                case 45: Game.Compat.RunScript(c.StrParam(0), null); break;
+                case 45:
+                    {
+                        // Essentials route scripts that move the character
+                        var m = System.Text.RegularExpressions.Regex.Match(c.StrParam(0).Trim(), @"^move_random_range\(\s*(\d+)\s*(?:,\s*(\d+))?\s*\)$");
+                        if (m.Success)
+                        {
+                            int xr = int.Parse(m.Groups[1].Value), yr = m.Groups[2].Success ? int.Parse(m.Groups[2].Value) : xr;
+                            MoveRandomRange(xr, yr);
+                            ok = true;
+                            break;
+                        }
+                        Game.Compat.RunScript(c.StrParam(0), null);
+                        break;
+                    }
             }
             if (!ok && Route != null && Route.Skippable) ok = true;
             return ok || code > 14;
