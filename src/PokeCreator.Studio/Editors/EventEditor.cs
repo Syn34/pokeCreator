@@ -120,6 +120,7 @@ namespace PokeCreator.Studio.Editors
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
                         if (gm.Success) return "◆ Give Item: " + gm.Groups[1].Value + (gm.Groups[2].Success ? " ×" + gm.Groups[2].Value : "");
                         if (sc.Replace(" ", "") == "setBattleRule(\"double\")") return "◆ Next Battle Is a Double Battle";
+                        if (sc.Replace(" ", "") == "setBattleRule(\"triple\")") return "◆ Next Battle Is a Triple Battle";
                         if (sc == "pbSmashThisEvent") return "◆ Remove This Event (until the map is re-entered)";
                         if (sc == "pbRockSmashRandomEncounter") return "◆ Maybe a Wild Pokémon (Rock Smash encounters)";
                         if (sc == "pbHeadbutt") return "◆ Headbutt Tree (Headbutt encounters)";

@@ -237,6 +237,19 @@ namespace PokeCreator.Studio.Editors
             cmd(battle, "Wild Battle", AddWildBattle);
             cmd(battle, "Double Battle (one trainer, two Pokémon out)", () => AddDoubleBattle(false));
             cmd(battle, "Double Battle (two trainers)", () => AddDoubleBattle(true));
+            cmd(battle, "Triple Battle (one trainer, three Pokémon out)", () => AddDoubleBattle(false, true));
+            cmd(battle, "Triple Wild Battle", () =>
+            {
+                var ids = _p.Species.Where(s => s.Form == 0).Select(s => s.Id).ToArray();
+                var parts = new List<string>();
+                for (int i = 1; i <= 3; i++)
+                {
+                    int k = ChoiceDialog.Ask(FindForm(), "Wild Pokémon " + i + " of 3", ids, true); if (k < 0) return;
+                    int lv = NumberDialog.Ask(FindForm(), "Level of " + ids[k], 5); if (lv < 1) return;
+                    parts.Add(":" + ids[k] + ", " + Math.Min(100, lv));
+                }
+                Insert(new EventCommand(355, 0, "WildBattle.start(" + string.Join(", ", parts) + ")"));
+            });
 
             var field = group("Field Moves");
             cmd(field, "Cut Tree (asks to use Cut)", () => Insert(new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0)));
@@ -487,7 +500,7 @@ namespace PokeCreator.Studio.Editors
 
         static string TrainerArgs(PokeCreator.Data.TrainerData tr) { return ":" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"" + (tr.Version > 0 ? ", " + tr.Version : ""); }
 
-        void AddDoubleBattle(bool twoTrainers)
+        void AddDoubleBattle(bool twoTrainers, bool triple = false)
         {
             var list = _p.Trainers.OrderBy(t => t.TrainerType).ThenBy(t => t.Name).ThenBy(t => t.Version).ToList();
             if (list.Count == 0) { MessageBox.Show(FindForm(), "There are no trainers yet. Add them under Database > Trainers.", "Double Battle"); return; }
@@ -502,7 +515,7 @@ namespace PokeCreator.Studio.Editors
             }
             else
             {
-                cmds.Add(new EventCommand(355, 0, "setBattleRule(\"double\")"));
+                cmds.Add(new EventCommand(355, 0, triple ? "setBattleRule(\"triple\")" : "setBattleRule(\"double\")"));
                 script = "TrainerBattle.start(" + TrainerArgs(list[k1]) + ")";
             }
             cmds.Add(new EventCommand(111, 0, 12, script));

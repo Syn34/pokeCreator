@@ -425,8 +425,18 @@ namespace PokeCreator.Runtime
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
+        /// <summary>Triple wild battle against three Pokémon (fewer if the player can't send out three).</summary>
+        public void StartTripleWildBattle(string s1, int l1, string s2, int l2, string s3, int l3, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var ws = new[] { PokeCreator.Pkmn.Pokemon.Create(Project, s1, l1, Rng), PokeCreator.Pkmn.Pokemon.Create(Project, s2, l2, Rng), PokeCreator.Pkmn.Pokemon.Create(Project, s3, l3, Rng) }.ToList();
+            if (ws.Any(w => w.Data(Project) == null) || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, ws, true, Rng, true, true) { PlayerName = State.PlayerName };
+            b.AlreadyCaught = sp => State.Caught.Contains(sp);
+            StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
+        }
+
         /// <summary>Double battle against two trainers (each sends out one Pokémon), or one trainer if the second is null.</summary>
-        public bool StartDoubleTrainerBattle(string type1, string name1, int version1, string type2, string name2, int version2, bool canLose, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        public bool StartDoubleTrainerBattle(string type1, string name1, int version1, string type2, string name2, int version2, bool canLose, Action<PokeCreator.Battles.BattleOutcome> onEnd, bool triple = false)
         {
             Func<string, string, int, PokeCreator.Data.TrainerData> find = (t, n, v) => Project.Trainers.FirstOrDefault(x => x.TrainerType == t && x.Name == n && x.Version == v) ?? Project.Trainers.FirstOrDefault(x => x.TrainerType == t && x.Name == n);
             var tr1 = find(type1, name1, version1);
@@ -444,7 +454,7 @@ namespace PokeCreator.Runtime
                 owner = Enumerable.Repeat(0, foes.Count).Concat(Enumerable.Repeat(1, more.Count)).ToArray();
                 foes.AddRange(more);
             }
-            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, true)
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, true, triple && tr2 == null)
             {
                 PlayerName = State.PlayerName, TrainerName = tr1.Name,
                 TrainerTypeName = tt1 != null && !string.IsNullOrEmpty(tt1.Name) ? tt1.Name : type1,

@@ -37,14 +37,14 @@ namespace PokeCreator.Runtime.UI
         int _cmd, _move, _anim, _target;
         BattleEvent _current;
         // Display state per field position: index = side * 2 + slot
-        readonly double[] _shownHp = new double[4];
-        readonly int[] _shownParty = { -1, -1, -1, -1 };
-        readonly bool[] _visible = new bool[4];
-        readonly int[] _faintDrop = new int[4];
-        readonly int[] _blink = new int[4];
-        readonly double[] _shownExp = new double[2];
+        readonly double[] _shownHp = new double[6];
+        readonly int[] _shownParty = { -1, -1, -1, -1, -1, -1 };
+        readonly bool[] _visible = new bool[6];
+        readonly int[] _faintDrop = new int[6];
+        readonly int[] _blink = new int[6];
+        readonly double[] _shownExp = new double[3];
         // Simple move effects: the user lunges, a burst in the move type's colour hits the target, arrows on stat changes
-        readonly int[] _lunge = new int[4];
+        readonly int[] _lunge = new int[6];
         int _burstKey = -1, _burstFrames, _statKey = -1, _statFrames, _statDir;
         Color _burstColor = new Color(248, 248, 248);
         string _lastCategory = "Physical";
@@ -78,9 +78,9 @@ namespace PokeCreator.Runtime.UI
             g.Audio.PlayBgm(bgm);
         }
 
-        static int Key(int side, int slot) { return side * 2 + Math.Max(0, Math.Min(1, slot)); }
+        static int Key(int side, int slot) { return side * 3 + Math.Max(0, Math.Min(2, slot)); }
         /// <summary>The field slot showing this party member (or 0).</summary>
-        int SlotOf(int side, int party) { for (int s = 0; s < 2; s++) if (_shownParty[Key(side, s)] == party) return s; return 0; }
+        int SlotOf(int side, int party) { for (int s = 0; s < 3; s++) if (_shownParty[Key(side, s)] == party) return s; return 0; }
         Battler Me { get { return _b.Field[0][_cmdSlot] ?? _b.Live(0).FirstOrDefault() ?? _b.Active[0]; } }
 
         // ------------------------------------------------------------------ update
@@ -155,7 +155,7 @@ namespace PokeCreator.Runtime.UI
                         int k = Key(e.Side, e.Slot);
                         _shownParty[k] = e.Party; _visible[k] = true; _faintDrop[k] = 0;
                         _shownHp[k] = _b.Parties[e.Side][e.Party].HP;
-                        if (e.Side == 0) _shownExp[Math.Min(1, e.Slot)] = ExpFraction(_party[e.Party]);
+                        if (e.Side == 0) _shownExp[Math.Min(2, e.Slot)] = ExpFraction(_party[e.Party]);
                         Game.Audio.PlaySe("Battle recall");
                         Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
                         return true;
@@ -431,8 +431,9 @@ namespace PokeCreator.Runtime.UI
             string tg = md != null ? md.Target ?? "NearOther" : "NearOther";
             if (_b.IsDouble && (tg == "NearOther" || tg == "NearFoe" || tg == "Other" || tg == "Foe"))
             {
-                _targets = _b.Live(1).ToList();
-                if (tg == "NearOther" || tg == "Other") { var ally = _b.Field[0][1 - _cmdSlot]; if (ally != null && !ally.Pk.Fainted) _targets.Add(ally); }
+                bool any = tg == "Other" || tg == "Foe";
+                _targets = _b.Live(1).Where(f => any || _b.Near(f, Me)).ToList();
+                if (tg == "NearOther" || tg == "Other") _targets.AddRange(_b.Live(0).Where(a => a != Me && (any || _b.Near(a, Me))));
                 if (_targets.Count > 1)
                 {
                     _target = Math.Max(0, _targets.FindIndex(t => t.Side == 1 && t.Slot == _cmdSlot));
@@ -648,6 +649,12 @@ namespace PokeCreator.Runtime.UI
         {
             int slide = Math.Max(0, _introSlide);
             if (!_b.IsDouble) { if (side == 1) { x = 384 + slide * 2; bottom = 200; } else { x = 128 - slide * 2; bottom = 288; } return; }
+            if (_b.IsTriple)
+            {
+                if (side == 1) { x = 300 + slot * 82 + slide * 2; bottom = 198 - slot * 6; }
+                else { x = 56 + slot * 92 - slide * 2; bottom = 288; }
+                return;
+            }
             if (side == 1) { x = (slot == 0 ? 330 : 440) + slide * 2; bottom = slot == 0 ? 196 : 188; }
             else { x = (slot == 0 ? 92 : 212) - slide * 2; bottom = 288; }
         }
@@ -671,7 +678,7 @@ namespace PokeCreator.Runtime.UI
             if (_player != null) _player.Draw(g, true);
             // Opponents (back row first), then the player's Pokémon
             for (int side = 1; side >= 0; side--)
-                for (int slot = _b.IsDouble ? 1 : 0; slot >= 0; slot--)
+                for (int slot = _b.SlotsPerSide - 1; slot >= 0; slot--)
                 {
                     int k = Key(side, slot);
                     if (!_visible[k] || _shownParty[k] < 0) continue;
@@ -691,7 +698,7 @@ namespace PokeCreator.Runtime.UI
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
             // Databoxes
-            for (int slot = 0; slot < (_b.IsDouble ? 2 : 1); slot++)
+            for (int slot = 0; slot < _b.SlotsPerSide; slot++)
             {
                 int kf = Key(1, slot), km = Key(0, slot);
                 if (_visible[kf] && _shownParty[kf] >= 0) DrawFoeBox(g, _b.Parties[1][_shownParty[kf]], kf, slot);
@@ -858,6 +865,18 @@ namespace PokeCreator.Runtime.UI
         void DrawFoeBox(Gfx g, Pokemon pk, int k, int slot)
         {
             bool dbl = _b.IsDouble;
+            if (_b.IsTriple)
+            {
+                // Triple battles: three slim boxes (name, level, HP bar)
+                int tx2 = 8, ty2 = 4 + slot * 44, tw = 220, th = 42;
+                Ui.Panel(g, tx2, ty2, tw, th, new Color(248, 248, 232), new Color(64, 80, 72));
+                Ui.Text(g, tx2 + 10, ty2 - 5, pk.Name(Game.Project));
+                Ui.TextRight(g, tx2 + tw - 10, ty2 - 5, "Lv" + pk.Level);
+                string st3 = Ui.StatusAbbrev(pk.Status);
+                if (st3 != "") g.DrawText(tx2 + 10, ty2 + 22, st3, new Color(232, 64, 48), Ui.DarkShadow);
+                Ui.HpBar(g, tx2 + 70, ty2 + 34, 130, (int)Math.Round(_shownHp[k]), pk.TotalHP(Game.Project));
+                return;
+            }
             int x = 16, y = dbl ? 8 + slot * 54 : 30, w = 236, h = dbl ? 50 : 62;
             Ui.Panel(g, x, y, w, h, new Color(248, 248, 232), new Color(64, 80, 72));
             Ui.Text(g, x + 12, y + 2, pk.Name(Game.Project));
@@ -874,6 +893,16 @@ namespace PokeCreator.Runtime.UI
         void DrawPlayerBox(Gfx g, Pokemon pk, int k, int slot)
         {
             bool dbl = _b.IsDouble;
+            if (_b.IsTriple)
+            {
+                int tx2 = 290, ty2 = 166 + slot * 41, tw = 216, th = 40;
+                Ui.Panel(g, tx2, ty2, tw, th, new Color(248, 248, 232), new Color(64, 80, 72));
+                Ui.Text(g, tx2 + 10, ty2 - 5, pk.Name(Game.Project));
+                Ui.TextRight(g, tx2 + tw - 10, ty2 - 5, "Lv" + pk.Level);
+                Ui.HpBar(g, tx2 + 60, ty2 + 28, 140, (int)Math.Round(_shownHp[k]), pk.TotalHP(Game.Project));
+                Ui.ExpBar(g, tx2 + 60, ty2 + th - 3, 140, _shownExp[Math.Min(2, slot)]);
+                return;
+            }
             int x = 262, y = dbl ? 196 + slot * 46 : 192, w = 240, h = dbl ? 44 : 88;
             Ui.Panel(g, x, y, w, h, new Color(248, 248, 232), new Color(64, 80, 72));
             Ui.Text(g, x + 16, y + 2, pk.Name(Game.Project));
@@ -886,7 +915,7 @@ namespace PokeCreator.Runtime.UI
                 // Compact box: no HP numbers (the bar shows how much is left)
                 if (st != "") g.DrawText(x + w - 60, y + 22, st, new Color(232, 64, 48), Ui.DarkShadow);
                 Ui.HpBar(g, x + 40, y + 30, 150, (int)Math.Round(_shownHp[k]), max);
-                Ui.ExpBar(g, x + 40, y + h - 5, 150, _shownExp[Math.Min(1, slot)]);
+                Ui.ExpBar(g, x + 40, y + h - 5, 150, _shownExp[Math.Min(2, slot)]);
                 return;
             }
             if (st != "") g.DrawText(x + 16, y + 28, st, new Color(232, 64, 48), Ui.DarkShadow);
@@ -904,7 +933,7 @@ namespace PokeCreator.Runtime.UI
             for (int i = 0; i < _targets.Count; i++)
             {
                 var t = _targets[i];
-                int cx = 40 + (i % 2) * 240, cy = by + 44 + (i / 2) * 26;
+                int cx = 40 + (i % 3) * 160, cy = by + 44 + (i / 3) * 26;
                 if (i == _target) Ui.Arrow(g, cx - 18, cy + 4);
                 Ui.Text(g, cx, cy, (t.Side == 0 ? "Ally " : "") + t.Pk.Name(Game.Project));
             }

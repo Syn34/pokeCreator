@@ -101,10 +101,12 @@ namespace PokeCreator.Battles
         public readonly Random Rng;
         public readonly List<Pokemon>[] Parties = new List<Pokemon>[2];
         /// <summary>Pokémon on the field: Field[side][slot]; slot 1 is only used in double battles. Empty = null.</summary>
-        public readonly Battler[][] Field = { new Battler[2], new Battler[2] };
+        public readonly Battler[][] Field = { new Battler[3], new Battler[3] };
         /// <summary>1 for single battles, 2 for double battles.</summary>
         public int SlotsPerSide { get; private set; }
-        public bool IsDouble { get { return SlotsPerSide == 2; } }
+        /// <summary>More than one Pokémon per side (double or triple battle).</summary>
+        public bool IsDouble { get { return SlotsPerSide >= 2; } }
+        public bool IsTriple { get { return SlotsPerSide == 3; } }
         /// <summary>Slot 0 of each side (what single-battle code means by "the" Pokémon).</summary>
         public Battler[] Active { get { return new[] { Field[0][0], Field[1][0] }; } }
         public readonly bool IsWild;
@@ -151,12 +153,24 @@ namespace PokeCreator.Battles
         readonly Dictionary<int, HashSet<int>> _participants = new Dictionary<int, HashSet<int>>(); // foe party index -> player party indexes
         List<BattleEvent> _ev;
 
-        public Battle(Project p, List<Pokemon> playerParty, List<Pokemon> foeParty, bool wild, Random rng, bool doubleBattle = false)
+        public Battle(Project p, List<Pokemon> playerParty, List<Pokemon> foeParty, bool wild, Random rng, bool doubleBattle = false, bool tripleBattle = false)
         {
             P = p; Rng = rng ?? new Random(); Parties[0] = playerParty; Parties[1] = foeParty; IsWild = wild;
-            // A double battle needs two Pokémon that can fight on each side
-            SlotsPerSide = doubleBattle && playerParty.Count(Able) >= 2 && foeParty.Count(Able) >= 2 ? 2 : 1;
+            // A double (triple) battle needs two (three) Pokémon that can fight on each side
+            int mine = playerParty.Count(Able), theirs = foeParty.Count(Able);
+            SlotsPerSide = tripleBattle && mine >= 3 && theirs >= 3 ? 3 : (doubleBattle || tripleBattle) && mine >= 2 && theirs >= 2 ? 2 : 1;
         }
+
+        /// <summary>Whether two Pokémon are next to each other (in triple battles the ones at opposite ends aren't).</summary>
+        public bool Near(Battler a, Battler b)
+        {
+            if (a == null || b == null || a == b) return false;
+            if (!IsTriple) return true;
+            return Math.Abs(a.Slot - b.Slot) <= 1;
+        }
+
+        /// <summary>The Pokémon on the same side next to this one.</summary>
+        List<Battler> Allies(Battler b) { return Live(b.Side).Where(x => x != b && Near(x, b)).ToList(); }
 
         /// <summary>Every Pokémon on the field (fainted ones included until they're replaced).</summary>
         public IEnumerable<Battler> OnField
@@ -166,16 +180,22 @@ namespace PokeCreator.Battles
         /// <summary>Pokémon of a side that can still fight.</summary>
         public List<Battler> Live(int side) { return Field[side].Take(SlotsPerSide).Where(b => b != null && !b.Pk.Fainted).ToList(); }
         bool OnFieldParty(int side, int party) { return Field[side].Take(SlotsPerSide).Any(b => b != null && b.PartyIndex == party); }
-        Battler Ally(Battler b) { if (!IsDouble) return null; var a = Field[b.Side][1 - b.Slot]; return a != null && !a.Pk.Fainted ? a : null; }
+        Battler Ally(Battler b) { if (!IsDouble) return null; return Allies(b).FirstOrDefault(); }
         /// <summary>An opposing Pokémon that can be hit: the chosen one, or another if it fainted.</summary>
         Battler OpponentFor(Battler user, Battler preferred)
         {
             if (preferred != null && !preferred.Pk.Fainted && preferred.Side != user.Side) return preferred;
             var foes = Live(1 - user.Side);
-            return foes.Count == 0 ? null : foes.FirstOrDefault(f => f.Slot == user.Slot) ?? foes[0];
+            if (foes.Count == 0) return null;
+            return foes.FirstOrDefault(f => f.Slot == user.Slot) ?? foes.FirstOrDefault(f => Near(f, user)) ?? foes[0];
         }
 
-        string Names(List<Battler> list) { return list.Count == 2 ? list[0].Pk.Name(P) + " and " + list[1].Pk.Name(P) : list.Count == 1 ? list[0].Pk.Name(P) : ""; }
+        string Names(List<Battler> list)
+        {
+            if (list.Count == 0) return "";
+            if (list.Count == 1) return list[0].Pk.Name(P);
+            return string.Join(", ", list.Take(list.Count - 1).Select(b => b.Pk.Name(P))) + " and " + list[list.Count - 1].Pk.Name(P);
+        }
 
         Battler Place(int side, int slot, int party)
         {
@@ -220,7 +240,7 @@ namespace PokeCreator.Battles
             if (IsWild)
             {
                 foreach (var b in foes) SendOutEvent(b);
-                Say(foes.Count == 2 ? "Oh! A wild " + foes[0].Pk.Name(P) + " and " + foes[1].Pk.Name(P) + " appeared!" : "A wild " + foes[0].Pk.Name(P) + " appeared!");
+                Say(foes.Count >= 2 ? "Oh! A wild " + Names(foes) + " appeared!" : "A wild " + foes[0].Pk.Name(P) + " appeared!");
             }
             else if (TwoTrainers)
             {
@@ -433,6 +453,7 @@ namespace PokeCreator.Battles
         BattleCommand ChooseAI(Battler me)
         {
             var targets = Live(1 - me.Side);
+            if (IsTriple && targets.Any(x => Near(x, me))) targets = targets.Where(x => Near(x, me)).ToList();
             if (targets.Count == 0) return BattleCommand.Fight(-1);
             var t = targets[Rng.Next(targets.Count)];
             if (!IsWild && TrainerSkill > 0 && targets.Count > 1) t = targets.OrderByDescending(x => BestScore(me, x)).First();
@@ -654,15 +675,21 @@ namespace PokeCreator.Battles
             // Who the move hits: one target, or every foe / every other Pokémon (double battles)
             var targets = new List<Battler>();
             string tg = md.Target ?? "NearOther";
-            if (tg == "AllNearFoes" || tg == "AllFoes") targets.AddRange(Live(1 - user.Side));
-            else if (tg == "AllNearOthers" || tg == "AllBattlers") { targets.AddRange(Live(1 - user.Side)); var al = Ally(user); if (al != null) targets.Add(al); }
-            else if (tg == "RandomNearFoe") { var f = Live(1 - user.Side); if (f.Count > 0) targets.Add(f[Rng.Next(f.Count)]); }
-            else if (tg == "NearAlly" || tg == "AllAllies") { var al = Ally(user); if (al == null) { Say("But it failed!"); return; } targets.Add(al); }
+            if (tg == "AllNearFoes") targets.AddRange(Live(1 - user.Side).Where(f => Near(f, user)));
+            else if (tg == "AllFoes") targets.AddRange(Live(1 - user.Side));
+            else if (tg == "AllNearOthers") { targets.AddRange(Live(1 - user.Side).Where(f => Near(f, user))); targets.AddRange(Allies(user)); }
+            else if (tg == "AllBattlers") { targets.AddRange(Live(1 - user.Side)); targets.AddRange(Live(user.Side).Where(x => x != user)); }
+            else if (tg == "RandomNearFoe") { var f = Live(1 - user.Side).Where(x => Near(x, user)).ToList(); if (f.Count > 0) targets.Add(f[Rng.Next(f.Count)]); }
+            else if (tg == "NearAlly") { var al = Ally(user); if (al == null) { Say("But it failed!"); return; } targets.Add(al); }
+            else if (tg == "AllAllies") { var als = Live(user.Side).Where(x => x != user).ToList(); if (als.Count == 0) { Say("But it failed!"); return; } targets.AddRange(als); }
             else
             {
                 // Follow Me / Rage Powder pull single-target moves aimed at that side
                 var center = target != null ? _centerOfAttention[target.Side] : null;
                 if (center != null && center.Side != user.Side && !center.Pk.Fainted && OnField.Contains(center) && code != "CannotBeRedirected" && !HasAbility(user, "STALWART") && !HasAbility(user, "PROPELLERTAIL")) target = center;
+                // Triple battles: single-target moves only reach Pokémon next to the user (unless they can hit any target)
+                if (target != null && IsTriple && target.Side != user.Side && !Near(target, user) && tg != "Other" && tg != "Foe")
+                    target = Live(target.Side).FirstOrDefault(f => Near(f, user)) ?? target;
                 targets.Add(target);
             }
             targets.RemoveAll(t => t == null || t.Pk.Fainted);

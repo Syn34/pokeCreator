@@ -650,7 +650,14 @@ namespace PokeCreator.Runtime.Script
             });
             Register("WildBattle.start", (c, a) =>
             {
-                // WildBattle.start(:SPECIES, level) or two pairs for a double battle
+                // WildBattle.start(:SPECIES, level), two pairs for a double battle, three for a triple
+                if (a.Count >= 6 && a[2] is string && a[4] is string)
+                {
+                    if (_game.ResumeOutcome.HasValue && c != null && _game.ResumeOwner == c) { var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null; return (int)o; }
+                    int ov = OutcomeVar(); _battleRules.Clear();
+                    _game.StartTripleWildBattle(Str(a, 0), ToInt(a[1]), Str(a, 2), ToInt(a[3]), Str(a, 4), ToInt(a[5]), o => _game.State.SetVar(ov, (int)o));
+                    return 1;
+                }
                 if (a.Count >= 4 && a[2] is string) return DoubleWildBattle(Str(a, 0), ToInt(a[1]), Str(a, 2), ToInt(a[3]), false, c);
                 return WildBattle(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false, c);
             });
@@ -820,7 +827,8 @@ namespace PokeCreator.Runtime.Script
         /// <summary>One trainer (a double battle if setBattleRule("double") was used), or two trainers in a double battle.</summary>
         object TrainerBattleList(List<object[]> trainers, Interpreter ctx)
         {
-            bool dbl = trainers.Count > 1 || IsDoubleRule();
+            bool triple = IsTripleRule();
+            bool dbl = trainers.Count > 1 || triple || IsDoubleRule();
             if (!dbl) return TrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], ctx);
             if (_game.ResumeOutcome.HasValue && ctx != null && _game.ResumeOwner == ctx)
             {
@@ -831,11 +839,20 @@ namespace PokeCreator.Runtime.Script
             int outcomeVar = OutcomeVar();
             _battleRules.Clear();
             var t2 = trainers.Count > 1 ? trainers[1] : null;
-            if (!_game.StartDoubleTrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], t2 != null ? (string)t2[0] : null, t2 != null ? (string)t2[1] : null, t2 != null ? (int)t2[2] : 0, canLose, o => _game.State.SetVar(outcomeVar, (int)o)))
+            if (!_game.StartDoubleTrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], t2 != null ? (string)t2[0] : null, t2 != null ? (string)t2[1] : null, t2 != null ? (int)t2[2] : 0, canLose, o => _game.State.SetVar(outcomeVar, (int)o), triple))
             {
                 WarnOnce("Double trainer battle skipped (trainer not found in the database, or no Pokémon that can battle)");
                 return true;
             }
+            return false;
+        }
+
+        /// <summary>setBattleRule("triple") / ("3v3") / ("size", "3v3").</summary>
+        bool IsTripleRule()
+        {
+            object v;
+            if (TakeRule("triple") || TakeRule("3v3")) return true;
+            if (_battleRules.TryGetValue("size", out v) && Convert.ToString(v).StartsWith("3v")) { _battleRules.Remove("size"); return true; }
             return false;
         }
 
