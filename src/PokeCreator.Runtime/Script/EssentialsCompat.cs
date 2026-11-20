@@ -317,6 +317,18 @@ namespace PokeCreator.Runtime.Script
             string key = name;
             Handler h;
             if (_commands.TryGetValue(key, out h)) return h(ctx, args);
+            // An API object's member: pbBattleChallenge.setDecision(1), pbBattleChallenge.extra.pbPrepareSwaps
+            int firstDot = name.IndexOf('.');
+            if (firstDot > 0 && _commands.TryGetValue(name.Substring(0, firstDot), out h))
+            {
+                object obj = h(ctx, new List<object>());
+                if (obj != null && !(obj is bool) && !(obj is int) && !(obj is string))
+                {
+                    var parts = name.Substring(firstDot + 1).Split('.');
+                    for (int k = 0; k < parts.Length && obj != null; k++) obj = Member(obj, parts[k], k == parts.Length - 1 ? args : new List<object>());
+                    return obj;
+                }
+            }
             int dot = name.LastIndexOf('.');
             if (dot > 0 && _commands.TryGetValue(name.Substring(dot + 1), out h)) return h(ctx, args);
             WarnOnce("Unsupported Essentials call: " + name + " (ignored)");
@@ -433,7 +445,7 @@ namespace PokeCreator.Runtime.Script
             Register("$player.female?", (c, a) => PlayerGender() == "Female");
             Register("$Trainer.male?", (c, a) => PlayerGender() != "Female");
             Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
-            Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game));
+            Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game) || (_game.State.Extras.Frontier != null && _game.State.Extras.Frontier.InChallenge));
             Register("$PokemonGlobal.encounter_version", (c, a) => _game.State.Extras.EncounterVersion);
             Register("pbFirstAblePokemon", (c, a) =>
             {
@@ -1242,7 +1254,7 @@ namespace PokeCreator.Runtime.Script
             }
             if (member == "id") { var prop = obj.GetType().GetProperty("Id"); if (prop != null) return prop.GetValue(obj, null); }
             string pascal = string.Concat(member.TrimEnd('?', '!').Split('_').Select(w => w.Length == 0 ? "" : char.ToUpperInvariant(w[0]) + w.Substring(1)));
-            var pp = obj.GetType().GetProperty(pascal);
+            var pp = obj.GetType().GetProperty(pascal) ?? obj.GetType().GetProperty(member.TrimEnd('?', '!'));
             if (pp != null) return pp.GetValue(obj, null);
             // Script API objects (pbBugContestState...): public methods by name
             string bare = member.TrimEnd('?', '!');

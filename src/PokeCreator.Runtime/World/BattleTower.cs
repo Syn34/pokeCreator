@@ -29,9 +29,9 @@ namespace PokeCreator.Runtime.World
     /// </summary>
     public static class BattleTower
     {
-        static readonly string[] FirstNames = { "Alex", "Jamie", "Morgan", "Riley", "Casey", "Taylor", "Jordan", "Quinn", "Avery", "Dakota", "Sky", "Rowan", "Kai", "Remy", "Sage", "Ash", "Robin", "Drew", "Emery", "Finley" };
+        public static readonly string[] FirstNames = { "Alex", "Jamie", "Morgan", "Riley", "Casey", "Taylor", "Jordan", "Quinn", "Avery", "Dakota", "Sky", "Rowan", "Kai", "Remy", "Sage", "Ash", "Robin", "Drew", "Emery", "Finley" };
         static readonly string[] HeldItems = { "LEFTOVERS", "SITRUSBERRY", "LUMBERRY", "FOCUSSASH", "CHOICEBAND", "CHOICESCARF", "CHOICESPECS", "LIFEORB", "EXPERTBELT", "QUICKCLAW", "WHITEHERB", "BRIGHTPOWDER", "SHELLBELL", "SCOPELENS" };
-        static readonly string[] Intros = { "I've been waiting for a worthy opponent!", "Let's see what your team can do!", "My Pokémon are in top form today!", "I won't go easy on you!", "This is where your streak ends!", "Show me your strongest Pokémon!" };
+        public static readonly string[] Intros = { "I've been waiting for a worthy opponent!", "Let's see what your team can do!", "My Pokémon are in top form today!", "I won't go easy on you!", "This is where your streak ends!", "Show me your strongest Pokémon!" };
 
         public static ChallengeState State(Game g)
         {
@@ -41,7 +41,7 @@ namespace PokeCreator.Runtime.World
 
         public static bool InProgress(Game g) { return g.State != null && g.State.Extras.Challenge != null && g.State.Extras.Challenge.InProgress; }
 
-        static Pokemon Copy(Game g, Pokemon pk, int level)
+        public static Pokemon Copy(Game g, Pokemon pk, int level)
         {
             var c = Json.Json.Deserialize<Pokemon>(Json.Json.Write(pk));
             if (level > 0)
@@ -88,7 +88,7 @@ namespace PokeCreator.Runtime.World
             NextRound(g, level);
         }
 
-        static Pokemon Generate(Game g, int set, int level)
+        public static Pokemon Generate(Game g, int set, int level)
         {
             int min = Math.Min(560, 330 + set * 45), max = Math.Min(680, 470 + set * 45);
             var pool = g.Project.Species.Where(sp => sp.Form == 0 && sp.BaseStats != null && sp.BaseStats.Count == 6 && sp.CatchRate > 3

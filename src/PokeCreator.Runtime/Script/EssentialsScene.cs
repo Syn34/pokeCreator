@@ -173,9 +173,6 @@ namespace PokeCreator.Runtime.Script
 
             // Battle Tower: pbBattleTower(rounds = 7, double = false, level = 50)
             Register("pbBattleTower", (c, a) => { BattleTower.Run(_game, a.Count > 0 ? ToInt(a[0]) : 7, a.Count > 1 && Truthy(a[1]), a.Count > 2 ? ToInt(a[2]) : 50); return true; });
-            Register("pbBattleChallenge.wins", (c, a) => BattleTower.State(_game).Wins);
-            Register("pbBattleChallenge.decision", (c, a) => BattleTower.State(_game).Decision);
-            Register("pbBattleChallenge.pbInProgress?", (c, a) => BattleTower.InProgress(_game));
             Register("pbBattleChallenge.record", (c, a) => { int r; BattleTower.State(_game).Records.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
             Register("pbBattleChallenge.streak", (c, a) => { int r; BattleTower.State(_game).Streaks.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
 
@@ -320,6 +317,71 @@ namespace PokeCreator.Runtime.Script
             // Game Corner
             Register("pbSlotMachine", (c, a) => { _game.PushScene(new UI.SlotMachineScene(_game, a.Count > 0 ? ToInt(a[0]) : 1)); return true; });
             Register("pbVoltorbFlip", (c, a) => { _game.PushScene(new UI.VoltorbFlipScene(_game)); return true; });
+
+            // Battle Frontier (Essentials' pbBattleChallenge)
+            Register("pbBattleChallenge", (c, a) => new BattleChallengeApi(_game));
+            Func<string, bool, bool, ChallengeRules> rules = (kind, dbl, open) => new ChallengeRules { Kind = kind, Double = dbl, OpenLevel = open, Size = dbl ? 4 : 3 };
+            Register("pbBattleTowerRules", (c, a) => rules("tower", a.Count > 0 && Truthy(a[0]), a.Count > 1 && Truthy(a[1])));
+            Register("pbBattleFactoryRules", (c, a) => rules("factory", a.Count > 0 && Truthy(a[0]), a.Count > 1 && Truthy(a[1])));
+            Register("pbBattlePalaceRules", (c, a) => rules("palace", a.Count > 0 && Truthy(a[0]), a.Count > 1 && Truthy(a[1])));
+            Register("pbBattleArenaRules", (c, a) => rules("arena", false, a.Count > 0 && Truthy(a[0])));
+            foreach (var cup in new[] { "pbPikaCupRules", "pbPokeCupRules", "pbPrimeCupRules", "pbFancyCupRules", "pbLittleCupRules", "pbNiceCupRules", "pbChallengeCupRules" })
+            {
+                string cn = cup;
+                Register(cn, (c, a) => new ChallengeRules { Kind = "cup", Double = a.Count > 0 && Truthy(a[0]), Size = 3, OpenLevel = cn == "pbPrimeCupRules" || cn == "pbChallengeCupRules", MaxLevel = cn == "pbLittleCupRules" ? 5 : cn == "pbPikaCupRules" ? 20 : 50 });
+            }
+            Register("pbHasEligible?", (c, a) =>
+            {
+                int need = a.Count > 0 ? ToInt(a[0]) : 3;
+                return _game.State.Party.Where(p => !p.IsEgg && !p.ShadowPokemon).Select(p => p.Species).Distinct().Count() >= need;
+            });
+            Register("pbEntryScreen", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                int need = a.Count > 0 ? ToInt(a[0]) : 3;
+                var fs = new BattleChallengeApi(_game);
+                var entries = new List<int>();
+                _game.PromptPending = true;
+                Action pick = null;
+                pick = () =>
+                {
+                    if (entries.Count >= need)
+                    {
+                        if (_game.State.Extras.Frontier == null) _game.State.Extras.Frontier = new FrontierState();
+                        _game.State.Extras.Frontier.Entries = entries.ToList();
+                        _game.SetPrompt(c, true); return;
+                    }
+                    _game.PushScene(new UI.PartyScene(_game, "Choose Pokémon " + (entries.Count + 1) + " of " + need + ".", null, (i, close) =>
+                    {
+                        var pk = _game.State.Party[i];
+                        if (pk.IsEgg || entries.Contains(i) || entries.Any(j => _game.State.Party[j].Species == pk.Species)) { _game.Message.Show("That Pokémon can't be entered."); return; }
+                        close(); entries.Add(i); pick();
+                    }, () => _game.SetPrompt(c, false)));
+                };
+                pick();
+                return false;
+            });
+            Register("pbBattleChallengeBattle", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                new BattleChallengeApi(_game).Battle(won => _game.SetPrompt(c, won));
+                return false;
+            });
+            Register("pbBattleChallengeBeginSpeech", (c, a) => new BattleChallengeApi(_game).BeginSpeech());
+            Register("pbBattleChallengeGraphic", (c, a) =>
+            {
+                var ev = CharArg(c, Arg(a, 0));
+                string gfx = new BattleChallengeApi(_game).NextGraphic();
+                if (ev != null && _game.Project.FindAsset("Graphics/Characters", gfx) != null) ev.CharacterName = gfx;
+                return true;
+            });
+            Register("$game_temp.last_battle_record", (c, a) => null);
+            Register("$PokemonGlobal.lastbattle", (c, a) => null);
+            Register("pbRecordLastBattle", (c, a) => true);
+            Register("pbPlayLastBattle", (c, a) => { _game.Message.Show("There's no recorded battle."); return true; });
 
             // Triple Triad
             Register("pbCanTriadDuel?", (c, a) => UI.TriadCards.Count(_game) >= 5);

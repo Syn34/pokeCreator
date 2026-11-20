@@ -35,6 +35,8 @@ namespace PokeCreator.Runtime.World
         public int VoltorbLevel { get; set; }
         /// <summary>Triple Triad cards owned: species → count.</summary>
         public Dictionary<string, int> TriadCards { get; set; }
+        /// <summary>Essentials Battle Frontier challenge (pbBattleChallenge) and records.</summary>
+        public FrontierState Frontier { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
         public int PokerusDay { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>
