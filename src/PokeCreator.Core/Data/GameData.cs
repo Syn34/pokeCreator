@@ -306,6 +306,7 @@ namespace PokeCreator.Data
         [Field("Default player", Help = "Index into Players", Group = "New game")] public int DefaultPlayer { get; set; }
         [Field("Player name", Group = "New game")] public string DefaultPlayerName { get; set; }
         [Field("Starting money", Group = "New game")] public int StartMoney { get; set; }
+        [Field("Running needs Running Shoes", Help = "On: the player can only run after an event sets $player.has_running_shoes = true (as in Essentials). Off: running works from the start.", Group = "New game")] public bool RunningShoesRequired { get; set; }
         [Field("Item in PC at start", Ref = "items", Group = "New game")] public List<string> StartItemStorage { get; set; }
         [Field("Home (map,x,y,dir)", Help = "Where the player goes after blacking out with no Pokémon Center.", Group = "New game"), JsonCompact] public List<int> Home { get; set; }
         [Field("PC storage creator")] public string StorageCreator { get; set; }

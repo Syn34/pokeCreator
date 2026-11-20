@@ -170,7 +170,7 @@ namespace PokeCreator.Runtime.World
             if (canControl && !Moving && !Jumping)
             {
                 int d = Input.Dir4;
-                bool run = Input.Press(Button.Run) && !Cycling;
+                bool run = Input.Press(Button.Run) && !Cycling && (!Game.Project.Settings.RunningShoesRequired || Game.State.Flags.Contains("has_running_shoes"));
                 MoveSpeed = run || Cycling ? 5 : 4;
                 SpeedScale = Cycling ? 1.5 : 1;
                 if (d != 0) Move(d);

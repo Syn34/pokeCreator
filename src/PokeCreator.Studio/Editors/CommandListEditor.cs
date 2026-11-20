@@ -216,6 +216,7 @@ namespace PokeCreator.Studio.Editors
             cmd(party, "Heal Party (Recover All)", () => Insert(new EventCommand(314, 0, 0)));
             cmd(party, "Enter Player Name", () => Insert(new EventCommand(355, 0, "pbTrainerName")));
             cmd(party, "Give Pokédex", () => Insert(new EventCommand(355, 0, "$player.has_pokedex = true")));
+            cmd(party, "Give Running Shoes", () => Insert(new EventCommand(355, 0, "$player.has_running_shoes = true")));
             cmd(party, "Change Player Character", () =>
             {
                 if (_p.Players.Count == 0) { MessageBox.Show(FindForm(), "There are no player characters. Add them under Game Settings > Player Characters.", "Change Player Character"); return; }

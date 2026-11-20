@@ -41,6 +41,7 @@ namespace PokeCreator.Import
             _p.Info.Name = ReadGameTitle() ?? Path.GetFileName(_src);
             _p.Info.ImportedFrom = "Pokémon Essentials: " + _src;
             _p.Settings.Title = _p.Info.Name;
+            _p.Settings.RunningShoesRequired = true; // Essentials games give the Running Shoes in an event
 
             Step("types", ImportTypes);
             Step("abilities", ImportAbilities);
