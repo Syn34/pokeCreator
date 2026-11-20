@@ -224,6 +224,10 @@ namespace PokeCreator.Projects
         static readonly Regex SpeciesCall = new Regex(@"\b(pbAddPokemon|pbAddPokemonSilent|pbAddToParty|pbAddToPartySilent|pbWildBattle|WildBattle\.start)\s*\(\s*:([A-Za-z0-9_]+)", RegexOptions.Compiled);
         static readonly Regex ItemCall = new Regex(@"(pbReceiveItem|pbItemBall|pbGiveItem|pbStoreItem|\$bag\.add|\$bag\.has\?|\$PokemonBag\.pbStoreItem)\s*\(\s*:([A-Za-z0-9_]+)", RegexOptions.Compiled);
         // TrainerBattle.start(:TYPE, "Name", version) / pbTrainerBattle(:TYPE, "Name", endSpeech, double, version)
+        // Second trainer / species of double battles
+        static readonly Regex SecondTrainer = new Regex(@"\bTrainerBattle\.start\s*\(\s*:[A-Za-z0-9_]+\s*,\s*""[^""]*""(?:\s*,\s*\d+)?\s*,\s*:([A-Za-z0-9_]+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+))?", RegexOptions.Compiled);
+        static readonly Regex SecondTrainerOld = new Regex(@"\bpbDoubleTrainerBattle\s*\((?:[^,]*,){4}\s*:([A-Za-z0-9_]+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+))?", RegexOptions.Compiled);
+        static readonly Regex SecondSpecies = new Regex(@"\b(WildBattle\.start|pbDoubleWildBattle)\s*\(\s*:[A-Za-z0-9_]+\s*,\s*\d+\s*,\s*:([A-Za-z0-9_]+)", RegexOptions.Compiled);
         static readonly Regex TrainerCall = new Regex(@"\b(pbTrainerBattle|pbDoubleTrainerBattle|TrainerBattle\.start)\s*\(\s*:([A-Za-z0-9_]+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+)\s*[,)])?", RegexOptions.Compiled);
 
         void CheckCommands(List<EventCommand> list, string where, string target, MapData map)
@@ -295,6 +299,17 @@ namespace PokeCreator.Projects
             if (string.IsNullOrEmpty(script)) return;
             foreach (Match m in SpeciesCall.Matches(script))
                 if (!Known("species", m.Groups[2].Value)) Add(ProblemSeverity.Error, where, target, m.Groups[1].Value + " uses :" + m.Groups[2].Value + ", but there is no such Pokémon.");
+            foreach (Match m in SecondSpecies.Matches(script))
+                if (!Known("species", m.Groups[2].Value)) Add(ProblemSeverity.Error, where, target, m.Groups[1].Value + " uses :" + m.Groups[2].Value + ", but there is no such Pokémon.");
+            foreach (var rx in new[] { SecondTrainer, SecondTrainerOld })
+                foreach (Match m in rx.Matches(script))
+                {
+                    string type = m.Groups[1].Value, name = m.Groups[2].Value;
+                    int version = m.Groups[3].Success ? int.Parse(m.Groups[3].Value) : 0;
+                    if (!Known("trainer_types", type)) Add(ProblemSeverity.Error, where, target, "Double battle uses trainer type :" + type + ", which doesn't exist.");
+                    else if (!_p.Trainers.Any(t => t.TrainerType == type && t.Name == name && (rx == SecondTrainerOld || t.Version == version)))
+                        Add(ProblemSeverity.Error, where, target, "Double battle against " + type + " \"" + name + "\"" + (version > 0 ? " (version " + version + ")" : "") + ", but there is no such trainer in the database.");
+                }
             foreach (Match m in ItemCall.Matches(script))
                 if (!Known("items", m.Groups[2].Value)) Add(ProblemSeverity.Error, where, target, m.Groups[1].Value + " uses :" + m.Groups[2].Value + ", but there is no such item.");
             foreach (Match m in TrainerCall.Matches(script))
