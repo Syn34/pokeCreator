@@ -1030,7 +1030,7 @@ namespace PokeCreator.Runtime
                         case "menu": _g.PushScene(new PauseMenu(_g)); break;
                         case "bag": _g.PushScene(new BagScene(_g)); break;
                         case "party": _g.PushScene(new PartyScene(_g)); break;
-                        case "dex": _g.PushScene(new PokedexScene(_g)); break;
+                        case "dex": PokedexScene.Open(_g); break;
                         case "options": _g.PushScene(new OptionsScene(_g)); break;
                         case "name": _g.AskName("Your name?", "", 10, n => _g.State.PlayerName = n, null); break;
                     }

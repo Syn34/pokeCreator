@@ -27,6 +27,8 @@ namespace PokeCreator.Runtime.Script
         {
             _game = g;
             RegisterBuiltins();
+            RegisterMoreCalls();
+            RegisterMoreCalls2();
         }
 
         public void Register(string name, Handler h) { _commands[name] = h; }
@@ -97,8 +99,32 @@ namespace PokeCreator.Runtime.Script
 
         void WarnOnce(string msg) { if (_warned.Add(msg)) Console.WriteLine("[essentials] " + msg); }
 
+        /// <summary>Inside a { |x| … } block spread over lines, a line break ends a statement (becomes ';').</summary>
+        static string BlockLineBreaks(string s)
+        {
+            if (s.IndexOf('{') < 0) return s;
+            var buf = s.ToCharArray(); var stack = new Stack<char>(); bool inStr = false; char q = '\0';
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inStr) { if (c == '\\') i++; else if (c == q) inStr = false; continue; }
+                if (c == '"' || c == '\'') { inStr = true; q = c; continue; }
+                if (c == '#' && (i + 1 >= s.Length || s[i + 1] != '{')) { while (i + 1 < s.Length && s[i + 1] != '\n') i++; continue; }
+                if (c == '(' || c == '[' || c == '{') stack.Push(c);
+                else if ((c == ')' || c == ']' || c == '}') && stack.Count > 0) stack.Pop();
+                else if (c == '\n' && stack.Count > 0 && stack.Peek() == '{')
+                {
+                    int p = i - 1; while (p >= 0 && (s[p] == ' ' || s[p] == '\t' || s[p] == '\r')) p--;
+                    int nx = i + 1; while (nx < s.Length && (s[nx] == ' ' || s[nx] == '\t' || s[nx] == '\r')) nx++;
+                    if (p >= 0 && ",{|([+-*/=&<>\\".IndexOf(s[p]) < 0 && nx < s.Length && s[nx] != '}') buf[i] = ';';
+                }
+            }
+            return new string(buf);
+        }
+
         static IEnumerable<string> SplitStatements(string s)
         {
+            s = BlockLineBreaks(s);
             // Statements end at a newline or ';' outside brackets and strings, so calls and arrays can span lines
             var parts = new List<string>();
             int depth = 0, start = 0; bool inStr = false; char q = '\0';
@@ -207,6 +233,14 @@ namespace PokeCreator.Runtime.Script
                     if (e[k] == '"' || e[k] == '\'') { int cl = e.IndexOf(e[k], k + 1); if (cl < 0) break; k = cl; continue; }
                     if (e[k] == '{' && MatchingBracket(e, k) == e.Length - 1) { ob = k; break; }
                     if (e[k] == '(' || e[k] == '[' || e[k] == '{') { int cl = MatchingBracket(e, k); if (cl < 0) break; k = cl; }
+                }
+                var plain = ob > 0 ? Regex.Match(e.Substring(0, ob), @"^(pbFadeOutIn|pbFadeOutInWithMusic|pbFadeOutAndHide|pbHideVisibleObjects|pbRunWithFade)(?:\((.*)\))?\s*$") : Match.Empty;
+                if (plain.Success)
+                {
+                    // A fade around a block: the block runs (the screen flashes briefly)
+                    var body = SplitStatements(e.Substring(ob + 1, e.Length - ob - 2).Replace(";", "\n")).ToList();
+                    int bp = 0; ExecBlock(ParseBlock(body, ref bp), ctx);
+                    return true;
                 }
                 var bm = ob > 0 ? Regex.Match(e.Substring(0, ob), @"^(.+)\.(\w+[?!]?)(?:\((.*)\))?\s*$") : Match.Empty;
                 if (bm.Success)

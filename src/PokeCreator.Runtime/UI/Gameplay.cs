@@ -374,10 +374,46 @@ namespace PokeCreator.Runtime.UI
         int _index, _scroll;
         const int Rows = 8;
 
-        public PokedexScene(Game g) : base(g)
+        readonly string _title = "Pokédex";
+
+        /// <summary>The Pokédexes the player can open: unlocked regional dexes (with something seen in them), then the National Dex (-1).</summary>
+        public static List<int> ViableDexes(Game g)
+        {
+            var list = new List<int>();
+            var unlocked = World.DexState.Unlocked(g);
+            for (int i = 0; i < g.Project.RegionalDexes.Count; i++)
+                if (unlocked.Contains(i) && g.Project.RegionalDexes[i].Species.Any(sp => g.State.Seen.Contains(sp))) list.Add(i);
+            if (unlocked.Contains(-1) || g.Project.RegionalDexes.Count == 0) list.Add(-1);
+            return list;
+        }
+
+        public static string DexName(Game g, int dex)
+        {
+            if (dex < 0 || dex >= g.Project.RegionalDexes.Count) return "National Pokédex";
+            var d = g.Project.RegionalDexes[dex];
+            return string.IsNullOrEmpty(d.Name) ? "Regional Pokédex" : d.Name + (d.Name.IndexOf("dex", StringComparison.OrdinalIgnoreCase) >= 0 ? "" : " Pokédex");
+        }
+
+        /// <summary>Opens the Pokédex: with several viable dexes the player picks one first.</summary>
+        public static void Open(Game g)
+        {
+            var dexes = ViableDexes(g);
+            if (dexes.Count <= 1) { g.PushScene(new PokedexScene(g, dexes.Count == 1 ? dexes[0] : -1)); return; }
+            var names = dexes.Select(d => DexName(g, d)).ToList(); names.Add("Cancel");
+            g.Message.Show("Which Pokédex?", names, names.Count - 1, k => { if (k >= 0 && k < dexes.Count) g.PushScene(new PokedexScene(g, dexes[k])); });
+        }
+
+        public PokedexScene(Game g) : this(g, -1) { }
+
+        public PokedexScene(Game g, int dex) : base(g)
         {
             Opaque = true;
-            _list = g.Project.Species.Where(s => s.Form == 0).ToList();
+            if (dex >= 0 && dex < g.Project.RegionalDexes.Count)
+            {
+                _list = g.Project.RegionalDexes[dex].Species.Select(sp => g.Project.Species.FirstOrDefault(s => s.Id == sp && s.Form == 0)).Where(s => s != null).ToList();
+                _title = DexName(g, dex);
+            }
+            else _list = g.Project.Species.Where(s => s.Form == 0).ToList();
             // Start on the last species the player has seen
             int last = _list.FindLastIndex(s => g.State.Seen.Contains(s.Id));
             _index = Math.Max(0, last); _scroll = Math.Max(0, _index - Rows / 2);
@@ -407,8 +443,8 @@ namespace PokeCreator.Runtime.UI
         {
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
             Ui.Panel(g, 8, 8, g.Width - 16, 40, new Color(248, 248, 248), new Color(120, 24, 24));
-            Ui.Text(g, 22, 12, "Pokédex");
-            Ui.TextRight(g, g.Width - 24, 12, "Seen " + Game.State.Seen.Count + "   Owned " + Game.State.Caught.Count);
+            Ui.Text(g, 22, 12, _title);
+            Ui.TextRight(g, g.Width - 24, 12, "Seen " + _list.Count(s => Game.State.Seen.Contains(s.Id)) + "   Owned " + _list.Count(s => Game.State.Caught.Contains(s.Id)));
             // Sprite of the highlighted species on the left
             Ui.Panel(g, 8, 56, 200, 240, new Color(248, 248, 248), new Color(120, 24, 24));
             var cur = _list.Count > 0 ? _list[_index] : null;

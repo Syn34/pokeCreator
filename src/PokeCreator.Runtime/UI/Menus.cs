@@ -134,7 +134,7 @@ namespace PokeCreator.Runtime.UI
             Decide();
             switch (_ids[r])
             {
-                case "dex": Game.PushScene(new PokedexScene(Game)); break;
+                case "dex": PokedexScene.Open(Game); break;
                 case "options": Game.PushScene(new OptionsScene(Game)); break;
                 case "party": Game.PushScene(new PartyScene(Game)); break;
                 case "bag": Game.PushScene(new BagScene(Game)); break;

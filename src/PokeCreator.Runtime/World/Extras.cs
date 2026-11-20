@@ -45,6 +45,10 @@ namespace PokeCreator.Runtime.World
         public int DungeonVersion { get; set; }
         /// <summary>The battle kept with pbRecordLastBattle (watched with pbPlayLastBattle).</summary>
         public BattleRecord SavedBattle { get; set; }
+        /// <summary>Pokédexes the player can use (regional dex numbers; -1 = National). Null = the default (the first regional dex, or National if there are none).</summary>
+        public List<int> UnlockedDexes { get; set; }
+        /// <summary>pbTimeEvent: the time (ticks) stored for a variable.</summary>
+        public Dictionary<string, long> TimeEvents { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
