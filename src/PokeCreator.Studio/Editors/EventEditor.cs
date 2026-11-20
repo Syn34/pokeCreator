@@ -68,6 +68,12 @@ namespace PokeCreator.Studio.Editors
                 case 223: return "◆ Change Screen Color Tone";
                 case 224: return "◆ Screen Flash";
                 case 225: return "◆ Screen Shake";
+                case 236:
+                    {
+                        string[] names = { "None", "Rain", "Storm", "Snow", "Blizzard", "Sandstorm", "Heavy Rain", "Sun", "Fog" };
+                        int t = c.IntParam(0);
+                        return "◆ Set Weather: " + (t >= 0 && t < names.Length ? names[t] : "type " + t) + (t > 0 ? ", strength " + c.IntParam(1) : "") + (c.IntParam(2) > 0 ? ", @" + c.IntParam(2) : "");
+                    }
                 case 241: return "◆ Play BGM: " + Audio(c);
                 case 242: return "◆ Fade Out BGM: " + c.IntParam(0) + " sec";
                 case 245: return "◆ Play BGS: " + Audio(c);

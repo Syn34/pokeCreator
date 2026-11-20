@@ -38,7 +38,7 @@ namespace PokeCreator.Maps
         [Field("Bicycle allowed")] public bool Bicycle { get; set; }
         [Field("Always on bicycle")] public bool BicycleAlways { get; set; }
         [Field("Healing spot (map,x,y)", Help = "Where you respawn after blacking out."), JsonCompact] public List<int> HealingSpot { get; set; }
-        [Field("Weather", Help = "e.g. Rain,50 (type, % chance)")] public string Weather { get; set; }
+        [Field("Weather", Help = "Type and % chance it happens when the player arrives, e.g. Rain,50. Types: Rain, Storm, Snow, Blizzard, Sandstorm, HeavyRain, Sun, Fog.")] public string Weather { get; set; }
         [Field("Town map position (region,x,y)"), JsonCompact] public List<int> MapPosition { get; set; }
         [Field("Dive map ID")] public int DiveMap { get; set; }
         [Field("Dark (needs Flash)")] public bool DarkMap { get; set; }

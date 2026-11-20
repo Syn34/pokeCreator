@@ -252,6 +252,15 @@ namespace PokeCreator.Studio.Editors
             cmd(screen, "Change Screen Tone", AddTone);
             cmd(screen, "Screen Flash", () => { int f = NumberDialog.Ask(FindForm(), "Flash length (1/20 second units)", 10); if (f > 0) Insert(new EventCommand(224, 0, ColorObj(255, 255, 255, 255), f)); });
 
+            cmd(screen, "Set Weather", () =>
+            {
+                string[] names = { "None", "Rain", "Storm", "Snow", "Blizzard", "Sandstorm", "Heavy Rain", "Sun", "Fog" };
+                int t = ChoiceDialog.Ask(FindForm(), "Weather", names); if (t < 0) return;
+                int power = t == 0 ? 0 : NumberDialog.Ask(FindForm(), "Strength (1-9)", 9); if (power < 0) return;
+                int sec = NumberDialog.Ask(FindForm(), "Change over (1/20 second units, 0 = at once)", 20); if (sec < 0) return;
+                Insert(new EventCommand(236, 0, t, Math.Min(9, power), sec * 2));
+            });
+
             var audio = group("Audio");
             cmd(audio, "Play BGM", AddMusic);
             cmd(audio, "Fade Out BGM", () => { int sec = NumberDialog.Ask(FindForm(), "Fade out over (seconds)", 1); if (sec >= 0) Insert(new EventCommand(242, 0, sec)); });

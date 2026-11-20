@@ -43,7 +43,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Fishing (Old/Good/Super Rod), Repel
 - [x] Bicycle, Escape Rope, Town Map
 - [ ] Running shoes toggle, Itemfinder
-- [ ] Weather and fog/panorama effects, flash/darkness maps, Essentials text codes (colours, speed, windowskins)
+- [x] Overworld weather (map Weather property and Set Weather command)
+- [ ] Fog/panorama images, flash/darkness maps, Essentials text codes (colours, speed, windowskins)
 
 ## v0.5: Studio power features
 - [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves

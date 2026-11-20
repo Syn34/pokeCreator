@@ -40,6 +40,7 @@ namespace PokeCreator.Runtime.World
         public Dictionary<string, int> PcItems { get; set; }
         public bool Surfing { get; set; }
         public bool Cycling { get; set; }
+        public List<int> Weather { get; set; }
         public List<int> Visited { get; set; }
         public List<int> EscapePoint { get; set; }
         public SaveData()
@@ -105,6 +106,7 @@ namespace PokeCreator.Runtime.World
                 RepelSteps = s.RepelSteps,
                 Surfing = g.Player != null && g.Player.Surfing,
                 Cycling = g.Player != null && g.Player.Cycling,
+                Weather = g.Weather.Type != 0 ? new List<int> { g.Weather.Type, g.Weather.Power } : null,
                 Visited = s.Visited.OrderBy(v => v).ToList(),
                 EscapePoint = s.EscapePoint,
                 PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,

@@ -43,6 +43,8 @@ namespace PokeCreator.Runtime
         MapRenderer _renderer;
 
         public int DisplayX, DisplayY;
+        /// <summary>Overworld weather (map metadata "Weather" or the Set Weather Effects command).</summary>
+        public readonly World.WeatherSystem Weather = new World.WeatherSystem();
         public int FrameCount;
         bool _quit;
 
@@ -154,6 +156,7 @@ namespace PokeCreator.Runtime
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
             Player.Surfing = d.Surfing;
             Player.Cycling = d.Cycling && !d.Surfing;
+            if (d.Weather != null && d.Weather.Count >= 2) Weather.Set(d.Weather[0], d.Weather[1], 0);
             if (!string.IsNullOrEmpty(d.Bgm) && string.IsNullOrEmpty(Audio.CurrentBgm)) Audio.PlayBgm(d.Bgm);
         }
 
@@ -189,6 +192,25 @@ namespace PokeCreator.Runtime
         {
             var data = Map != null ? Map.Data : null;
             if (data != null && data.AutoplayBgm && data.Bgm != null && !string.IsNullOrEmpty(data.Bgm.Name)) Audio.PlayBgm(data.Bgm.Name, data.Bgm.Volume);
+        }
+
+        /// <summary>
+        /// Essentials: entering a map with "Weather" metadata (e.g. Rain,50) starts that weather with that % chance;
+        /// otherwise the weather stops. Walking across a connection into the same weather keeps it.
+        /// </summary>
+        void RollMapWeather(bool warped)
+        {
+            var w = Map.Data.Properties != null ? Map.Data.Properties.Weather : null;
+            int type = World.WeatherSystem.None, chance = 0;
+            if (!string.IsNullOrEmpty(w))
+            {
+                var parts = w.Split(',');
+                type = World.WeatherSystem.TypeFromName(parts[0]);
+                if (parts.Length < 2 || !int.TryParse(parts[1].Trim(), out chance)) chance = 100;
+            }
+            if (!warped && type == Weather.Type && type != World.WeatherSystem.None) return;
+            if (type != World.WeatherSystem.None && Rng.Next(100) < chance) Weather.Set(type, 9, 0);
+            else Weather.Set(World.WeatherSystem.None, 0, 0);
         }
 
         /// <summary>Map music, or the Bicycle / Surf music while riding.</summary>
@@ -238,6 +260,7 @@ namespace PokeCreator.Runtime
             CenterCamera();
             UpdateRiding();
             PlayMapMusic();
+            RollMapWeather(true);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -256,6 +279,7 @@ namespace PokeCreator.Runtime
             if (State != null) State.Visited.Add(data.Id);
             UpdateRiding();
             PlayMapMusic();
+            RollMapWeather(false);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -472,6 +496,7 @@ namespace PokeCreator.Runtime
                 _toneFrames--;
             }
             if (_signTimer > 0) _signTimer--;
+            Weather.Update(DisplayX, DisplayY, Gfx.Width, Gfx.Height);
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
@@ -551,6 +576,7 @@ namespace PokeCreator.Runtime
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
                 _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
                 DrawTone();
+                Weather.Draw(Gfx);
                 DrawExclaim();
                 DrawLocationSign();
             }
@@ -671,6 +697,7 @@ namespace PokeCreator.Runtime
                     }
                 case "fish": World.FieldMoves.Fish(_g, p[1]); break;
                 case "bagitem": UI.ItemFlow.UseFromBag(_g, p[1], null); break;
+                case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
                 case "visit": foreach (var v in p[1].Split(',')) _g.State.Visited.Add(int.Parse(v)); break;
                 case "party":
                     foreach (var pk in _g.State.Party)

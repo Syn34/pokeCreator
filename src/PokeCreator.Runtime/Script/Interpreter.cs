@@ -78,6 +78,15 @@ namespace PokeCreator.Runtime.Script
 
         public void Wait(int frames) { _wait = Math.Max(_wait, frames); }
         /// <summary>Waits until every forced move route (player and events) has finished.</summary>
+        /// <summary>Weather type of a Set Weather Effects command: a number (Essentials order) or a name like :Rain.</summary>
+        static int WeatherType(object o)
+        {
+            if (o == null) return WeatherSystem.None;
+            var str = o as string;
+            if (str != null) { int n; return int.TryParse(str, out n) ? n : WeatherSystem.TypeFromName(str); }
+            try { return Convert.ToInt32(o); } catch { return WeatherSystem.None; }
+        }
+
         public void WaitForMoves() { _waitForMoves = true; }
 
         public void Update()
@@ -220,7 +229,8 @@ namespace PokeCreator.Runtime.Script
                         if (c.IntParam(4) != 0) ch.Turn(c.IntParam(4));
                         return true;
                     }
-                case 203: case 204: case 205: case 206: case 207: case 221: case 222: case 236: return true;
+                case 203: case 204: case 205: case 206: case 207: case 221: case 222: return true;
+                case 236: _game.Weather.Set(WeatherType(c.Params.Count > 0 ? c.Params[0] : null), c.IntParam(1), c.IntParam(2)); return true;
                 case 208: _game.Player.Transparent = c.IntParam(0) == 0; return true;
                 case 209:
                     {

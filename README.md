@@ -58,6 +58,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
 - C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands
 - Location signs, day/night tint on outdoor maps, BGM/SE/ME through SDL_mixer
+- **Weather**: rain, storm (with lightning), heavy rain, snow, blizzard, sandstorm, sun and fog, from a map's Weather property (e.g. `Rain,50`) or the Set Weather command
 - **Pokémon:** real individual Pokémon with official stat formulas, 25 natures, IVs/EVs, all six EXP growth curves, gender ratios, abilities, shininess and level-up movesets. Events that give Pokémon (`pbAddPokemon`) create them, and healing commands restore HP and PP
 - **Title screen** (uses your `Graphics/Titles/title.png`) with Continue / New Game / Quit
 - **Pause menu** (Esc/X): Pokémon party (switch order), 3-page summary (info, stats with nature colours, moves), Bag with 8 pockets, trainer card, Save, Quit to Title
