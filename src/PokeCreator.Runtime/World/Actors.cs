@@ -261,6 +261,7 @@ namespace PokeCreator.Runtime.World
                 _pendingNeighbor = null;
             }
             Game.State.Steps++;
+            DayCare.OnStep(Game);
             // Player touch / event touch on the tile we stepped onto
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
                 if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }

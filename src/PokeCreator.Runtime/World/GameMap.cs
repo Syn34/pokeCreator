@@ -35,6 +35,10 @@ namespace PokeCreator.Runtime.World
         public int HealMap, HealX, HealY, HealDir;
         /// <summary>Steps left on a Repel.</summary>
         public int RepelSteps;
+        /// <summary>Pokémon left at the Day Care, its egg counter and whether an Egg is waiting.</summary>
+        public List<DayCareSlot> DayCare = new List<DayCareSlot>();
+        public int DayCareEggSteps;
+        public bool DayCareEgg;
         /// <summary>Maps the player has been to (Fly only goes to visited places).</summary>
         public readonly HashSet<int> Visited = new HashSet<int>();
         /// <summary>Where Dig / the Escape Rope go back to: map, x, y, direction (set by pbSetEscapePoint).</summary>
@@ -48,7 +52,12 @@ namespace PokeCreator.Runtime.World
         public bool GetSwitch(int id) { bool v; return Switches.TryGetValue(id, out v) && v; }
         public void SetSwitch(int id, bool v) { Switches[id] = v; }
         public int GetVar(int id) { int v; return Variables.TryGetValue(id, out v) ? v : 0; }
-        public void SetVar(int id, int v) { Variables[id] = v; }
+        public void SetVar(int id, int v) { Variables[id] = v; StringVars.Remove(id); }
+        /// <summary>Variables holding text (Essentials scripts store names in variables, shown with \v[n]).</summary>
+        public readonly Dictionary<int, string> StringVars = new Dictionary<int, string>();
+        public void SetStr(int id, string s) { Variables[id] = 0; StringVars[id] = s ?? ""; }
+        /// <summary>A variable as text: its string if it holds one, otherwise its number.</summary>
+        public string VarText(int id) { string s; return StringVars.TryGetValue(id, out s) ? s : GetVar(id).ToString(); }
         public bool GetSelf(int map, int ev, string ch) { return SelfSwitches.Contains(map + "," + ev + "," + ch); }
         public void SetSelf(int map, int ev, string ch, bool v)
         {

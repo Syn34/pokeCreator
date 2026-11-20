@@ -55,6 +55,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Pokédex** (seen and caught, list and entry pages) in the pause menu once `$player.has_pokedex = true`; **Options** (text speed, music and sound volume); **name entry** for `pbTrainerName` / `pbEnterPlayerName`, and nicknames when receiving a Pokémon
 - **Field moves**: Surf (press A at the water with a Surf user in the party; water encounters while surfing), Cut trees, Rock Smash rocks (with Rock Smash encounters), Strength boulders, Headbutt trees, fishing with the Old/Good/Super Rod from the Bag, and berry plants (`pbPickBerry`). Essentials' events for these (`pbCut`, `pbRockSmash`, `pbSmashThisEvent`, `pbPushThisBoulder`, `pbHeadbutt`...) work unchanged, and the Studio has them in the palette (Field Moves) and as right-click templates (New Field Object). Pokémon that know a field move (Cut, Fly, Surf, Strength, Rock Smash, Headbutt, Teleport, Dig, Sweet Scent) list it in the party menu
 - **Town Map and Fly**: the region map from your town map data (Graphics/UI/Town Map), with the player's position; Fly goes to any place with a fly point the player has visited. **Bicycle** (from the Bag; faster, its own sprite and music, only on outdoor/bike maps), **Escape Rope** and Dig (back to the cave entrance set by `pbSetEscapePoint`), Teleport (last Pokémon Center)
+- **Day Care and Eggs**: Essentials' `DayCare` calls work, so the example Day Care events run unchanged. Pokémon gain EXP as you walk, compatible pairs make Eggs (baby species, inherited IVs, Everstone, Destiny Knot, egg moves), and Eggs hatch after their hatch steps (faster with Flame Body). Variables can hold names for `\v[n]`
 - Poké Marts (`pbPokemonMart`), the Pokémon Center PC (Pokémon storage boxes and item storage) and trainers who spot the player and walk up
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
 - C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands
@@ -67,7 +68,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 
 **Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
 
-**Not yet:** Waterfall/Dive/Flash, Day Care, double battles and battle animations. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Not yet:** Waterfall/Dive/Flash, double battles and battle animations. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quick start (Windows)
 

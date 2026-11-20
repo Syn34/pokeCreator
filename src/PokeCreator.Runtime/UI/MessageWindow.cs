@@ -50,7 +50,7 @@ namespace PokeCreator.Runtime.UI
         public string Expand(string s)
         {
             s = s.Replace("\\PN", _game.State.PlayerName).Replace("\\pn", _game.State.PlayerName);
-            s = Regex.Replace(s, @"\\[vV]\[(\d+)\]", m => _game.State.GetVar(int.Parse(m.Groups[1].Value)).ToString());
+            s = Regex.Replace(s, @"\\[vV]\[(\d+)\]", m => _game.State.VarText(int.Parse(m.Groups[1].Value)));
             s = s.Replace("\\n", "\n").Replace("\\N", "\n");
             s = Regex.Replace(s, @"\\[a-zA-Z]+\[[^\]]*\]", "");                    // codes with arguments: \c[1], \se[..], \wtnp[..]
             s = Regex.Replace(s, @"\\(?:op|cl|wu|wd|pm|pg|cn|[brigG])", "");          // argument-less codes: \b (blue), \r (red) ...

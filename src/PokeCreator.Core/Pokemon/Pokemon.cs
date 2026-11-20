@@ -113,6 +113,8 @@ namespace PokeCreator.Pkmn
         public int MetMap { get; set; }
         public int MetLevel { get; set; }
         public bool IsEgg { get; set; }
+        /// <summary>Steps left before an Egg hatches.</summary>
+        public int EggSteps { get; set; }
 
         public Pokemon()
         {
@@ -129,6 +131,7 @@ namespace PokeCreator.Pkmn
 
         public string Name(Project p)
         {
+            if (IsEgg) return "Egg";
             if (!string.IsNullOrEmpty(Nickname)) return Nickname;
             var d = Data(p);
             return d != null && !string.IsNullOrEmpty(d.Name) ? d.Name : Species;

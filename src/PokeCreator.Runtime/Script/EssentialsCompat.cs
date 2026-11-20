@@ -351,7 +351,12 @@ namespace PokeCreator.Runtime.Script
             });
 
             // Variables, bag and screen helpers
-            Register("pbSet", (c, a) => { _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1))); _game.Map.RefreshEvents(); return Arg(a, 1); });
+            Register("pbSet", (c, a) =>
+            {
+                if (Arg(a, 1) is string) _game.State.SetStr(ToInt(Arg(a, 0)), (string)Arg(a, 1));
+                else _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1)));
+                _game.Map.RefreshEvents(); return Arg(a, 1);
+            });
             Register("pbGet", (c, a) => _game.State.GetVar(ToInt(Arg(a, 0))));
             Register("$bag.remove", (c, a) => { bool had = _game.State.Bag.ContainsKey(Str(a, 0)); _game.State.AddItem(Str(a, 0), -(a.Count > 1 ? ToInt(a[1]) : 1)); return had; });
             Register("$bag.can_add?", (c, a) => true);
@@ -365,7 +370,44 @@ namespace PokeCreator.Runtime.Script
 
             Register("pbGetPokemon", (c, a) => null);
             Register("pbPartyCount", (c, a) => _game.Party.Count);
-            Register("pbChooseNonEggPokemon", (c, a) => true);
+            Register("pbChooseNonEggPokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg); return true; });
+            Register("pbChoosePokemon", (c, a) => { ChoosePokemon(a, pk => true); return true; });
+            Register("pbChooseAblePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.Fainted); return true; });
+            Register("$player.has_other_able_pokemon?", (c, a) => { int i = ToInt(Arg(a, 0)); return _game.State.Party.Where((pk, k) => k != i).Any(pk => !pk.IsEgg && !pk.Fainted); });
+            Register("cannot_store", (c, a) => false);
+            // Day Care (Essentials v21 DayCare class)
+            Register("DayCare.count", (c, a) => DayCare.Count(_game));
+            Register("DayCare.deposit", (c, a) => { DayCare.Deposit(_game, ToInt(Arg(a, 0))); return true; });
+            Register("DayCare.withdraw", (c, a) => { DayCare.Withdraw(_game, ToInt(Arg(a, 0))); return true; });
+            Register("DayCare.egg_generated?", (c, a) => _game.State.DayCareEgg);
+            Register("DayCare.collect_egg", (c, a) => { DayCare.CollectEgg(_game); return true; });
+            Register("DayCare.reset_egg_counters", (c, a) => { _game.State.DayCareEgg = false; _game.State.DayCareEggSteps = 0; return true; });
+            Register("DayCare.get_compatibility", (c, a) => { int v = DayCare.Compatibility(_game); if (a.Count > 0) _game.State.SetVar(ToInt(a[0]), v); return v; });
+            Register("DayCare.get_details", (c, a) =>
+            {
+                int slot = ToInt(Arg(a, 0));
+                if (slot < 0 || slot >= _game.State.DayCare.Count) return false;
+                if (a.Count > 1) _game.State.SetStr(ToInt(a[1]), _game.State.DayCare[slot].Pokemon.Name(_game.Project));
+                if (a.Count > 2) _game.State.SetVar(ToInt(a[2]), DayCare.Cost(_game, slot));
+                return true;
+            });
+            Register("DayCare.get_level_gain", (c, a) =>
+            {
+                int slot = ToInt(Arg(a, 0));
+                if (slot < 0 || slot >= _game.State.DayCare.Count) return false;
+                if (a.Count > 1) _game.State.SetStr(ToInt(a[1]), _game.State.DayCare[slot].Pokemon.Name(_game.Project));
+                if (a.Count > 2) _game.State.SetVar(ToInt(a[2]), DayCare.LevelGain(_game, slot));
+                return true;
+            });
+            Register("DayCare.choose", (c, a) =>
+            {
+                int v = a.Count > 1 ? ToInt(a[1]) : 1;
+                var names = _game.State.DayCare.Select(s => s.Pokemon.Name(_game.Project) + " (Lv. " + s.Pokemon.Level + ")").ToList();
+                if (names.Count == 0) { _game.State.SetVar(v, -1); return true; }
+                names.Add("Cancel");
+                _game.Message.Show(Str(a, 0), names, names.Count - 1, k => _game.State.SetVar(v, k == names.Count - 1 ? -1 : k));
+                return true;
+            });
             Register("pbEventCanReachPlayer?", (c, a) => false);
             Register("pbFacingTerrainTag", (c, a) => 0);
             Register("pbGetTimeNow", (c, a) => DateTime.Now);
@@ -474,6 +516,22 @@ namespace PokeCreator.Runtime.Script
 
         // ------------------------------------------------------------------ parsing helpers
         static object Arg(List<object> a, int i) { return i < a.Count ? a[i] : null; }
+
+        /// <summary>pbChoosePokemon(var, nameVar): the party screen; var = index (-1 if cancelled), nameVar = name.</summary>
+        void ChoosePokemon(List<object> a, Func<PokeCreator.Pkmn.Pokemon, bool> allowed)
+        {
+            int v = a.Count > 0 ? ToInt(a[0]) : 1, nameVar = a.Count > 1 ? ToInt(a[1]) : 0;
+            _game.State.SetVar(v, -1);
+            _game.PushScene(new UI.PartyScene(_game, "Choose a Pokémon.", pk => allowed(pk) ? null : "NOT ABLE", (i, close) =>
+            {
+                var pk = _game.State.Party[i];
+                if (!allowed(pk)) { _game.Audio.PlaySe("GUI sel buzzer"); return; }
+                _game.State.SetVar(v, i);
+                if (nameVar > 0) _game.State.SetStr(nameVar, pk.Name(_game.Project));
+                close();
+                if (_game.Map != null) _game.Map.RefreshEvents();
+            }, () => { _game.State.SetVar(v, -1); }));
+        }
         static string Str(List<object> a, int i) { return i < a.Count && a[i] != null ? Convert.ToString(a[i], CultureInfo.InvariantCulture) : ""; }
         static int ToInt(object o)
         {

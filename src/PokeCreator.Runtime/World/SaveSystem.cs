@@ -28,6 +28,7 @@ namespace PokeCreator.Runtime.World
         public string Bgm { get; set; }
         public List<int> SwitchesOn { get; set; }
         public Dictionary<string, int> Variables { get; set; }
+        public Dictionary<string, string> StringVariables { get; set; }
         public List<string> SelfSwitches { get; set; }
         public Dictionary<string, int> Bag { get; set; }
         public List<Pokemon> Party { get; set; }
@@ -43,6 +44,9 @@ namespace PokeCreator.Runtime.World
         public List<int> Weather { get; set; }
         public List<int> Visited { get; set; }
         public List<int> EscapePoint { get; set; }
+        public List<DayCareSlot> DayCare { get; set; }
+        public int DayCareEggSteps { get; set; }
+        public bool DayCareEgg { get; set; }
         public SaveData()
         {
             Version = 1; SwitchesOn = new List<int>(); Variables = new Dictionary<string, int>(); SelfSwitches = new List<string>();
@@ -99,6 +103,7 @@ namespace PokeCreator.Runtime.World
                 Location = g.Message.Expand(g.Map.DisplayName), Bgm = g.Audio.CurrentBgm,
                 SwitchesOn = s.Switches.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList(),
                 Variables = s.Variables.Where(kv => kv.Value != 0).ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+                StringVariables = s.StringVars.Count > 0 ? s.StringVars.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value) : null,
                 SelfSwitches = s.SelfSwitches.OrderBy(x => x).ToList(),
                 Bag = new Dictionary<string, int>(s.Bag),
                 Party = s.Party, Storage = s.Storage,
@@ -109,6 +114,9 @@ namespace PokeCreator.Runtime.World
                 Weather = g.Weather.Type != 0 ? new List<int> { g.Weather.Type, g.Weather.Power } : null,
                 Visited = s.Visited.OrderBy(v => v).ToList(),
                 EscapePoint = s.EscapePoint,
+                DayCare = s.DayCare.Count > 0 ? s.DayCare : null,
+                DayCareEggSteps = s.DayCareEggSteps,
+                DayCareEgg = s.DayCareEgg,
                 PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,
                 HealPoint = s.HealMap > 0 ? new List<int> { s.HealMap, s.HealX, s.HealY, s.HealDir } : null
             };
@@ -126,6 +134,8 @@ namespace PokeCreator.Runtime.World
             s.Money = d.Money; s.Steps = d.Steps;
             s.Switches.Clear(); foreach (var id in d.SwitchesOn) s.Switches[id] = true;
             s.Variables.Clear(); foreach (var kv in d.Variables) { int id; if (int.TryParse(kv.Key, out id)) s.Variables[id] = kv.Value; }
+            s.StringVars.Clear();
+            if (d.StringVariables != null) foreach (var kv in d.StringVariables) { int id; if (int.TryParse(kv.Key, out id)) s.StringVars[id] = kv.Value; }
             s.SelfSwitches.Clear(); foreach (var k in d.SelfSwitches) s.SelfSwitches.Add(k);
             s.Bag.Clear(); foreach (var kv in d.Bag) s.Bag[kv.Key] = kv.Value;
             s.Party = d.Party ?? new List<Pokemon>();
@@ -137,6 +147,9 @@ namespace PokeCreator.Runtime.World
             s.RepelSteps = d.RepelSteps;
             if (d.Visited != null) foreach (var v in d.Visited) s.Visited.Add(v);
             s.EscapePoint = d.EscapePoint;
+            s.DayCare = d.DayCare ?? new List<DayCareSlot>();
+            s.DayCareEggSteps = d.DayCareEggSteps;
+            s.DayCareEgg = d.DayCareEgg;
             s.PcItems.Clear(); if (d.PcItems != null) foreach (var kv in d.PcItems) s.PcItems[kv.Key] = kv.Value;
             if (d.HealPoint != null && d.HealPoint.Count >= 4) { s.HealMap = d.HealPoint[0]; s.HealX = d.HealPoint[1]; s.HealY = d.HealPoint[2]; s.HealDir = d.HealPoint[3]; }
             return d;
