@@ -34,7 +34,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Screens (Reflect, Light Screen, Aurora Veil), Tailwind, Safeguard, Mist, Trick Room, Gravity, terrains, entry hazards (Stealth Rock, Spikes, Toxic Spikes, Sticky Web) with Rapid Spin / Defog
 - [x] Taunt, Encore, Disable, Substitute, Leech Seed, Curse, Perish Song, Destiny Bond, Attract, Wish, Baton Pass, U-turn / Volt Switch, Roar / Dragon Tail in trainer battles, Metronome, Sleep Talk, Outrage / Rollout locks, Counter, Future Sight, Knock Off, variable power and type (Low Kick, Gyro Ball, Hex, Hidden Power...)
 - [ ] Remaining abilities and items, about 85 rarer move effects (Pledges, Fling, Pursuit, type-changing moves...)
-- [ ] Battle animations for moves
+- [x] Battle animations for moves: Essentials' PkmnAnimations imported and played (Move / OppMove / Common, extra hits, charging turns, type defaults, sounds, flashes, hue), "Battle Effects" option
 - [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
 
 ## v0.4: World features
@@ -60,7 +60,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Problems panel: missing graphics and audio, broken references, script errors
 - [x] Common events
 - [ ] Troops/battle setup screens
-- [ ] Animation editor for battle animations
+- [x] Animation editor for battle animations (preview, frames, cels, sheet palette, sounds, import from Essentials)
 - [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 
 ## Later

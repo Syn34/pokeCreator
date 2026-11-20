@@ -20,6 +20,17 @@ namespace PokeCreator.Ruby
         public override string ToString() { return Name; }
     }
 
+    /// <summary>An Array subclass (Essentials' PBAnimations, PBAnimation...) with its instance variables.</summary>
+    public class RUserArray : List<object>
+    {
+        public string ClassName;
+        public Dictionary<string, object> Ivars = new Dictionary<string, object>();
+        public RUserArray(string cls) { ClassName = cls; }
+        public object Get(string name) { object v; return Ivars.TryGetValue(name, out v) ? v : null; }
+        public int Int(string name) { var v = Get(name); return v == null ? 0 : (v is bool ? ((bool)v ? 1 : 0) : Convert.ToInt32(v, CultureInfo.InvariantCulture)); }
+        public string Str(string name) { var v = Get(name); return v == null ? "" : v.ToString(); }
+    }
+
     public class RHash
     {
         public List<KeyValuePair<object, object>> Pairs = new List<KeyValuePair<object, object>>();
@@ -125,6 +136,8 @@ namespace PokeCreator.Ruby
             return v;
         }
 
+        int PeekByte() { long p = _r.BaseStream.Position; int b = _r.BaseStream.ReadByte(); _r.BaseStream.Position = p; return b; }
+
         byte[] ReadBytes() { int n = ReadFixnum(); return _r.ReadBytes(n); }
 
         string ReadSymbol()
@@ -162,6 +175,7 @@ namespace PokeCreator.Ruby
                         {
                             string k = ReadSymbol(); var v = ReadValue();
                             var ro = obj as RObject; if (ro != null) ro.Ivars[k.TrimStart('@')] = v;
+                            var ua = obj as RUserArray; if (ua != null) ua.Ivars[k.TrimStart('@')] = v;
                         }
                         return obj;
                     }
@@ -221,7 +235,19 @@ namespace PokeCreator.Ruby
                         object o = v; _objects.Add(o); return o;
                     }
                 case 'e': ReadSymbol(); return ReadValue();
-                case 'C': ReadSymbol(); return ReadValue();
+                case 'C':
+                    {
+                        string cls = ReadSymbol();
+                        if (_r.BaseStream.CanSeek && PeekByte() == '[')
+                        {
+                            _r.ReadByte();
+                            var a = new RUserArray(cls); _objects.Add(a);
+                            int n = ReadFixnum();
+                            for (int i = 0; i < n; i++) a.Add(ReadValue());
+                            return a;
+                        }
+                        return ReadValue();
+                    }
                 case 'c':
                 case 'm':
                 case 'M': { var s = Encoding.UTF8.GetString(ReadBytes()); var o = new RSymbol(s); _objects.Add(o); return o; }

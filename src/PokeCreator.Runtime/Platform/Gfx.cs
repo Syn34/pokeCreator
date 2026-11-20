@@ -91,6 +91,50 @@ namespace PokeCreator.Runtime.Platform
             return t;
         }
 
+        /// <summary>Loads an image with its hue rotated (RMXP's hue setting for animations), cached per hue.</summary>
+        public Texture LoadHued(string path, int hue)
+        {
+            hue = ((hue % 360) + 360) % 360;
+            if (hue == 0 || string.IsNullOrEmpty(path)) return Load(path);
+            string key = path + "#hue" + hue;
+            Texture t;
+            if (_textures.TryGetValue(key, out t)) return t;
+            t = null;
+            var px = ReadPixels(path);
+            if (px != null)
+            {
+                int h = px.GetLength(0), w = px.GetLength(1);
+                var data = new int[w * h];
+                double rad = hue * Math.PI / 180, cos = Math.Cos(rad), sin = Math.Sin(rad);
+                // Rotation of the colour around the grey axis (keeps brightness), like RGSS's hue change
+                double[] m = {
+                    cos + (1 - cos) / 3, (1 - cos) / 3 - Math.Sqrt(1 / 3.0) * sin, (1 - cos) / 3 + Math.Sqrt(1 / 3.0) * sin,
+                    (1 - cos) / 3 + Math.Sqrt(1 / 3.0) * sin, cos + (1 - cos) / 3, (1 - cos) / 3 - Math.Sqrt(1 / 3.0) * sin,
+                    (1 - cos) / 3 - Math.Sqrt(1 / 3.0) * sin, (1 - cos) / 3 + Math.Sqrt(1 / 3.0) * sin, cos + (1 - cos) / 3 };
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        uint c = px[y, x];
+                        int a = (int)(c >> 24), r = (int)((c >> 16) & 255), g = (int)((c >> 8) & 255), b = (int)(c & 255);
+                        int nr = Clamp(r * m[0] + g * m[1] + b * m[2]), ng = Clamp(r * m[3] + g * m[4] + b * m[5]), nb = Clamp(r * m[6] + g * m[7] + b * m[8]);
+                        data[y * w + x] = (a << 24) | (nr << 16) | (ng << 8) | nb;
+                    }
+                IntPtr tex = SDL.SDL_CreateTexture(Renderer, SDL.PIXELFORMAT_ARGB8888, 0, w, h);
+                if (tex != IntPtr.Zero)
+                {
+                    var handle = System.Runtime.InteropServices.GCHandle.Alloc(data, System.Runtime.InteropServices.GCHandleType.Pinned);
+                    try { SDL.SDL_UpdateTexture(tex, IntPtr.Zero, handle.AddrOfPinnedObject(), w * 4); }
+                    finally { handle.Free(); }
+                    SDL.SDL_SetTextureBlendMode(tex, SDL.BLENDMODE_BLEND);
+                    t = new Texture { Handle = tex, Width = w, Height = h, Path = key };
+                }
+            }
+            _textures[key] = t;
+            return t;
+        }
+
+        static int Clamp(double v) { return v < 0 ? 0 : v > 255 ? 255 : (int)v; }
+
         /// <summary>Reads an image's pixels as ARGB values ([y, x]); null if it can't be loaded.</summary>
         public uint[,] ReadPixels(string path)
         {
@@ -118,6 +162,54 @@ namespace PokeCreator.Runtime.Platform
             if (alpha < 255) SDL.SDL_SetTextureAlphaMod(t.Handle, (byte)Math.Max(0, alpha));
             SDL.SDL_RenderCopy(Renderer, t.Handle, ref src, ref dst);
             if (alpha < 255) SDL.SDL_SetTextureAlphaMod(t.Handle, 255);
+        }
+
+        int _subtractMode = -1;
+
+        /// <summary>
+        /// Draws part of a texture centred at (cx, cy), zoomed, rotated (degrees, counter-clockwise as in RMXP),
+        /// mirrored, with opacity, blend (0 normal, 1 additive, 2 subtractive), an optional colour tint
+        /// (R,G,B,A blend toward that colour, like RMXP's Sprite#color).
+        /// </summary>
+        public void DrawEx(Texture t, int sx, int sy, int sw, int sh, double cx, double cy, double zoomX, double zoomY, double angle, bool mirror, int opacity, int blend, Color color = default(Color))
+        {
+            if (t == null || opacity <= 0 || zoomX == 0 || zoomY == 0) return;
+            int dw = (int)Math.Round(sw * Math.Abs(zoomX)), dh = (int)Math.Round(sh * Math.Abs(zoomY));
+            if (dw <= 0 || dh <= 0) return;
+            var src = new SDL_Rect(sx, sy, sw, sh);
+            var dst = new SDL_Rect((int)Math.Round(cx - dw / 2.0), (int)Math.Round(cy - dh / 2.0), dw, dh);
+            var center = new SDL_Point(dw / 2, dh / 2);
+            int flip = (mirror ^ zoomX < 0 ? 1 : 0) | (zoomY < 0 ? 2 : 0);
+            int mode = 1;
+            if (blend == 1) mode = 2;
+            else if (blend == 2)
+            {
+                if (_subtractMode == -1) { try { _subtractMode = SDL.SDL_ComposeCustomBlendMode(5, 2, 3, 1, 2, 1); } catch { _subtractMode = 0; } }
+                mode = _subtractMode != 0 ? _subtractMode : 2;
+            }
+            // A colour tint darkens channels toward the colour, then an additive pass brightens toward it
+            double a = color.A / 255.0;
+            byte mr = 255, mg = 255, mb = 255;
+            SDL.SDL_SetTextureBlendMode(t.Handle, mode);
+            SDL.SDL_SetTextureAlphaMod(t.Handle, (byte)Math.Max(0, Math.Min(255, opacity)));
+            if (a > 0)
+            {
+                mr = (byte)(255 * (1 - a) + color.R * a * (color.R / 255.0));
+                mg = (byte)(255 * (1 - a) + color.G * a * (color.G / 255.0));
+                mb = (byte)(255 * (1 - a) + color.B * a * (color.B / 255.0));
+                SDL.SDL_SetTextureColorMod(t.Handle, mr, mg, mb);
+            }
+            SDL.SDL_RenderCopyEx(Renderer, t.Handle, ref src, ref dst, -angle, ref center, flip);
+            if (a > 0)
+            {
+                // Additive pass so white or light tints can brighten the sprite
+                SDL.SDL_SetTextureBlendMode(t.Handle, 2);
+                SDL.SDL_SetTextureColorMod(t.Handle, (byte)(color.R * a), (byte)(color.G * a), (byte)(color.B * a));
+                SDL.SDL_RenderCopyEx(Renderer, t.Handle, ref src, ref dst, -angle, ref center, flip);
+                SDL.SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
+            }
+            SDL.SDL_SetTextureAlphaMod(t.Handle, 255);
+            SDL.SDL_SetTextureBlendMode(t.Handle, 1);
         }
 
         public void DrawTinted(Texture t, int sx, int sy, int sw, int sh, int dx, int dy, Color tint)

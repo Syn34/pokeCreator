@@ -278,6 +278,7 @@ namespace PokeCreator.Runtime
         readonly List<Scene> _scenes = new List<Scene>();
         public void PushScene(Scene s) { _scenes.Add(s); }
         public bool SceneOpen { get { return _scenes.Count > 0; } }
+        public T FindScene<T>() where T : Scene { return _scenes.OfType<T>().LastOrDefault(); }
 
         // ------------------------------------------------------------------ maps
         public void SetupMap(int id, int x, int y, int dir)
@@ -818,6 +819,12 @@ namespace PokeCreator.Runtime
                         break;
                     }
                 case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)), null); break;
+                case "anim": // anim MOVE|Common:Name userSide [targetSlot]: plays a battle animation in the open battle
+                    {
+                        var bs = _g.FindScene<PokeCreator.Runtime.UI.BattleScene>();
+                        if (bs != null) Console.WriteLine("[autotest] anim " + p[1] + " -> " + bs.DebugAnimation(p[1], p.Length > 2 ? int.Parse(p[2]) : 0, p.Length > 3 ? int.Parse(p[3]) : 0));
+                        break;
+                    }
                 case "scene":
                     switch (p[1])
                     {

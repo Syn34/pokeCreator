@@ -39,6 +39,11 @@ namespace PokeCreator.Battles
             }
         }
 
+        static string WeatherAnimName(string w)
+        {
+            switch (w) { case Sun: return "Sun"; case Rain: return "Rain"; case Sandstorm: return "Sandstorm"; case Hail: return "Hail"; default: return ""; }
+        }
+
         static string WeatherStartText(string w)
         {
             switch (w) { case Sun: return "The sunlight turned harsh!"; case Rain: return "It started to rain!"; case Sandstorm: return "A sandstorm kicked up!"; case Hail: return "It started to hail!"; default: return ""; }
@@ -64,6 +69,7 @@ namespace PokeCreator.Battles
             Weather = w;
             string rock = w == Sun ? "HEATROCK" : w == Rain ? "DAMPROCK" : w == Sandstorm ? "SMOOTHROCK" : "ICYROCK";
             WeatherTurns = by != null && by.Pk.Item == rock ? 8 : 5;
+            CommonAnim(WeatherAnimName(w), null);
             Say(WeatherStartText(w));
             return true;
         }
@@ -73,6 +79,7 @@ namespace PokeCreator.Battles
         {
             if (Weather == NoWeather) return;
             if (WeatherTurns > 0 && --WeatherTurns == 0) { Say(WeatherEndText(Weather)); Weather = NoWeather; return; }
+            CommonAnim(WeatherAnimName(Weather), null);
             Say(WeatherOngoingText(Weather));
             if (EffWeather != Sandstorm && EffWeather != Hail) return;
             foreach (var b in OnField.Where(x => !x.Pk.Fainted).OrderByDescending(x => Speed(x)).ToList())

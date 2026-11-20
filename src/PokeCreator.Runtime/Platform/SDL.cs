@@ -11,6 +11,19 @@ namespace PokeCreator.Runtime.Platform
         public SDL_Rect(int x, int y, int w, int h) { this.x = x; this.y = y; this.w = w; this.h = h; }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SDL_FRect
+    {
+        public float x, y, w, h;
+        public SDL_FRect(float x, float y, float w, float h) { this.x = x; this.y = y; this.w = w; this.h = h; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SDL_FPoint { public float x, y; public SDL_FPoint(float x, float y) { this.x = x; this.y = y; } }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SDL_Point { public int x, y; public SDL_Point(int x, int y) { this.x = x; this.y = y; } }
+
     /// <summary>Raw SDL_Event (56 bytes in SDL2). Only the type field is read directly.</summary>
     [StructLayout(LayoutKind.Sequential, Size = 64)]
     public struct SDL_Event
@@ -77,12 +90,15 @@ namespace PokeCreator.Runtime.Platform
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_SetRenderDrawBlendMode(IntPtr renderer, int mode);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderClear(IntPtr renderer);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderCopy(IntPtr renderer, IntPtr texture, ref SDL_Rect src, ref SDL_Rect dst);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderCopyEx(IntPtr renderer, IntPtr texture, ref SDL_Rect src, ref SDL_Rect dst, double angle, ref SDL_Point center, int flip);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_ComposeCustomBlendMode(int srcColorFactor, int dstColorFactor, int colorOperation, int srcAlphaFactor, int dstAlphaFactor, int alphaOperation);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderFillRect(IntPtr renderer, ref SDL_Rect rect);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderDrawRect(IntPtr renderer, ref SDL_Rect rect);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_RenderPresent(IntPtr renderer);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_RenderReadPixels(IntPtr renderer, IntPtr rect, uint format, IntPtr pixels, int pitch);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_SetRenderTarget(IntPtr renderer, IntPtr texture);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_CreateTexture(IntPtr renderer, uint format, int access, int w, int h);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_UpdateTexture(IntPtr texture, IntPtr rect, IntPtr pixels, int pitch);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_CreateTextureFromSurface(IntPtr renderer, IntPtr surface);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_DestroyTexture(IntPtr texture);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_QueryTexture(IntPtr texture, out uint format, out int access, out int w, out int h);

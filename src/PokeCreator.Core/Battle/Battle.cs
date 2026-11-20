@@ -8,7 +8,11 @@ using PokeCreator.Projects;
 
 namespace PokeCreator.Battles
 {
-    public enum BattleEventKind { Message, Hp, Faint, SendOut, Withdraw, StatChange, Status, Exp, LevelUp, Catch, Flee, Hit, Miss, MoveUsed }
+    public enum BattleEventKind { Message, Hp, Faint, SendOut, Withdraw, StatChange, Status, Exp, LevelUp, Catch, Flee, Hit, Miss, MoveUsed,
+        /// <summary>A move's animation: Side/Party/Slot = user, Value/Value2 = target side/slot, Text = move.</summary>
+        MoveAnim,
+        /// <summary>A common animation (Text = "StatUp", "Poison", "Rain"...) on Side/Slot; Side -1 = whole field.</summary>
+        CommonAnim }
 
     /// <summary>Something the battle screen shows, in order: a message, an HP bar change, a Pokémon fainting...</summary>
     public class BattleEvent
@@ -238,7 +242,8 @@ namespace PokeCreator.Battles
         }
 
         /// <summary>Moves the player's Pokémon can use (with PP); Struggle if none.</summary>
-        public bool HasUsableMove(Battler b) { return b.Pk.Moves.Any(m => m.PP > 0); }
+        /// <summary>Whether the Pokémon has a move it can pick (PP left and not blocked by Taunt / Disable / Encore); if not, it uses Struggle.</summary>
+        public bool HasUsableMove(Battler b) { for (int i = 0; i < b.Pk.Moves.Count; i++) if (b.Pk.Moves[i].PP > 0 && CanSelect(b, i)) return true; return false; }
 
         // ------------------------------------------------------------------ turns
         public List<BattleEvent> DoTurn(BattleCommand player)
@@ -474,15 +479,15 @@ namespace PokeCreator.Battles
             {
                 if (user.SleepTurns <= 0) user.SleepTurns = 1 + Rng.Next(3);
                 user.SleepTurns -= HasAbility(user, "EARLYBIRD") ? 2 : 1;
-                if (user.SleepTurns > 0 && !UsableWhileAsleep(user, slot)) { Say(n + " is fast asleep."); user.Charging = null; EndLock(user); return; }
-                if (user.SleepTurns > 0) Say(n + " is fast asleep.");
+                if (user.SleepTurns > 0 && !UsableWhileAsleep(user, slot)) { CommonAnim("Sleep", user); Say(n + " is fast asleep."); user.Charging = null; EndLock(user); return; }
+                if (user.SleepTurns > 0) { CommonAnim("Sleep", user); Say(n + " is fast asleep."); }
                 else {
                 user.Pk.Status = ""; StatusEvent(user); Say(n + " woke up!");
                 }
             }
             if (status == "FROZEN")
             {
-                if (Rng.Next(5) != 0) { Say(n + " is frozen solid!"); return; }
+                if (Rng.Next(5) != 0) { CommonAnim("Frozen", user); Say(n + " is frozen solid!"); return; }
                 user.Pk.Status = ""; StatusEvent(user); Say(n + " thawed out!");
             }
             if (user.Flinched) { Say(n + " flinched and couldn't move!"); user.Charging = null; return; }
@@ -492,6 +497,7 @@ namespace PokeCreator.Battles
                 if (user.Confusion == 0) Say(n + " snapped out of its confusion!");
                 else
                 {
+                    CommonAnim("Confusion", user);
                     Say(n + " is confused!");
                     if (Rng.Next(3) == 0)
                     {
@@ -503,12 +509,13 @@ namespace PokeCreator.Battles
                     }
                 }
             }
-            if (status == "PARALYSIS" && Rng.Next(4) == 0) { Say(n + " is paralyzed! It can't move!"); user.Charging = null; EndLock(user); return; }
+            if (status == "PARALYSIS" && Rng.Next(4) == 0) { CommonAnim("Paralysis", user); Say(n + " is paralyzed! It can't move!"); user.Charging = null; EndLock(user); return; }
             if (user.AttractedTo != null)
             {
                 if (!OnField.Contains(user.AttractedTo) || user.AttractedTo.Pk.Fainted) user.AttractedTo = null;
                 else
                 {
+                    CommonAnim("Attract", user);
                     Say(n + " is in love with " + NameL(user.AttractedTo) + "!");
                     if (Rng.Next(2) == 0) { Say(n + " is immobilized by love!"); user.Charging = null; EndLock(user); return; }
                 }
@@ -546,6 +553,7 @@ namespace PokeCreator.Battles
                 if (pm != null) pm.PP = Math.Max(0, pm.PP - 1);
                 user.Charging = md.Id; user.ChargingSlot = slot;
                 user.Invulnerable = code.Contains("Invulnerable");
+                MoveAnim(user, target, md, 1, true);
                 Say(n + ChargeText(md.Id));
                 return;
             }
@@ -567,6 +575,7 @@ namespace PokeCreator.Battles
             }
             if (selfTarget)
             {
+                MoveAnim(user, md.Target == "FoeSide" ? (Live(1 - user.Side).FirstOrDefault() ?? user) : user, md);
                 if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
                 return;
             }
@@ -599,6 +608,7 @@ namespace PokeCreator.Battles
             targets.RemoveAll(t => t == null || t.Pk.Fainted);
             if (targets.Count == 0) { Say("But there was no target..."); return; }
             _spread = targets.Count > 1 ? 0.75 : 1;
+            bool animShown = false;
             foreach (var t in targets)
             {
                 if (user.Pk.Fainted || Outcome != BattleOutcome.Ongoing) break;
@@ -608,10 +618,25 @@ namespace PokeCreator.Battles
                 if (t.SubstituteHP > 0 && md.Category == "Status" && t.Side != user.Side && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR")) { Say("But it failed!"); user.LastMoveFailed = true; continue; }
                 if (AbilityAbsorbs(user, t, md, MoveType(user, md, code))) continue;
                 if (!Hits(user, t, md, code)) { user.LastMoveFailed = true; Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
+                if (!animShown) { MoveAnim(user, t, md); animShown = true; }
                 if (md.Category == "Status") StatusMove(user, t, md, code);
                 else DamagingMove(user, t, md, code);
             }
             _spread = 1;
+        }
+
+        bool CommonAnimBefore(string name, Battler b) { CommonAnim(name, b); return true; }
+
+        /// <summary>A move's animation; hit > 0 = an extra hit or a charging turn (Essentials' hit number), Flag = charging.</summary>
+        void MoveAnim(Battler user, Battler target, MoveData md, int hit = 0, bool charging = false)
+        {
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveAnim, Side = user.Side, Party = user.PartyIndex, Slot = user.Slot, Value = target != null ? target.Side : user.Side, Value2 = target != null ? target.Slot : user.Slot, Text = hit > 0 ? md.Id + ":" + hit : md.Id, Flag = charging });
+        }
+
+        /// <summary>Shows one of the common animations (Poison, Burn, StatUp, Rain...) on a Pokémon, or on the field if b is null.</summary>
+        void CommonAnim(string name, Battler b)
+        {
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.CommonAnim, Side = b != null ? b.Side : -1, Party = b != null ? b.PartyIndex : 0, Slot = b != null ? b.Slot : 0, Text = name });
         }
 
         /// <summary>Damage multiplier for moves hitting more than one Pokémon (0.75).</summary>
@@ -712,6 +737,7 @@ namespace PokeCreator.Battles
             string enduredBy = null;
             for (int h = 0; h < hits && !target.Pk.Fainted && !user.Pk.Fainted; h++)
             {
+                if (h > 0) MoveAnim(user, target, md, h);
                 int dmg;
                 bool crit = false;
                 int fixedDmg = FixedDamage(user, target, md, code);
@@ -979,8 +1005,8 @@ namespace PokeCreator.Battles
             b.Stages[stat] = nv;
             if (nv < old) b.StatsLoweredThisTurn = true;
             int d = Math.Abs(nv - old);
-            Say(who + (amount > 0 ? (d >= 3 ? " rose drastically!" : d == 2 ? " rose sharply!" : " rose!") : (d >= 3 ? " severely fell!" : d == 2 ? " harshly fell!" : " fell!")));
             _ev.Add(new BattleEvent { Kind = BattleEventKind.StatChange, Side = b.Side, Party = b.PartyIndex, Value = amount });
+            Say(who + (amount > 0 ? (d >= 3 ? " rose drastically!" : d == 2 ? " rose sharply!" : " rose!") : (d >= 3 ? " severely fell!" : d == 2 ? " harshly fell!" : " fell!")));
             // Defiant / Competitive: lowered by a foe -> sharply raise Attack / Sp. Atk
             if (amount < 0 && source != null && source.Side != b.Side)
             {
@@ -1046,6 +1072,7 @@ namespace PokeCreator.Battles
             if (b.Confusion > 0) { if (showFail) Say(Name(b) + " is already confused."); return false; }
             if (HasAbility(b, "OWNTEMPO")) { if (showFail) { Splash(b); Say(Name(b) + " doesn't become confused!"); } return false; }
             b.Confusion = 2 + Rng.Next(4);
+            CommonAnim("Confusion", b);
             Say(Name(b) + " became confused!");
             return true;
         }
@@ -1147,6 +1174,8 @@ namespace PokeCreator.Battles
                 if (b.Pk.Fainted) continue;
                 int max = b.Pk.TotalHP(P);
                 string st = (b.Pk.Status ?? "").ToUpperInvariant();
+                if (st == "BURN" && !HasAbility(b, "MAGICGUARD")) CommonAnim("Burn", b);
+                else if (st == "POISON" && !HasAbility(b, "MAGICGUARD") && !HasAbility(b, "POISONHEAL")) CommonAnim(b.ToxicCount > 0 ? "Toxic" : "Poison", b);
                 if (st == "BURN") Residual(b, Math.Max(1, max / (HasAbility(b, "HEATPROOF") ? 32 : 16)), Name(b) + " was hurt by its burn!");
                 else if (st == "POISON" && HasAbility(b, "POISONHEAL"))
                 {
@@ -1161,7 +1190,7 @@ namespace PokeCreator.Battles
                 {
                     b.BindTurns--;
                     if (b.BindTurns == 0) Say(Name(b) + " was freed!");
-                    else Residual(b, Math.Max(1, max / 8), Name(b) + " is hurt by the squeeze!");
+                    else if (CommonAnimBefore("Bind", b)) Residual(b, Math.Max(1, max / 8), Name(b) + " is hurt by the squeeze!");
                 }
                 if (!b.Pk.Fainted && b.Pk.Item == "LEFTOVERS" && b.Pk.HP < max)
                 {

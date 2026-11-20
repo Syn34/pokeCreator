@@ -556,6 +556,7 @@ namespace PokeCreator.Battles
             if (!selfTarget) target = OpponentFor(user, target != null && target.Side != user.Side ? target : null);
             if (target == null) { Say("But there was no target..."); return; }
             if (!selfTarget && !Hits(user, target, md, code)) { Say(Name(user) + "'s attack missed!"); return; }
+            MoveAnim(user, selfTarget ? user : target, md);
             if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
         }
 
@@ -745,6 +746,7 @@ namespace PokeCreator.Battles
                 // Leech Seed: drains 1/8 to the Pokémon opposite
                 if (b.LeechSeeded && !HasAbility(b, "MAGICGUARD"))
                 {
+                    CommonAnim("LeechSeed", b);
                     var sapper = Live(1 - b.Side).FirstOrDefault();
                     int dmg = Math.Min(b.Pk.HP, Math.Max(1, max / 8));
                     Residual(b, dmg, Name(b) + "'s health is sapped by Leech Seed!");
@@ -774,6 +776,8 @@ namespace PokeCreator.Battles
                 _delayed.Remove(d);
                 var t = Field[d.Side][d.Slot];
                 if (t == null || t.Pk.Fainted) continue;
+                var fmd = Move(d.Move);
+                if (fmd != null) MoveAnim(t, t, fmd, 1);
                 Say(Name(t) + " took the " + MoveNameOf(d.Move) + " attack!");
                 int f = t.Pk.HP; t.Pk.HP = Math.Max(0, t.Pk.HP - d.Damage); Hp(t, f);
             }

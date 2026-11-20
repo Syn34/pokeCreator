@@ -24,6 +24,9 @@ namespace PokeCreator.Runtime.UI
         public bool RunToggle { get; set; }
         /// <summary>Battle style: false = Switch (asked to change Pokémon when a trainer sends out the next one), true = Set.</summary>
         public bool BattleStyleSet { get; set; }
+        /// <summary>Battle animations off (Essentials' "Battle Effects" option). Stored inverted so older options files keep them on.</summary>
+        public bool BattleEffectsOff { get; set; }
+        [Json.JsonIgnore] public bool BattleEffects { get { return !BattleEffectsOff; } set { BattleEffectsOff = !value; } }
         public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; SpeechFrame = ""; MenuFrame = ""; }
 
         static string FilePath(Game g) { return Path.Combine(SaveSystem.Folder(g.Project), "options.json"); }
@@ -461,7 +464,7 @@ namespace PokeCreator.Runtime.UI
     {
         readonly PlayerOptions _o;
         int _row;
-        static readonly string[] Labels = { "Text Speed", "Music Volume", "Sound Volume", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Close" };
+        static readonly string[] Labels = { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Close" };
         List<string> _speech, _menu;
 
         public OptionsScene(Game g) : base(g)
@@ -489,10 +492,11 @@ namespace PokeCreator.Runtime.UI
                 if (_row == 0) _o.TextSpeed = (_o.TextSpeed + d + 4) % 4;
                 else if (_row == 1) _o.BgmVolume = Math.Max(0, Math.Min(100, _o.BgmVolume + d * 10));
                 else if (_row == 2) _o.SeVolume = Math.Max(0, Math.Min(100, _o.SeVolume + d * 10));
-                else if (_row == 3) _o.BattleStyleSet = !_o.BattleStyleSet;
-                else if (_row == 4) _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d);
-                else if (_row == 5) _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d);
-                else if (_row == 6) _o.RunToggle = !_o.RunToggle;
+                else if (_row == 3) _o.BattleEffects = !_o.BattleEffects;
+                else if (_row == 4) _o.BattleStyleSet = !_o.BattleStyleSet;
+                else if (_row == 5) _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d);
+                else if (_row == 6) _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d);
+                else if (_row == 7) _o.RunToggle = !_o.RunToggle;
                 _o.Apply(Game);
                 if (_row != Labels.Length - 1) Cursor();
             }
@@ -504,12 +508,12 @@ namespace PokeCreator.Runtime.UI
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Options");
-            Ui.Panel(g, 8, 60, g.Width - 16, 230, new Color(248, 248, 248), new Color(32, 48, 96));
+            Ui.Panel(g, 8, 60, g.Width - 16, 234, new Color(248, 248, 248), new Color(32, 48, 96));
             string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶",
-                                "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "" };
+                                "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "" };
             for (int i = 0; i < Labels.Length; i++)
             {
-                int y = 68 + i * 28;
+                int y = 66 + i * 25;
                 if (i == _row) Ui.Arrow(g, 22, y + 8);
                 Ui.Text(g, 44, y, Labels[i]);
                 Ui.TextRight(g, g.Width - 32, y, values[i]);

@@ -63,6 +63,7 @@ namespace PokeCreator.Import
             ImportCommonEvents();
             ImportTilesets();
             ImportMaps();
+            ImportAnimations();
 
             if (BaseDataFolder != null)
             {
@@ -458,6 +459,74 @@ namespace PokeCreator.Import
             if (sys.Str("windowskin_name").Length > 0) _p.Settings.Windowskin = sys.Str("windowskin_name");
             var titleBgm = sys.Obj("title_bgm");
             if (titleBgm != null) _p.Settings.TitleBGM = titleBgm.Str("name");
+        }
+
+        void ImportAnimations()
+        {
+            string f = RxPath("PkmnAnimations.rxdata");
+            if (!File.Exists(f)) { Log("  (no Data/PkmnAnimations.rxdata, battle animations skipped)"); return; }
+            Log("Reading Data/PkmnAnimations.rxdata");
+            try
+            {
+                _p.Animations = ReadAnimations(f);
+                Log("  " + _p.Animations.Count + " battle animations");
+            }
+            catch (Exception ex) { Warn("PkmnAnimations.rxdata: " + ex.Message); }
+        }
+
+        /// <summary>Reads Essentials' PkmnAnimations.rxdata (PBAnimations of PBAnimation) into battle animations.</summary>
+        public static List<BattleAnimation> ReadAnimations(string file)
+        {
+            var result = new List<BattleAnimation>();
+            var root = MarshalReader.Load(file);
+            var ua = root as RUserArray;
+            var list = ua != null ? (ua.Get("array") as List<object> ?? ua) : root as List<object>;
+            if (list == null) return result;
+            // Essentials finds a move's extra-hit and charging animations by position (the move's index + hit number):
+            // "Fury Attack hit 2" right after "Move:FURYATTACK" becomes "Move:FURYATTACK:1"
+            string baseName = null; int baseIndex = 0;
+            for (int idx = 0; idx < list.Count; idx++)
+            {
+                var an = list[idx] as RUserArray;
+                if (an == null) { baseName = null; continue; }
+                string name = an.Str("name");
+                if (string.IsNullOrEmpty(name)) { baseName = null; continue; }
+                if (name.StartsWith("Move:") || name.StartsWith("OppMove:")) { baseName = name; baseIndex = idx; }
+                else if (!name.StartsWith("Common:") && baseName != null) name = baseName + ":" + (idx - baseIndex);
+                result.RemoveAll(x => x.Id == name); // as in Essentials, a later animation with the same name wins
+                var ba = new BattleAnimation { Id = name, Graphic = an.Str("graphic"), Hue = an.Int("hue"), Position = an.Int("position") };
+                var frames = an.Get("array") as List<object> ?? an;
+                foreach (var fo in frames)
+                {
+                    var cels = new List<int[]>();
+                    var fl = fo as List<object>;
+                    if (fl != null)
+                        foreach (var co in fl)
+                        {
+                            var cl = co as List<object>;
+                            if (cl == null) { cels.Add(null); continue; }
+                            var cel = new int[BattleAnimation.CelLength];
+                            for (int i = 0; i < cel.Length && i < cl.Count; i++)
+                                cel[i] = cl[i] == null ? 0 : cl[i] is bool ? ((bool)cl[i] ? 1 : 0) : Convert.ToInt32(cl[i]);
+                            cels.Add(cel);
+                        }
+                    while (cels.Count > 0 && cels[cels.Count - 1] == null) cels.RemoveAt(cels.Count - 1);
+                    ba.Frames.Add(cels);
+                }
+                var timings = an.Get("timing") as List<object>;
+                if (timings != null)
+                    foreach (var to in timings)
+                    {
+                        var t = to as RObject;
+                        if (t == null) continue;
+                        var at = new AnimationTiming { Frame = t.Int("frame"), Type = t.Int("timingType"), Sound = t.Str("name"), Volume = t.Int("volume"), Pitch = t.Int("pitch"), FlashScope = t.Int("flashScope"), FlashDuration = t.Int("flashDuration") };
+                        var fc = t.Get("flashColor") as RUserData;
+                        if (fc != null) { var d = fc.AsDoubles(); if (d.Length >= 4) at.FlashColor = new[] { (int)d[0], (int)d[1], (int)d[2], (int)d[3] }; }
+                        ba.Timings.Add(at);
+                    }
+                result.Add(ba);
+            }
+            return result;
         }
 
         void ImportCommonEvents()

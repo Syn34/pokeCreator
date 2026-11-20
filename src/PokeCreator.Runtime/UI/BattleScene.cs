@@ -48,6 +48,11 @@ namespace PokeCreator.Runtime.UI
         int _burstKey = -1, _burstFrames, _statKey = -1, _statFrames, _statDir;
         Color _burstColor = new Color(248, 248, 248);
         string _lastCategory = "Physical";
+        // Essentials battle animations (Data/animations.json)
+        BattleAnimPlayer _player;
+        string _briefText;
+        bool _animThisMove;
+        bool AnimsOn { get { return Game.Project.Animations.Count > 0 && Game.Options.BattleEffects; } }
         bool _trainerVisible, _ballVisible, _ballCaught;
         int _ballShakes, _ballSlot;
         int _introSlide = 120;
@@ -109,6 +114,7 @@ namespace PokeCreator.Runtime.UI
 
         void StartCommands()
         {
+            _briefText = null;
             _pending.Clear();
             var live = _b.Live(0);
             _cmdSlot = live.Count > 0 ? live[0].Slot : 0;
@@ -132,7 +138,11 @@ namespace PokeCreator.Runtime.UI
         {
             switch (e.Kind)
             {
-                case BattleEventKind.Message: Game.Message.Show(e.Text); return false;
+                case BattleEventKind.Message:
+                    // "X used Y!" closes by itself and stays in the box while the move's animation plays (as in Essentials)
+                    if (AnimsOn && _queue.Count > 0 && _queue.Peek().Kind == BattleEventKind.MoveUsed) { _briefText = e.Text; Game.Message.Show(e.Text + "\\wtnp[6]"); }
+                    else { _briefText = null; Game.Message.Show(e.Text); }
+                    return false;
                 case BattleEventKind.SendOut:
                     {
                         if (e.Side == 1) _trainerVisible = false;
@@ -149,19 +159,44 @@ namespace PokeCreator.Runtime.UI
                 case BattleEventKind.Hit:
                     Game.Audio.PlaySe(e.Value > 100 ? "Battle damage super" : e.Value < 100 ? "Battle damage weak" : "Battle damage normal");
                     _blink[Key(e.Side, SlotOf(e.Side, e.Party))] = 16;
-                    _burstKey = Key(e.Side, SlotOf(e.Side, e.Party)); _burstFrames = 18;
+                    if (!_animThisMove) { _burstKey = Key(e.Side, SlotOf(e.Side, e.Party)); _burstFrames = 18; }
                     return true;
                 case BattleEventKind.MoveUsed:
                     {
                         var md = Game.Project.Moves.FirstOrDefault(m => m.Id == e.Text);
                         _burstColor = TypeColor(md != null ? md.Type : "NORMAL");
                         _lastCategory = md != null ? md.Category ?? "Physical" : "Physical";
+                        _animThisMove = false;
+                        if (AnimsOn) return false; // the move's animation plays when it hits (MoveAnim)
                         if (_lastCategory == "Physical") { _lunge[Key(e.Side, SlotOf(e.Side, e.Party))] = 12; return true; }
                         return false;
                     }
+                case BattleEventKind.MoveAnim:
+                    {
+                        if (!AnimsOn) return false;
+                        string moveId = e.Text ?? ""; int hit = 0;
+                        int colon = moveId.IndexOf(':');
+                        if (colon > 0) { int.TryParse(moveId.Substring(colon + 1), out hit); moveId = moveId.Substring(0, colon); }
+                        var md = Game.Project.Moves.FirstOrDefault(m => m.Id == moveId);
+                        bool swap;
+                        // Charging turns only animate when the move has a charging animation; extra hits fall back to the move's own
+                        var anim = BattleAnimations.ForMove(Game.Project.Animations, md, e.Side == 1, out swap, hit, !e.Flag);
+                        if (anim == null) return false;
+                        var user = Battler(e.Side, e.Slot); var target = Battler(e.Value, e.Value2);
+                        if (user == null) return false;
+                        if (target == null) target = user;
+                        _player = swap ? new BattleAnimPlayer(Game, anim, target, user) : new BattleAnimPlayer(Game, anim, user, target);
+                        _animThisMove = true;
+                        return true;
+                    }
+                case BattleEventKind.CommonAnim: return StartCommon(e.Text, e.Side, e.Slot);
+                case BattleEventKind.Status:
+                    if (!string.IsNullOrEmpty(e.Text)) StartCommon(StatusAnimName(e.Text), e.Side, SlotOf(e.Side, e.Party));
+                    return _player != null;
                 case BattleEventKind.Faint: Game.Audio.PlaySe("Pkmn faint"); return true;
                 case BattleEventKind.StatChange:
                     Game.Audio.PlaySe(e.Value > 0 ? "Battle stat up" : "Battle stat down");
+                    if (StartCommon(e.Value > 0 ? "StatUp" : "StatDown", e.Side, SlotOf(e.Side, e.Party))) return true;
                     _statKey = Key(e.Side, SlotOf(e.Side, e.Party)); _statFrames = 24; _statDir = e.Value > 0 ? 1 : -1;
                     return true;
                 case BattleEventKind.Exp:
@@ -197,6 +232,13 @@ namespace PokeCreator.Runtime.UI
         {
             var e = _current;
             _anim++;
+            if (_player != null)
+            {
+                _player.Update();
+                if (!_player.Done) return false;
+                _player = null;
+                return true;
+            }
             switch (e.Kind)
             {
                 case BattleEventKind.Hp:
@@ -219,7 +261,9 @@ namespace PokeCreator.Runtime.UI
                         if (_anim >= 20) { _visible[k] = false; return true; }
                         return false;
                     }
-                case BattleEventKind.SendOut: return _anim >= 12;
+                case BattleEventKind.SendOut:
+                    if (_anim == 12 && _b.Parties[e.Side][e.Party].Shiny && StartCommon("Shiny", e.Side, e.Slot)) return false;
+                    return _anim >= 12;
                 case BattleEventKind.Withdraw: return _anim >= 10;
                 case BattleEventKind.StatChange: return _anim >= 24;
                 case BattleEventKind.Exp:
@@ -247,6 +291,63 @@ namespace PokeCreator.Runtime.UI
                         return false;
                     }
                 default: return true;
+            }
+        }
+
+        // ------------------------------------------------------------------ battle animations
+        /// <summary>A battler as the animation player sees it (sprite centre and texture), or null if nobody stands there.</summary>
+        AnimBattler Battler(int side, int slot)
+        {
+            if (side < 0 || side > 1) return null;
+            int k = Key(side, slot);
+            if (_shownParty[k] < 0) return null;
+            var pk = _b.Parties[side][_shownParty[k]];
+            int x, bottom; Pos(side, slot, out x, out bottom);
+            int fw;
+            var tex = BattlerTexture(pk, side == 0, out fw);
+            int h = tex != null ? tex.Height : 96;
+            return new AnimBattler { Key = k, X = x, Y = bottom - h / 2.0, Tex = tex, FrameW = tex != null ? fw : 0, FrameH = h };
+        }
+
+        /// <summary>Starts "Common:name" on a Pokémon (side -1 = the field, e.g. weather). False if there is no such animation.</summary>
+        bool StartCommon(string name, int side, int slot)
+        {
+            if (!AnimsOn || string.IsNullOrEmpty(name)) return false;
+            var anim = BattleAnimations.Common(Game.Project.Animations, name);
+            if (anim == null) return false;
+            AnimBattler user, target;
+            if (side < 0)
+            {
+                user = Battler(0, 0) ?? Battler(0, 1); target = Battler(1, 0) ?? Battler(1, 1);
+                if (user == null) user = target;
+                if (user == null) return false;
+            }
+            else { user = Battler(side, slot); target = user; if (user == null) return false; }
+            _player = new BattleAnimPlayer(Game, anim, user, target);
+            return true;
+        }
+
+        /// <summary>Autotest: plays a move's (or "Common:X") animation now, from userSide's first Pokémon.</summary>
+        public string DebugAnimation(string what, int userSide, int targetSlot)
+        {
+            if (what.StartsWith("Common:")) return StartCommon(what.Substring(7), userSide, 0) ? "common" : "none";
+            var md = Game.Project.Moves.FirstOrDefault(m => m.Id == what);
+            bool swap;
+            var anim = BattleAnimations.ForMove(Game.Project.Animations, md, userSide == 1, out swap);
+            if (anim == null) return "none";
+            var user = Battler(userSide, 0); var target = Battler(1 - userSide, targetSlot) ?? Battler(1 - userSide, 0);
+            if (user == null) return "no user";
+            _player = swap ? new BattleAnimPlayer(Game, anim, target, user) : new BattleAnimPlayer(Game, anim, user, target);
+            _current = new BattleEvent { Kind = BattleEventKind.MoveAnim }; _anim = 0; _mode = Mode.Events;
+            return anim.Id + (swap ? " (swapped)" : "");
+        }
+
+        static string StatusAnimName(string status)
+        {
+            switch ((status ?? "").ToUpperInvariant())
+            {
+                case "SLEEP": return "Sleep"; case "POISON": return "Poison"; case "BURN": return "Burn";
+                case "PARALYSIS": return "Paralysis"; case "FROZEN": return "Frozen"; default: return null;
             }
         }
 
@@ -551,6 +652,7 @@ namespace PokeCreator.Runtime.UI
                     if (tex2 != null) g.Draw(tex2, 0, 0, tex2.Width, tex2.Height, tx + 56 - tex2.Width / 2, 200 - tex2.Height);
                 }
             }
+            if (_player != null) _player.Draw(g, true);
             // Opponents (back row first), then the player's Pokémon
             for (int side = 1; side >= 0; side--)
                 for (int slot = _b.IsDouble ? 1 : 0; slot >= 0; slot--)
@@ -562,12 +664,15 @@ namespace PokeCreator.Runtime.UI
                     var pk = _b.Parties[side][_shownParty[k]];
                     // Lunge toward the other side
                     if (_lunge[k] > 0) { int t = _lunge[k]--; int off = (int)(Math.Sin((12 - t) / 12.0 * Math.PI) * 24); x += side == 0 ? off : -off; bottom += side == 0 ? -off / 3 : off / 3; }
+                    var st = _player != null ? _player.BattlerState(k) : null;
+                    if (st != null) { DrawPokemonAnimated(g, pk, side == 0, st); continue; }
                     DrawPokemon(g, pk, side == 0, x, bottom + _faintDrop[k]);
                     if (_mode == Mode.Target && _targets.Count > _target && _targets[_target].Side == side && _targets[_target].Slot == slot && (Frame / 8) % 2 == 0)
                         Ellipse(g, x, bottom - 2, 30, 6, new Color(248, 232, 80));
                 }
             if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
             DrawEffects(g);
+            if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             // Databoxes
             for (int slot = 0; slot < (_b.IsDouble ? 2 : 1); slot++)
             {
@@ -581,7 +686,11 @@ namespace PokeCreator.Runtime.UI
                 if (_mode == Mode.Command) DrawCommands(g);
                 else if (_mode == Mode.Fight) DrawFight(g);
                 else if (_mode == Mode.Target) DrawTarget(g);
-                else MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
+                else
+                {
+                    MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
+                    if (_briefText != null && _mode == Mode.Events) g.DrawText(26, g.Height - 86, _briefText, Color.TextBase, Color.TextShadow);
+                }
             }
         }
 
@@ -664,12 +773,30 @@ namespace PokeCreator.Runtime.UI
             }
         }
 
-        void DrawPokemon(Gfx g, Pokemon pk, bool back, int cx, int bottom)
+        Texture BattlerTexture(Pokemon pk, bool back, out int frameW)
         {
             string folder = back ? (pk.Shiny ? "Graphics/Pokemon/Back shiny" : "Graphics/Pokemon/Back") : (pk.Shiny ? "Graphics/Pokemon/Front shiny" : "Graphics/Pokemon/Front");
             string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
             var path = Game.Project.FindAsset(folder, id) ?? Game.Project.FindAsset(back ? "Graphics/Pokemon/Back" : "Graphics/Pokemon/Front", pk.Species);
             var tex = Game.Gfx.Load(path);
+            frameW = tex == null ? 0 : tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width; // animated strips: first frame
+            return tex;
+        }
+
+        /// <summary>A Pokémon moved, zoomed, rotated or tinted by a battle animation.</summary>
+        void DrawPokemonAnimated(Gfx g, Pokemon pk, bool back, AnimSpriteState st)
+        {
+            if (!st.Visible) return;
+            int fw;
+            var tex = BattlerTexture(pk, back, out fw);
+            if (tex == null) { Ui.PokemonFront(g, Game, pk, (int)st.X, (int)st.Y + 48, 160); return; }
+            g.DrawEx(tex, 0, 0, fw, tex.Height, st.X, st.Y, st.ZoomX, st.ZoomY, st.Angle, st.Mirror, st.Opacity, st.Blend, st.Color);
+        }
+
+        void DrawPokemon(Gfx g, Pokemon pk, bool back, int cx, int bottom)
+        {
+            int fwUnused;
+            var tex = BattlerTexture(pk, back, out fwUnused);
             if (tex == null)
             {
                 if (back) { Ui.PokemonFront(g, Game, pk, cx, bottom, 160); return; } // no back sprite: show the front one

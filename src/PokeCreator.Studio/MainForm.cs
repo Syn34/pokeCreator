@@ -600,6 +600,8 @@ namespace PokeCreator.Studio
         {
             // Town Maps get the visual editor (click squares on the region image)
             if (t.Key == "town_maps") { OpenDocument("sys:townmaps", () => new TownMapEditor(Project)); return null; }
+            // Battle animations get the frame editor with a live preview
+            if (t.Key == "animations") { OpenDocument("sys:animations", () => new AnimationEditor(Project)); return null; }
             return OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)) as DatabaseEditor;
         }
 

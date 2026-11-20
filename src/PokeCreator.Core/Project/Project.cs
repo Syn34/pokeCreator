@@ -69,6 +69,7 @@ namespace PokeCreator.Projects
         public List<EncounterData> Encounters = new List<EncounterData>();
         public List<TownMapRegion> TownMaps = new List<TownMapRegion>();
         public List<RegionalDex> RegionalDexes = new List<RegionalDex>();
+        public List<BattleAnimation> Animations = new List<BattleAnimation>();
 
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
@@ -90,6 +91,7 @@ namespace PokeCreator.Projects
             AddTable("encounters", "Wild Encounters", typeof(EncounterData), "encounters.json", () => Encounters);
             AddTable("town_maps", "Town Maps", typeof(TownMapRegion), "town_maps.json", () => TownMaps);
             AddTable("regional_dexes", "Regional Dexes", typeof(RegionalDex), "regional_dexes.json", () => RegionalDexes);
+            AddTable("animations", "Battle Animations", typeof(BattleAnimation), "animations.json", () => Animations);
         }
 
         void AddTable(string key, string label, Type t, string file, Func<IList> get)
@@ -221,6 +223,7 @@ namespace PokeCreator.Projects
             p.Encounters = LoadOr(p.DataFile("encounters.json"), p.Encounters);
             p.TownMaps = LoadOr(p.DataFile("town_maps.json"), p.TownMaps);
             p.RegionalDexes = LoadOr(p.DataFile("regional_dexes.json"), p.RegionalDexes);
+            p.Animations = LoadOr(p.DataFile("animations.json"), p.Animations);
             p.MapInfos = LoadOr(p.DataFile("mapinfos.json"), p.MapInfos);
             p.Tilesets = LoadOr(p.DataFile("tilesets.json"), p.Tilesets);
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);
