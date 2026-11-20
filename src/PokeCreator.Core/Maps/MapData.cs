@@ -277,9 +277,17 @@ namespace PokeCreator.Maps
         public string TilesetName { get; set; }
         /// <summary>7 autotile images in Graphics/Autotiles.</summary>
         public List<string> AutotileNames { get; set; }
-        public string PanoramaName { get; set; }
-        public int PanoramaHue { get; set; }
-        public string FogName { get; set; }
+        /// <summary>Picture in Graphics/Panoramas shown behind the map, scrolling at half speed (RMXP).</summary>
+        [Field("Panorama (Graphics/Panoramas)", Asset = "Graphics/Panoramas", Group = "Panorama and fog")] public string PanoramaName { get; set; }
+        [Field("Panorama hue", Group = "Panorama and fog")] public int PanoramaHue { get; set; }
+        /// <summary>Picture in Graphics/Fogs tiled over the map (RMXP fog).</summary>
+        [Field("Fog (Graphics/Fogs)", Asset = "Graphics/Fogs", Group = "Panorama and fog")] public string FogName { get; set; }
+        [Field("Fog hue", Group = "Panorama and fog")] public int FogHue { get; set; }
+        [Field("Fog opacity (0-255)", Group = "Panorama and fog")] public int FogOpacity { get; set; }
+        [Field("Fog blend", Help = "0 normal, 1 add, 2 subtract", Group = "Panorama and fog")] public int FogBlend { get; set; }
+        [Field("Fog zoom %", Group = "Panorama and fog")] public int FogZoom { get; set; }
+        [Field("Fog scroll X", Help = "Pixels per 8 frames", Group = "Panorama and fog")] public int FogSx { get; set; }
+        [Field("Fog scroll Y", Group = "Panorama and fog")] public int FogSy { get; set; }
         public string BattlebackName { get; set; }
         /// <summary>More sheets (slot 1 and up) from the tileset's folder.</summary>
         public List<TileSheet> Sheets { get; set; }
@@ -293,6 +301,7 @@ namespace PokeCreator.Maps
         public TilesetData()
         {
             Name = ""; Folder = ""; TilesetName = ""; AutotileNames = new List<string> { "", "", "", "", "", "", "" };
+            FogOpacity = 64; FogZoom = 100;
             Sheets = new List<TileSheet>();
             Passages = new List<int>(); Priorities = new List<int>(); TerrainTags = new List<int>();
         }

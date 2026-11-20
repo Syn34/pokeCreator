@@ -300,6 +300,26 @@ namespace PokeCreator.Studio.Editors
                 Insert(new EventCommand(236, 0, t, Math.Min(9, power), sec * 2));
             });
 
+            cmd(screen, "Change Fog", () =>
+            {
+                string n = AssetPick("Graphics/Fogs", "Fog picture (Cancel = no fog)") ?? "";
+                int op = n.Length == 0 ? 0 : NumberDialog.Ask(FindForm(), "Opacity (0-255)", 64); if (op < 0) return;
+                int sx = n.Length == 0 ? 0 : NumberDialog.Ask(FindForm(), "Drift sideways (pixels per 8 frames, can be negative)", 0);
+                int sy = n.Length == 0 ? 0 : NumberDialog.Ask(FindForm(), "Drift down (pixels per 8 frames)", 0);
+                Insert(new EventCommand(204, 0, 1, n, 0, op, 0, 100, sx, sy));
+            });
+            cmd(screen, "Change Panorama", () =>
+            {
+                string n = AssetPick("Graphics/Panoramas", "Panorama picture (Cancel = none)") ?? "";
+                Insert(new EventCommand(204, 0, 0, n, 0));
+            });
+            cmd(screen, "Change Fog Opacity", () =>
+            {
+                int op = NumberDialog.Ask(FindForm(), "Opacity (0-255)", 64); if (op < 0) return;
+                int t = NumberDialog.Ask(FindForm(), "Over (1/20 second units)", 20); if (t < 0) return;
+                Insert(new EventCommand(206, 0, op, t * 2));
+            });
+
             var audio = group("Audio");
             cmd(audio, "Play BGM", AddMusic);
             cmd(audio, "Fade Out BGM", () => { int sec = NumberDialog.Ask(FindForm(), "Fade out over (seconds)", 1); if (sec >= 0) Insert(new EventCommand(242, 0, sec)); });

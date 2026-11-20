@@ -562,7 +562,9 @@ namespace PokeCreator.Import
                     Id = t.Int("id"), Name = t.Str("name"), TilesetName = t.Str("tileset_name"),
                     AutotileNames = t.List("autotile_names").Select(x => x == null ? "" : x.ToString()).ToList(),
                     PanoramaName = t.Str("panorama_name"), PanoramaHue = t.Int("panorama_hue"),
-                    FogName = t.Str("fog_name"), BattlebackName = t.Str("battleback_name")
+                    FogName = t.Str("fog_name"), BattlebackName = t.Str("battleback_name"),
+                    FogHue = t.Int("fog_hue"), FogOpacity = t.Int("fog_opacity"), FogBlend = t.Int("fog_blend_type"), FogZoom = t.Int("fog_zoom"),
+                    FogSx = t.Int("fog_sx"), FogSy = t.Int("fog_sy")
                 };
                 while (ts.AutotileNames.Count < 7) ts.AutotileNames.Add("");
                 ts.Passages = TableList(t.Get("passages"));

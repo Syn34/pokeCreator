@@ -74,6 +74,14 @@ namespace PokeCreator.Studio.Editors
                 case 235: return "◆ Erase Picture " + c.IntParam(0);
                 case 104: return "◆ Message Position: " + (c.IntParam(0) == 0 ? "top" : c.IntParam(0) == 1 ? "middle" : "bottom") + (c.IntParam(1) == 1 ? ", text only" : "");
                 case 354: return "◆ Return to Title Screen";
+                case 204:
+                    {
+                        int k = c.IntParam(0);
+                        if (k == 0) return "◆ Change Panorama: " + (c.StrParam(1).Length > 0 ? c.StrParam(1) : "(none)");
+                        if (k == 1) return "◆ Change Fog: " + (c.StrParam(1).Length > 0 ? c.StrParam(1) + ", opacity " + c.IntParam(3) + (c.IntParam(6) != 0 || c.IntParam(7) != 0 ? ", drift " + c.IntParam(6) + "," + c.IntParam(7) : "") : "(none)");
+                        return "◆ Change Battleback: " + c.StrParam(1);
+                    }
+                case 206: return "◆ Change Fog Opacity: " + c.IntParam(0) + ", @" + c.IntParam(1);
                 case 247: return "◆ Memorize BGM";
                 case 248: return "◆ Restore BGM";
                 case 236:

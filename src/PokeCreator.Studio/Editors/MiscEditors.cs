@@ -63,7 +63,9 @@ namespace PokeCreator.Studio.Editors
             add.Click += (s, e) => { int id = _p.Tilesets.Count == 0 ? 1 : _p.Tilesets.Max(t => t.Id) + 1; _p.Tilesets.Add(new TilesetData { Id = id, Name = "New tileset" }); Fill(); _list.SelectedIndex = _list.Items.Count - 1; Mark(); };
             var makeDefault = new Button { Text = "Make Default for New Projects", AutoSize = true };
             makeDefault.Click += (s, e) => MakeDefault();
-            bar.Controls.AddRange(new Control[] { fromFolder, fromImage, add, makeDefault });
+            var planes = new Button { Text = "Panorama && Fog…", AutoSize = true };
+            planes.Click += (s, e) => EditPlanes();
+            bar.Controls.AddRange(new Control[] { fromFolder, fromImage, add, makeDefault, planes });
             left.Controls.Add(_list); left.Controls.Add(bar);
             left.Controls.Add(new Label { Text = "Tilesets", Dock = DockStyle.Top, Height = 22, Font = Theme.HeaderFont });
 
@@ -248,6 +250,25 @@ namespace PokeCreator.Studio.Editors
                     Mark(); ShowSelected();
                 }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Replace Image", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            }
+        }
+
+        /// <summary>The tileset's panorama (behind the map) and fog (over it), as in RPG Maker XP.</summary>
+        void EditPlanes()
+        {
+            var ts = _list.SelectedItem as TilesetData;
+            if (ts == null) return;
+            string[] keep = { "PanoramaName", "PanoramaHue", "FogName", "FogHue", "FogOpacity", "FogBlend", "FogZoom", "FogSx", "FogSy" };
+            var hide = typeof(TilesetData).GetProperties().Select(pr => pr.Name).Where(n => !keep.Contains(n)).ToArray();
+            using (var f = new Form { Text = "Panorama and fog — " + ts.Name, Width = 520, Height = 420, StartPosition = FormStartPosition.CenterParent, MinimizeBox = false, MaximizeBox = false })
+            {
+                var fb = new FormBuilder();
+                fb.Changed += Mark;
+                var form = fb.Build(ts, hide);
+                var ok = new Button { Text = "Close", Dock = DockStyle.Bottom, Height = 30, DialogResult = DialogResult.OK };
+                f.Controls.Add(form); f.Controls.Add(ok);
+                f.AcceptButton = ok;
+                f.ShowDialog(FindForm());
             }
         }
 

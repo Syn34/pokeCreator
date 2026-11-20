@@ -65,6 +65,7 @@ namespace PokeCreator.Runtime
 
         /// <summary>Overworld weather (map metadata "Weather" or the Set Weather Effects command).</summary>
         public readonly World.WeatherSystem Weather = new World.WeatherSystem();
+        public readonly World.MapPlanes Planes = new World.MapPlanes();
         public int FrameCount;
         bool _quit;
 
@@ -298,6 +299,7 @@ namespace PokeCreator.Runtime
             UpdateRiding();
             PlayMapMusic();
             RollMapWeather(true);
+            Planes.FromTileset(Map.Tileset);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -317,6 +319,7 @@ namespace PokeCreator.Runtime
             UpdateRiding();
             PlayMapMusic();
             RollMapWeather(false);
+            Planes.FromTileset(Map.Tileset);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
             Gfx.SetTitle((Project.Settings.Title ?? "PokeCreator") + " - " + Message.Expand(Map.DisplayName));
@@ -608,6 +611,7 @@ namespace PokeCreator.Runtime
             }
             if (_signTimer > 0) _signTimer--;
             Weather.Update(DisplayX, DisplayY, Gfx.Width, Gfx.Height);
+            Planes.Update();
             Pictures.Update();
             UpdateShake();
             if (_hasScriptSwitches && ++_scriptSwitchTimer >= 120 && !Interpreter.Running) { _scriptSwitchTimer = 0; Map.RefreshEvents(); }
@@ -690,7 +694,9 @@ namespace PokeCreator.Runtime
             if (Map != null && firstOpaque < 0)
             {
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
+                Planes.DrawPanorama(this, DisplayX - (int)_shake, DisplayY);
                 _renderer.Draw(Map, DisplayX - (int)_shake, DisplayY, chars, FrameCount);
+                Planes.DrawFog(this, DisplayX - (int)_shake, DisplayY);
                 DrawTone();
                 DrawDarkness();
                 Weather.Draw(Gfx);

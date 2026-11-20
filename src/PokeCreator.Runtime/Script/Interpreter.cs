@@ -228,7 +228,20 @@ namespace PokeCreator.Runtime.Script
                         if (c.IntParam(4) != 0) ch.Turn(c.IntParam(4));
                         return true;
                     }
-                case 203: case 204: case 205: case 206: case 207: case 221: case 222: return true;
+                case 204: // Change Map Settings: panorama, fog or battleback
+                    {
+                        int kind = c.IntParam(0);
+                        var pl = _game.Planes;
+                        if (kind == 0) { pl.Panorama = c.StrParam(1); pl.PanoramaHue = c.IntParam(2); }
+                        else if (kind == 1)
+                        {
+                            pl.Fog = c.StrParam(1); pl.FogHue = c.IntParam(2); pl.FogOpacity = c.IntParam(3); pl.FogBlend = c.IntParam(4);
+                            pl.FogZoom = c.IntParam(5) > 0 ? c.IntParam(5) : 100; pl.FogSx = c.IntParam(6); pl.FogSy = c.IntParam(7);
+                        }
+                        return true;
+                    }
+                case 206: _game.Planes.FadeFog(c.IntParam(0), c.IntParam(1) * 3 / 2); return true; // Change Fog Opacity (duration in RMXP frames at 40 fps)
+                case 203: case 205: case 207: case 221: case 222: return true;
                 case 236: _game.Weather.Set(WeatherType(c.Params.Count > 0 ? c.Params[0] : null), c.IntParam(1), c.IntParam(2)); return true;
                 case 208: _game.Player.Transparent = c.IntParam(0) == 0; return true;
                 case 209:

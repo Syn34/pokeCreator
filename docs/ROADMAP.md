@@ -52,7 +52,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Overworld weather (map Weather property and Set Weather command)
 - [x] Essentials text codes: colours, pauses, speed, sounds, money window, positions, speaker names, alignment
 - [x] Flash/darkness maps, windowskins and text codes
-- [ ] Fog/panorama images
+- [x] Fog/panorama images (tileset settings, Change Fog / Panorama / Fog Opacity commands)
 
 ## v0.5: Studio power features
 - [ ] Gen 9 cosmetic forms (Tatsugiri, Squawkabilly, Ogerpon masks...) and battle function codes for new moves
