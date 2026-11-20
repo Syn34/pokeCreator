@@ -314,17 +314,19 @@ namespace PokeCreator.Studio.Editors
         }
 
         /// <summary>Selects the event layer and opens an event's editor (used by the Problems list).</summary>
-        public void EditEventById(int id)
+        public void EditEventById(int id, int page = 0)
         {
             var ev = _map.Events.FirstOrDefault(e => e.Id == id);
             if (ev == null) return;
-            EditEvent(ev);
+            EditEvent(ev, page);
         }
 
-        public void EditEvent(MapEvent ev)
+        public void EditEvent(MapEvent ev) { EditEvent(ev, 0); }
+
+        public void EditEvent(MapEvent ev, int page)
         {
             bool pushed = Snapshot();
-            using (var dlg = new EventEditor(_p, _map, ev))
+            using (var dlg = new EventEditor(_p, _map, ev, page))
             {
                 if (dlg.ShowDialog(this) == DialogResult.OK) { MarkDirty(); _canvas.Invalidate(); }
                 else if (pushed && _undo.Count > 0) { _undo.Pop(); UpdateUndoButtons(); }

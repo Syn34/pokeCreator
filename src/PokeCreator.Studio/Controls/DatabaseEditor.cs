@@ -433,46 +433,4 @@ namespace PokeCreator.Studio.Controls
         public void Save() { _save(); Dirty = false; if (DirtyChanged != null) DirtyChanged(); }
     }
 
-    /// <summary>Switch and variable names.</summary>
-    public class SwitchesDocument : UserControl, IDocument
-    {
-        readonly Project _p;
-        readonly DataGridView _sw, _var;
-        public string Title { get { return "Switches & Variables"; } }
-        public bool Dirty { get; private set; }
-        public event Action DirtyChanged;
-
-        public SwitchesDocument(Project p)
-        {
-            _p = p; Dock = DockStyle.Fill;
-            var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 400 };
-            _sw = MakeGrid("Switch", p.System.Switches);
-            _var = MakeGrid("Variable", p.System.Variables);
-            split.Panel1.Controls.Add(_sw); split.Panel1.Controls.Add(new Label { Text = "Switches (on/off flags)", Dock = DockStyle.Top, Font = Theme.HeaderFont, Height = 26 });
-            split.Panel2.Controls.Add(_var); split.Panel2.Controls.Add(new Label { Text = "Variables (numbers)", Dock = DockStyle.Top, Font = Theme.HeaderFont, Height = 26 });
-            Controls.Add(split);
-        }
-
-        DataGridView MakeGrid(string what, List<string> names)
-        {
-            var g = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, BackgroundColor = Theme.Panel };
-            g.Columns.Add("id", "ID"); g.Columns.Add("name", what + " name");
-            g.Columns[0].ReadOnly = true; g.Columns[0].FillWeight = 20;
-            while (names.Count < 101) names.Add(null);
-            for (int i = 1; i < names.Count; i++) g.Rows.Add(i.ToString("000"), names[i] ?? "");
-            g.CellValueChanged += (s, e) =>
-            {
-                if (e.RowIndex < 0) return;
-                names[e.RowIndex + 1] = Convert.ToString(g.Rows[e.RowIndex].Cells[1].Value);
-                if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); }
-            };
-            return g;
-        }
-
-        public void Save()
-        {
-            Json.Json.ToFile(_p.DataFile("system.json"), _p.System);
-            Dirty = false; if (DirtyChanged != null) DirtyChanged();
-        }
-    }
 }

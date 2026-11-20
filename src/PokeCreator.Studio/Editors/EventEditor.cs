@@ -118,7 +118,10 @@ namespace PokeCreator.Studio.Editors
         readonly TabControl _pages = new TabControl { Dock = DockStyle.Fill };
         readonly TextBox _name = new TextBox { Width = 220 };
 
-        public EventEditor(Project p, MapData map, MapEvent ev)
+        public EventEditor(Project p, MapData map, MapEvent ev) : this(p, map, ev, 0) { }
+
+        /// <param name="page">Which page to show first (0-based).</param>
+        public EventEditor(Project p, MapData map, MapEvent ev, int page)
         {
             _p = p; _map = map; _ev = ev;
             _work = Json.Json.Deserialize<MapEvent>(Json.Json.Write(ev));
@@ -144,7 +147,7 @@ namespace PokeCreator.Studio.Editors
             CancelButton = cancel;
 
             Controls.Add(_pages); Controls.Add(top); Controls.Add(bottom);
-            BuildPages(0);
+            BuildPages(Math.Max(0, Math.Min(page, _work.Pages.Count - 1)));
         }
 
         void Apply()
@@ -181,9 +184,9 @@ namespace PokeCreator.Studio.Editors
             int y = 4;
             left.Controls.Add(Head("Conditions", ref y));
             var c = pg.Condition;
-            AddCheckNum(left, "Switch", c.Switch1Valid, c.Switch1Id, (v, n) => { c.Switch1Valid = v; c.Switch1Id = n; }, ref y);
-            AddCheckNum(left, "Switch", c.Switch2Valid, c.Switch2Id, (v, n) => { c.Switch2Valid = v; c.Switch2Id = n; }, ref y);
-            AddCheckNum(left, "Variable", c.VariableValid, c.VariableId, (v, n) => { c.VariableValid = v; c.VariableId = n; }, ref y);
+            AddCheckId(left, p, false, "Switch", c.Switch1Valid, c.Switch1Id, (v, n) => { c.Switch1Valid = v; c.Switch1Id = n; }, ref y);
+            AddCheckId(left, p, false, "Switch", c.Switch2Valid, c.Switch2Id, (v, n) => { c.Switch2Valid = v; c.Switch2Id = n; }, ref y);
+            AddCheckId(left, p, true, "Variable", c.VariableValid, c.VariableId, (v, n) => { c.VariableValid = v; c.VariableId = n; }, ref y);
             var varVal = new NumericUpDown { Left = 200, Top = y, Width = 80, Minimum = -99999, Maximum = 99999, Value = c.VariableValue };
             varVal.ValueChanged += (s, e) => c.VariableValue = (int)varVal.Value;
             left.Controls.Add(new Label { Text = "is at least", Left = 120, Top = y + 3, AutoSize = true }); left.Controls.Add(varVal); y += 28;
@@ -249,6 +252,16 @@ namespace PokeCreator.Studio.Editors
         }
 
         static Label Head(string t, ref int y) { var l = new Label { Text = t, Font = Theme.HeaderFont, ForeColor = Theme.Accent, Left = 4, Top = y, AutoSize = true }; y += 24; return l; }
+
+        /// <summary>A checkbox plus a switch/variable picker button showing the name.</summary>
+        static void AddCheckId(Panel host, Project p, bool isVar, string label, bool on, int id, Action<bool, int> set, ref int y)
+        {
+            var cb = new CheckBox { Text = label, Left = 8, Top = y, Checked = on, Width = 100 };
+            var btn = new IdButton(p, isVar, id) { Left = 110, Top = y - 1, Width = 200 };
+            cb.CheckedChanged += (s, e) => set(cb.Checked, btn.Id);
+            btn.IdChanged += n => { if (!cb.Checked) cb.Checked = true; set(cb.Checked, n); };
+            host.Controls.Add(cb); host.Controls.Add(btn); y += 28;
+        }
 
         static void AddCheckNum(Panel host, string label, bool on, int num, Action<bool, int> set, ref int y)
         {

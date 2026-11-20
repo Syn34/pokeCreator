@@ -298,7 +298,7 @@ namespace PokeCreator.Studio.Editors
 
         void AddInputNumber()
         {
-            int id = NumberDialog.Ask(FindForm(), "Store the number in variable", 1); if (id < 1) return;
+            int id = IdPickerDialog.Ask(FindForm(), _p, true, 1, "Store the number in which variable?"); if (id < 1) return;
             int digits = NumberDialog.Ask(FindForm(), "How many digits (1-8)", 3); if (digits < 1) return;
             Insert(new EventCommand(103, 0, id, Math.Min(8, digits)));
         }
@@ -321,11 +321,11 @@ namespace PokeCreator.Studio.Editors
             EventCommand cond;
             switch (k)
             {
-                case 0: case 1: { int id = NumberDialog.Ask(FindForm(), "Switch ID", 1); if (id < 1) return; cond = new EventCommand(111, 0, 0, id, k == 0 ? 0 : 1); break; }
+                case 0: case 1: { int id = IdPickerDialog.Ask(FindForm(), _p, false, 1, "Which switch?"); if (id < 1) return; cond = new EventCommand(111, 0, 0, id, k == 0 ? 0 : 1); break; }
                 case 2: { int ch = ChoiceDialog.Ask(FindForm(), "Self switch", new[] { "A", "B", "C", "D" }); if (ch < 0) return; cond = new EventCommand(111, 0, 2, "ABCD"[ch].ToString(), 0); break; }
                 case 3:
                     {
-                        int id = NumberDialog.Ask(FindForm(), "Variable ID", 1); if (id < 1) return;
+                        int id = IdPickerDialog.Ask(FindForm(), _p, true, 1, "Which variable?"); if (id < 1) return;
                         string[] ops = { "== equal to", ">= at least", "<= at most", "> more than", "< less than", "!= not equal to" };
                         int op = ChoiceDialog.Ask(FindForm(), "Variable " + id + " is", ops); if (op < 0) return;
                         int v = NumberDialog.Ask(FindForm(), "Number", 1, -99999);
@@ -347,7 +347,7 @@ namespace PokeCreator.Studio.Editors
 
         void AddSwitch()
         {
-            int id = NumberDialog.Ask(FindForm(), "Switch ID", 1); if (id < 1) return;
+            int id = IdPickerDialog.Ask(FindForm(), _p, false, 1, "Turn which switch ON or OFF?"); if (id < 1) return;
             int on = ChoiceDialog.Ask(FindForm(), "Set switch " + id + " (" + _p.SwitchName(id) + ") to", new[] { "ON", "OFF" }); if (on < 0) return;
             Insert(new EventCommand(121, 0, id, id, on));
         }
@@ -360,11 +360,11 @@ namespace PokeCreator.Studio.Editors
 
         void AddVariable()
         {
-            int id = NumberDialog.Ask(FindForm(), "Variable ID", 1); if (id < 1) return;
+            int id = IdPickerDialog.Ask(FindForm(), _p, true, 1, "Change which variable?"); if (id < 1) return;
             int op = ChoiceDialog.Ask(FindForm(), "Variable " + id + " (" + _p.VariableName(id) + ")", new[] { "Set to", "Add", "Subtract", "Multiply by", "Divide by", "Remainder after dividing by" }); if (op < 0) return;
             int src = ChoiceDialog.Ask(FindForm(), "Using", new[] { "A number", "Another variable", "A random number" }); if (src < 0) return;
             if (src == 0) { int v = NumberDialog.Ask(FindForm(), "Number", 0, -99999); Insert(new EventCommand(122, 0, id, id, op, 0, v)); }
-            else if (src == 1) { int v = NumberDialog.Ask(FindForm(), "Variable ID", 1); if (v < 1) return; Insert(new EventCommand(122, 0, id, id, op, 1, v)); }
+            else if (src == 1) { int v = IdPickerDialog.Ask(FindForm(), _p, true, 1, "Read the value from which variable?"); if (v < 1) return; Insert(new EventCommand(122, 0, id, id, op, 1, v)); }
             else { int lo = NumberDialog.Ask(FindForm(), "Random from", 1, -99999); int hi = NumberDialog.Ask(FindForm(), "Random to", 10, -99999); Insert(new EventCommand(122, 0, id, id, op, 2, lo, hi)); }
         }
 
@@ -659,7 +659,7 @@ namespace PokeCreator.Studio.Editors
                         m = new EventCommand(14, 0, x, y); break;
                     }
                 case 15: { int f = NumberDialog.Ask(this, "Wait (1/20 second units)", 4); if (f < 1) return; m = new EventCommand(15, 0, f); break; }
-                case 27: case 28: { int id = NumberDialog.Ask(this, "Switch ID", 1); if (id < 1) return; m = new EventCommand(code, 0, id); break; }
+                case 27: case 28: { int id = IdPickerDialog.Ask(this, _project, false, 1, code == 27 ? "Turn which switch ON?" : "Turn which switch OFF?"); if (id < 1) return; m = new EventCommand(code, 0, id); break; }
                 case 29: { int k = ChoiceDialog.Ask(this, "Movement speed", new[] { "1: Slowest", "2: Slower", "3: Slow", "4: Normal", "5: Fast", "6: Fastest" }); if (k < 0) return; m = new EventCommand(29, 0, k + 1); break; }
                 case 30: { int k = ChoiceDialog.Ask(this, "Movement frequency", new[] { "1: Lowest", "2: Lower", "3: Low", "4: Normal", "5: High", "6: Highest" }); if (k < 0) return; m = new EventCommand(30, 0, k + 1); break; }
                 case 42: { int o = NumberDialog.Ask(this, "Opacity (0 = invisible, 255 = solid)", 255); if (o < 0) return; m = new EventCommand(42, 0, Math.Min(255, o)); break; }

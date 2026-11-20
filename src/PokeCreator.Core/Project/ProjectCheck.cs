@@ -197,7 +197,7 @@ namespace PokeCreator.Projects
                         string pw = ev.Pages.Count > 1 ? ew + ", page " + (pi + 1) : ew;
                         if (pg.Graphic != null && !string.IsNullOrEmpty(pg.Graphic.CharacterName) && !HasAsset("Graphics/Characters", pg.Graphic.CharacterName))
                             Add(ProblemSeverity.Warning, pw, et, "Its graphic '" + pg.Graphic.CharacterName + "' is missing from Graphics/Characters.");
-                        CheckCommands(pg.List, pw, et, map);
+                        CheckCommands(pg.List, pw, et + ":page:" + (pi + 1), map);
                     }
                 }
             }

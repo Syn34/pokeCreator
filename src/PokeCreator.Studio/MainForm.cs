@@ -132,7 +132,7 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add(new ToolStripSeparator());
             game.DropDownItems.Add("Game Settings", null, (s, e) => OpenSettings());
             game.DropDownItems.Add("Player Characters", null, (s, e) => OpenPlayers());
-            game.DropDownItems.Add("Switches && Variables", null, (s, e) => OpenDocument("sys:switches", () => new SwitchesDocument(Project)));
+            game.DropDownItems.Add("Switches && Variables", null, (s, e) => OpenDocument("sys:switches", () => new SwitchesEditor(this, Project)));
 
             var db = new ToolStripMenuItem("&Database");
             db.DropDownOpening += (s, e) =>
@@ -514,7 +514,7 @@ namespace PokeCreator.Studio
             if (s == "sys:settings") OpenSettings();
             else if (s == "sys:appearance") OpenAppearance();
             else if (s == "sys:players") OpenPlayers();
-            else if (s == "sys:switches") OpenDocument(s, () => new SwitchesDocument(Project));
+            else if (s == "sys:switches") OpenDocument(s, () => new SwitchesEditor(this, Project));
             else if (s == "sys:tilesets") OpenDocument(s, () => new TilesetEditor(Project));
             else if (s == "sys:world") OpenWorld();
             else if (s == "sys:commonevents") OpenDocument(s, () => new CommonEventsEditor(this, Project));
@@ -629,9 +629,12 @@ namespace PokeCreator.Studio
         }
 
         /// <summary>Opens whatever a problem is about: the map, the event, the database record, the script line...</summary>
-        void GoToProblem(Problem pr)
+        void GoToProblem(Problem pr) { NavigateTo(pr.Target); }
+
+        /// <summary>Opens a place in the project: "map:N", "map:N:event:E", "commonevent:N", "db:table:ID", "settings", "file:path|line"...</summary>
+        public void NavigateTo(string target)
         {
-            string t = pr.Target ?? "";
+            string t = target ?? "";
             var parts = t.Split(':');
             int n;
             if (t.StartsWith("map:") && int.TryParse(parts[1], out n))
@@ -639,7 +642,9 @@ namespace PokeCreator.Studio
                 if (Project.GetMapInfo(n) == null) return;
                 var ed = OpenMap(n);
                 int ev;
-                if (ed != null && parts.Length >= 4 && parts[2] == "event" && int.TryParse(parts[3], out ev)) BeginInvoke(new Action(() => ed.EditEventById(ev)));
+                int page = 0;
+                if (parts.Length >= 6 && parts[4] == "page" && int.TryParse(parts[5], out page)) page--;
+                if (ed != null && parts.Length >= 4 && parts[2] == "event" && int.TryParse(parts[3], out ev)) BeginInvoke(new Action(() => ed.EditEventById(ev, Math.Max(0, page))));
             }
             else if (t.StartsWith("commonevent:") && int.TryParse(parts[1], out n))
             {
