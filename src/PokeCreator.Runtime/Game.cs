@@ -329,6 +329,61 @@ namespace PokeCreator.Runtime
             return bd;
         }
 
+        // ------------------------------------------------------------------ trainers who spot the player
+        static readonly System.Text.RegularExpressions.Regex TrainerName = new System.Text.RegularExpressions.Regex(@"trainer\((\d+)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Essentials trainers: an event named "Trainer(n)" with an Event Touch page starts when the player walks into
+        /// its line of sight (n tiles in the direction it faces, nothing in between). Returns true if one started.
+        /// </summary>
+        public bool CheckTrainerSight()
+        {
+            if (Map == null || !PartyCanBattle) return false;
+            foreach (var e in Map.Events)
+            {
+                if (e.Erased || e.Starting || e.Trigger != Triggers.EventTouch || !e.HasCommands) continue;
+                var m = TrainerName.Match(e.Name ?? "");
+                if (!m.Success) continue;
+                if (InSight(e, int.Parse(m.Groups[1].Value))) { e.Start(); return true; }
+            }
+            return false;
+        }
+
+        bool InSight(GameEvent e, int range)
+        {
+            int d = e.Direction;
+            int dx = d == 4 ? -1 : d == 6 ? 1 : 0, dy = d == 8 ? -1 : d == 2 ? 1 : 0;
+            int x = e.X, y = e.Y;
+            for (int i = 1; i <= range; i++)
+            {
+                if (x + dx == Player.X && y + dy == Player.Y) return true;
+                if (!e.Passable(x, y, d)) return false;
+                x += dx; y += dy;
+            }
+            return false;
+        }
+
+        Character _exclaimOn;
+        int _exclaimTimer;
+
+        /// <summary>Shows a "!" over a character for a moment (trainers noticing the player).</summary>
+        public void Exclaim(Character c, int frames)
+        {
+            _exclaimOn = c; _exclaimTimer = frames;
+            Audio.PlaySe("Exclaim");
+        }
+
+        void DrawExclaim()
+        {
+            if (_exclaimTimer <= 0 || _exclaimOn == null) return;
+            _exclaimTimer--;
+            int x = _exclaimOn.ScreenX(DisplayX) - 10, y = _exclaimOn.ScreenY(DisplayY) - 64 - Math.Max(0, 8 - (30 - _exclaimTimer) * 2);
+            Gfx.FillRect(x - 2, y - 2, 24, 28, new Color(40, 40, 48));
+            Gfx.FillRect(x, y, 20, 24, new Color(248, 248, 248));
+            Gfx.FillRect(x + 8, y + 3, 4, 12, new Color(232, 48, 40));
+            Gfx.FillRect(x + 8, y + 17, 4, 4, new Color(232, 48, 40));
+        }
+
         /// <summary>After losing: heal the party and go back to the last healing spot (Home in Game Settings, else the start).</summary>
         public void Whiteout()
         {
@@ -455,6 +510,7 @@ namespace PokeCreator.Runtime
                 var chars = new List<Character>(Map.Events.Where(e => !e.Erased).Cast<Character>()) { Player };
                 _renderer.Draw(Map, DisplayX, DisplayY, chars, FrameCount);
                 DrawTone();
+                DrawExclaim();
                 DrawLocationSign();
             }
             for (int i = Math.Max(0, firstOpaque); i < _scenes.Count; i++) _scenes[i].Draw(Gfx);

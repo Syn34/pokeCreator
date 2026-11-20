@@ -233,6 +233,7 @@ namespace PokeCreator.Runtime.World
             // Player touch / event touch on the tile we stepped onto
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
                 if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
+            if (!Game.InterpreterRunning && Game.CheckTrainerSight()) return;
             Game.Encounters.OnStep(X, Y);
         }
 

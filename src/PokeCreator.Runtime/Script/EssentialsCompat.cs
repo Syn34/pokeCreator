@@ -223,7 +223,7 @@ namespace PokeCreator.Runtime.Script
         void RegisterBuiltins()
         {
             Handler noop = (c, a) => true;
-            foreach (var n in new[] { "pbTrainerIntro", "pbTrainerEnd", "pbNoticePlayer", "pbCallBub", "pbFadeOutIn",
+            foreach (var n in new[] { "pbCallBub", "pbFadeOutIn",
                                       "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
                                       "pbMoveRoute", "pbPhoneRegisterBattle", "pbPhoneRegister", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
@@ -250,6 +250,31 @@ namespace PokeCreator.Runtime.Script
             });
             Register("get_character", (c, a) => ToInt(Arg(a, 0)));
             Register("get_self", (c, a) => 0);
+            // Trainers: intro music, "!" and walking up to the player, music back afterwards
+            Register("pbTrainerIntro", (c, a) =>
+            {
+                var tt = _game.Project.TrainerTypes.FirstOrDefault(t => t.Id == Str(a, 0));
+                if (tt != null && !string.IsNullOrEmpty(tt.IntroBGM)) _game.Audio.PlayMe(tt.IntroBGM);
+                return true;
+            });
+            Register("pbTrainerEnd", (c, a) => { _game.RestoreMapBgm(); return true; });
+            Register("pbNoticePlayer", (c, a) =>
+            {
+                if (c == null) return true;
+                var ch = c.GetCharacter(a.Count > 0 && a[0] != null ? ToInt(a[0]) : 0) as GameEvent;
+                if (ch == null) return true;
+                _game.Exclaim(ch, 30);
+                int dist = Math.Abs(ch.X - _game.Player.X) + Math.Abs(ch.Y - _game.Player.Y);
+                var route = new PokeCreator.Maps.MoveRoute { Repeat = false };
+                route.List.Add(new PokeCreator.Maps.EventCommand(15, 0, 6));          // wait while the "!" shows
+                for (int i = 1; i < dist; i++) route.List.Add(new PokeCreator.Maps.EventCommand(10, 0)); // step toward the player
+                route.List.Add(new PokeCreator.Maps.EventCommand(25, 0));             // face the player
+                route.List.Add(new PokeCreator.Maps.EventCommand(0, 0));
+                ch.ForceMoveRoute(route);
+                _game.Player.TurnToward(ch);
+                c.WaitForMoves();
+                return true;
+            });
             Register("pbMapInterpreter", (c, a) => c);
 
             Register("pbReceiveItem", (c, a) => GiveItem(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1, "obtained"));

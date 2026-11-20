@@ -77,6 +77,8 @@ namespace PokeCreator.Runtime.Script
         }
 
         public void Wait(int frames) { _wait = Math.Max(_wait, frames); }
+        /// <summary>Waits until every forced move route (player and events) has finished.</summary>
+        public void WaitForMoves() { _waitForMoves = true; }
 
         public void Update()
         {
