@@ -312,6 +312,8 @@ namespace PokeCreator.Runtime.UI
         protected override void Update()
         {
             var party = Party;
+            if (_moveSel >= 0) { MoveSelect(); return; }
+            if (_page == 3 && Input.Trigger(Button.Action) && party.Count > 0 && !party[Math.Min(_index, party.Count - 1)].IsEgg) { Decide(); _moveSel = 0; _swapFrom = -1; return; }
             if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
             if (Input.Repeat(Button.Right)) { _page = (_page + 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
             if (Input.Repeat(Button.Left)) { _page = (_page + Pages.Length - 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
@@ -368,6 +370,37 @@ namespace PokeCreator.Runtime.UI
                 case 3: DrawMoves(g, pk, rx, rw); break;
                 case 4: DrawRibbons(g, pk, rx, rw); break;
             }
+        }
+
+        int _moveSel = -1, _swapFrom = -1;
+
+        /// <summary>Moves page: look at a move's details; choose two to swap their order.</summary>
+        void MoveSelect()
+        {
+            var pk = Party[Math.Min(_index, Party.Count - 1)];
+            int n = pk.Moves.Count;
+            if (Input.Repeat(Button.Down) && n > 0) { _moveSel = (_moveSel + 1) % n; Cursor(); }
+            if (Input.Repeat(Button.Up) && n > 0) { _moveSel = (_moveSel + n - 1) % n; Cursor(); }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); if (_swapFrom >= 0) _swapFrom = -1; else _moveSel = -1; return; }
+            if (Input.Trigger(Button.Action) && n > 1)
+            {
+                Decide();
+                if (_swapFrom < 0) { _swapFrom = _moveSel; return; }
+                if (_swapFrom != _moveSel) { var t = pk.Moves[_swapFrom]; pk.Moves[_swapFrom] = pk.Moves[_moveSel]; pk.Moves[_moveSel] = t; }
+                _swapFrom = -1;
+            }
+        }
+
+        void DrawMoveDetails(Gfx g, PokeCreator.Data.MoveData md)
+        {
+            Ui.Panel(g, 8, 48, 184, 328, new Color(248, 248, 248), new Color(152, 160, 176));
+            if (md == null) return;
+            Ui.TypeBadge(g, Game, 18, 56, md.Type);
+            Ui.Text(g, 18, 92, md.Category);
+            g.DrawText(18, 126, "Power", new Color(232, 88, 64), new Color(248, 192, 176)); Ui.TextRight(g, 180, 126, md.Power > 1 ? md.Power.ToString() : "---");
+            g.DrawText(18, 158, "Accuracy", new Color(232, 88, 64), new Color(248, 192, 176)); Ui.TextRight(g, 180, 158, md.Accuracy > 0 ? md.Accuracy + "%" : "---");
+            int y = 196;
+            foreach (var l in Wrap(g, md.Description ?? "", 164)) { if (y > 344) break; Ui.Text(g, 18, y, l); y += 28; }
         }
 
         void Row(Gfx g, int rx, int rw, int y, string label, string value)
@@ -480,7 +513,8 @@ namespace PokeCreator.Runtime.UI
             for (int i = 0; i < 4; i++)
             {
                 int y = 60 + i * 78;
-                Ui.Panel(g, rx + 8, y, rw - 16, 70, new Color(240, 240, 248), new Color(184, 192, 208));
+                Color fill = i == _swapFrom ? new Color(200, 232, 248) : i == _moveSel ? new Color(248, 232, 168) : new Color(240, 240, 248);
+                Ui.Panel(g, rx + 8, y, rw - 16, 70, fill, new Color(184, 192, 208));
                 if (i >= pk.Moves.Count) { Ui.Text(g, rx + 24, y + 18, "-"); continue; }
                 var m = pk.Moves[i];
                 var md = p.Moves.FirstOrDefault(x => x.Id == m.Id);
@@ -491,6 +525,7 @@ namespace PokeCreator.Runtime.UI
                 if (md != null) Ui.Text(g, rx + 22, y + 36, md.Category);
                 if (md != null && md.Power > 1) Ui.Text(g, rx + 126, y + 36, md.Power.ToString());
             }
+            if (_moveSel >= 0 && _moveSel < pk.Moves.Count) DrawMoveDetails(g, p.Moves.FirstOrDefault(x => x.Id == pk.Moves[_moveSel].Id));
         }
 
         static List<string> Wrap(Gfx g, string text, int width)
