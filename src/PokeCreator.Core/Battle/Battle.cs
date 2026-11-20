@@ -12,7 +12,9 @@ namespace PokeCreator.Battles
         /// <summary>A move's animation: Side/Party/Slot = user, Value/Value2 = target side/slot, Text = move.</summary>
         MoveAnim,
         /// <summary>A common animation (Text = "StatUp", "Poison", "Rain"...) on Side/Slot; Side -1 = whole field.</summary>
-        CommonAnim }
+        CommonAnim,
+        /// <summary>A Pokémon changed form (Mega Evolution): its sprite and databox update.</summary>
+        FormChange }
 
     /// <summary>Something the battle screen shows, in order: a message, an HP bar change, a Pokémon fainting...</summary>
     public class BattleEvent
@@ -37,6 +39,7 @@ namespace PokeCreator.Battles
         public string Item;
         public int Slot;        // which of the player's Pokémon this is for (double battles)
         public int TargetSide = -1, TargetSlot; // chosen target (-1 = automatic)
+        public bool Mega;       // Mega Evolve before moving
         public static BattleCommand Fight(int slot) { return new BattleCommand { Kind = BattleCommandKind.Fight, Index = slot }; }
         public static BattleCommand Fight(int slot, int fieldSlot, int targetSide, int targetSlot) { return new BattleCommand { Kind = BattleCommandKind.Fight, Index = slot, Slot = fieldSlot, TargetSide = targetSide, TargetSlot = targetSlot }; }
         public static BattleCommand Switch(int party) { return new BattleCommand { Kind = BattleCommandKind.Switch, Index = party }; }
@@ -294,6 +297,10 @@ namespace PokeCreator.Battles
                 if (forced >= 0 && o.Key.Charging == null) o.Value.Index = forced;
                 var pmd = MoveFor(o.Key, o.Value.Index); o.Key.PlannedMove = pmd != null ? pmd.Id : null;
             }
+
+            // Mega Evolution happens before any move, fastest first
+            foreach (var o in orders.OrderByDescending(x => Speed(x.Key)).ToList())
+                if ((o.Key.Side == 0 && o.Value.Mega) || (o.Key.Side == 1 && AIWantsMega(o.Key))) MegaEvolve(o.Key);
 
             // Moves: priority, then speed (ties at random)
             var tie = orders.ToDictionary(o => o.Key, o => Rng.Next(1000));

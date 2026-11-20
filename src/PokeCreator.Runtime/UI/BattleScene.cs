@@ -51,6 +51,8 @@ namespace PokeCreator.Runtime.UI
         // Essentials battle animations (Data/animations.json)
         BattleAnimPlayer _player;
         string _briefText;
+        bool _megaOn;
+        int _formFlash; // Mega Evolve the Pokémon choosing its move (toggled with Shift in the Fight menu)
         bool _animThisMove;
         bool AnimsOn { get { return Game.Project.Animations.Count > 0 && Game.Options.BattleEffects; } }
         bool _trainerVisible, _ballVisible, _ballCaught;
@@ -65,6 +67,8 @@ namespace PokeCreator.Runtime.UI
         public BattleScene(Game g, Battle battle, BattleSetup setup) : base(g)
         {
             Opaque = true; _b = battle; _setup = setup; _party = battle.Parties[0];
+            battle.PlayerHasMegaRing = Battle.MegaRings.Any(r => g.State.ItemCount(r) > 0);
+            battle.BagHas = r => g.State.ItemCount(r) > 0;
             _trainerVisible = !setup.Wild;
             foreach (var e in battle.Start()) _queue.Enqueue(e);
             // Seen in the Pokédex as soon as it appears
@@ -126,6 +130,8 @@ namespace PokeCreator.Runtime.UI
         void Commit(BattleCommand c)
         {
             c.Slot = _cmdSlot;
+            if (c.Kind == BattleCommandKind.Fight && _megaOn && _b.CanMegaEvolve(Me)) c.Mega = true;
+            _megaOn = false;
             _pending.RemoveAll(x => x.Slot == _cmdSlot);
             _pending.Add(c);
             var next = _b.Live(0).FirstOrDefault(x => x.Slot > _cmdSlot);
@@ -190,6 +196,12 @@ namespace PokeCreator.Runtime.UI
                         return true;
                     }
                 case BattleEventKind.CommonAnim: return StartCommon(e.Text, e.Side, e.Slot);
+                case BattleEventKind.FormChange:
+                    Game.Audio.PlaySe("Battle recall");
+                    _blink[Key(e.Side, e.Slot)] = 0;
+                    if (StartCommon("MegaEvolution", e.Side, e.Slot)) return true;
+                    _formFlash = 24;
+                    return true;
                 case BattleEventKind.Status:
                     if (!string.IsNullOrEmpty(e.Text)) StartCommon(StatusAnimName(e.Text), e.Side, SlotOf(e.Side, e.Party));
                     return _player != null;
@@ -261,6 +273,7 @@ namespace PokeCreator.Runtime.UI
                         if (_anim >= 20) { _visible[k] = false; return true; }
                         return false;
                     }
+                case BattleEventKind.FormChange: return _anim >= 24;
                 case BattleEventKind.SendOut:
                     if (_anim == 12 && _b.Parties[e.Side][e.Party].Shiny && StartCommon("Shiny", e.Side, e.Slot)) return false;
                     return _anim >= 12;
@@ -406,6 +419,8 @@ namespace PokeCreator.Runtime.UI
             if (Input.Repeat(Button.Down) && _move + 2 < n) { _move += 2; Cursor(); }
             if (Input.Repeat(Button.Up) && _move >= 2) { _move -= 2; Cursor(); }
             if (Input.Trigger(Button.Cancel)) { Cancel(); _mode = Mode.Command; return; }
+            // Shift: Mega Evolution on/off (one Pokémon per battle)
+            if (Input.Trigger(Button.Run) && _b.CanMegaEvolve(Me) && !_pending.Any(x => x.Mega)) { _megaOn = !_megaOn; Decide(); }
             if (!Input.Trigger(Button.Action)) return;
             if (Me.Pk.Moves[_move].PP <= 0) { Buzz(); Game.Message.Show("There's no PP left for this move!"); return; }
             var why = _b.CannotSelectReason(Me, _move);
@@ -528,6 +543,7 @@ namespace PokeCreator.Runtime.UI
         // ------------------------------------------------------------------ ending
         void EndBattle()
         {
+            _b.RevertForms();
             _mode = Mode.Ending;
             var o = _b.Outcome;
             var steps = new List<Action<Action>>();
@@ -673,6 +689,7 @@ namespace PokeCreator.Runtime.UI
             if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
             DrawEffects(g);
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
+            if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
             // Databoxes
             for (int slot = 0; slot < (_b.IsDouble ? 2 : 1); slot++)
             {
@@ -920,6 +937,13 @@ namespace PokeCreator.Runtime.UI
                 Ui.Text(g, cx, cy, i < moves.Count ? ItemEffects.MoveName(Game.Project, moves[i].Id) : "-");
             }
             Ui.Panel(g, 348, by, g.Width - 352, 96, new Color(248, 248, 248), new Color(96, 88, 120));
+            if (_b.CanMegaEvolve(Me) && !_pending.Any(x => x.Mega))
+            {
+                string mega = _megaOn ? "MEGA EVOLVE: ON" : "Shift: Mega Evolve";
+                int mw = g.TextWidth(mega) + 20;
+                Ui.Panel(g, 4, by - 34, mw, 30, _megaOn ? new Color(248, 200, 96) : new Color(248, 248, 248), new Color(96, 88, 120));
+                g.DrawText(14, by - 32, mega, Ui.Dark, Ui.DarkShadow);
+            }
             if (_move < moves.Count)
             {
                 var m = moves[_move];

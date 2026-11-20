@@ -547,7 +547,18 @@ namespace PokeCreator.Battles
         string MoveNameOf(string id) { var m = Move(id); return m != null ? m.Name ?? id : id; }
 
         /// <summary>Uses another move (Metronome, Sleep Talk, Copycat...): its own targets, no PP.</summary>
+        int _callDepth;
+
         void CallMove(Battler user, Battler target, MoveData md)
+        {
+            // A called move can't call another move (Mirror Move copying Mirror Move would never end)
+            if (_callDepth > 0 || !CanBeCalled(md)) { Say("But it failed!"); return; }
+            _callDepth++;
+            try { CallMoveCore(user, target, md); }
+            finally { _callDepth--; }
+        }
+
+        void CallMoveCore(Battler user, Battler target, MoveData md)
         {
             string code = md.FunctionCode ?? "None";
             Say(Name(user) + " used " + (md.Name ?? md.Id) + "!");

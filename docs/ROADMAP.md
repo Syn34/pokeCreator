@@ -36,6 +36,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [ ] Remaining abilities and items, about 85 rarer move effects (Pledges, Fling, Pursuit, type-changing moves...)
 - [x] Battle animations for moves: Essentials' PkmnAnimations imported and played (Move / OppMove / Common, extra hits, charging turns, type defaults, sounds, flashes, hue), "Battle Effects" option
 - [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
+- [x] Mega Evolution (Mega Ring, Mega Stones / Mega move, AI trainers, reverts after battle)
+- [ ] Triple battles
 
 ## v0.4: World features
 - [x] Field moves: Surf, Cut, Strength, Rock Smash, Headbutt; berry plants (picking)
