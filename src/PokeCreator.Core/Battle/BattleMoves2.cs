@@ -15,6 +15,11 @@ namespace PokeCreator.Battles
     public partial class Battle
     {
         public readonly int[] LuckyChant = new int[2];
+        /// <summary>Pledge combinations: sea of fire (hurts each turn), swamp (quarter Speed), rainbow (double effect chances).</summary>
+        public readonly int[] SeaOfFire = new int[2], Swamp = new int[2], Rainbow = new int[2];
+        bool _pursuitBoost;
+        Battler _pledgeUser; string _pledgeCode;
+        double _pledgeBoost = 1;
         public int MudSport, WaterSport, MagicRoom, WonderRoom, FairyLock;
         readonly bool[] _faintedLastTurn = new bool[2], _faintedThisTurn = new bool[2];
         int _echoedVoice; bool _echoedThisTurn;
@@ -382,6 +387,8 @@ namespace PokeCreator.Battles
                 case "UsedAfterAllyRoundWithDoublePower": return _roundUsedThisTurn ? 2 : 1;
                 case "DoublePowerAfterFusionFlare": return _lastMoveThisTurn == "FUSIONFLARE" ? 2 : 1;
                 case "DoublePowerAfterFusionBolt": return _lastMoveThisTurn == "FUSIONBOLT" ? 2 : 1;
+                case "PursueSwitchingFoe": return _pursuitBoost ? 2 : 1;
+                case "FirePledge": case "GrassPledge": case "WaterPledge": return _pledgeBoost;
             }
             return 1;
         }
@@ -462,6 +469,7 @@ namespace PokeCreator.Battles
                 case "TrapTargetInBattleLowerTargetDefSpDef1EachTurn": if (!target.Pk.Fainted && !target.Octolocked) { target.Octolocked = true; target.Trapped = true; Say(Name(target) + " can no longer escape!"); } break;
             }
             if (code == "UsedAfterAllyRoundWithDoublePower") _roundUsedThisTurn = true;
+            if (code == "FirePledge" || code == "GrassPledge" || code == "WaterPledge") FinishPledge(user, target, code);
             if (code == "PowerHigherWithConsecutiveUseOnUserSide") { _echoedThisTurn = true; _echoedVoice++; }
         }
 
@@ -488,8 +496,44 @@ namespace PokeCreator.Battles
             return true;
         }
 
+        /// <summary>
+        /// The first Pledge of a turn waits for an ally's different Pledge; the second one hits harder and leaves a
+        /// sea of fire (Fire + Grass), a swamp (Grass + Water) or a rainbow (Water + Fire).
+        /// </summary>
+        void PledgeBefore(Battler user, string code)
+        {
+            _pledgeBoost = 1;
+            if (_pledgeUser != null && _pledgeUser != user && _pledgeUser.Side == user.Side && _pledgeCode != code && !_pledgeUser.Pk.Fainted)
+                _pledgeBoost = 150.0 / 80;
+        }
+
+        void FinishPledge(Battler user, Battler target, string code)
+        {
+            if (_pledgeBoost > 1)
+            {
+                var pair = new HashSet<string> { code, _pledgeCode };
+                int foe = 1 - user.Side;
+                if (pair.Contains("FirePledge") && pair.Contains("GrassPledge")) { SeaOfFire[foe] = 4; Say("A sea of fire enveloped " + SideName(foe, IsWild) + "!"); }
+                else if (pair.Contains("GrassPledge") && pair.Contains("WaterPledge")) { Swamp[foe] = 4; Say("A swamp enveloped " + SideName(foe, IsWild) + "!"); }
+                else if (pair.Contains("WaterPledge") && pair.Contains("FirePledge")) { Rainbow[user.Side] = 4; Say("A rainbow appeared in the sky on " + SideName(user.Side, IsWild) + "'s side!"); }
+                _pledgeUser = null; _pledgeCode = null; _pledgeBoost = 1;
+                return;
+            }
+            _pledgeUser = user; _pledgeCode = code;
+        }
+
         void MoreEndOfTurn()
         {
+            for (int s = 0; s < 2; s++)
+            {
+                if (SeaOfFire[s] > 0)
+                {
+                    foreach (var b in Live(s).Where(x => !TypesOf(x).Contains("FIRE")).ToList()) Residual(b, Math.Max(1, b.Pk.TotalHP(P) / 8), Name(b) + " was hurt by the sea of fire!");
+                    if (--SeaOfFire[s] == 0) Say("The sea of fire around " + SideName(s, IsWild) + " disappeared!");
+                }
+                if (Swamp[s] > 0 && --Swamp[s] == 0) Say("The swamp around " + SideName(s, IsWild) + " disappeared!");
+                if (Rainbow[s] > 0 && --Rainbow[s] == 0) Say("The rainbow on " + SideName(s, IsWild) + "'s side disappeared!");
+            }
             foreach (var b in OnField.Where(x => !x.Pk.Fainted).ToList())
             {
                 if (b.Octolocked) { ChangeStat(b, S.Defense, -1); ChangeStat(b, S.SpDef, -1); }
@@ -511,6 +555,7 @@ namespace PokeCreator.Battles
         /// <summary>Per-turn bookkeeping for Retaliate, Echoed Voice, Round, the Fusion moves and Ion Deluge.</summary>
         void StartOfTurnBookkeeping()
         {
+            _pledgeUser = null; _pledgeCode = null; _pledgeBoost = 1; _pursuitBoost = false;
             foreach (var b in OnField) b.BeakBlast = false;
             _faintedLastTurn[0] = _faintedThisTurn[0]; _faintedLastTurn[1] = _faintedThisTurn[1];
             _faintedThisTurn[0] = _faintedThisTurn[1] = false;

@@ -316,7 +316,21 @@ namespace PokeCreator.Battles
                 else if (cmd.Kind == BattleCommandKind.Switch)
                 {
                     if (IsTrapped(o.Key)) Say(Name(o.Key) + " can't be switched out!");
-                    else SwitchPlayer(o.Key.Slot, cmd.Index);
+                    else
+                    {
+                        // Pursuit: a foe using it hits the Pokémon before it leaves, with double power
+                        foreach (var po in orders.Where(x => x.Key.Side != o.Key.Side && x.Value.Kind == BattleCommandKind.Fight).ToList())
+                        {
+                            var pmd = MoveFor(po.Key, po.Value.Index);
+                            if (pmd == null || pmd.FunctionCode != "PursueSwitchingFoe" || po.Key.Pk.Fainted || o.Key.Pk.Fainted) continue;
+                            Say(Name(o.Key) + " is being withdrawn...");
+                            _pursuitBoost = true;
+                            Act(po.Key, o.Key, po.Value.Index);
+                            _pursuitBoost = false;
+                            orders.Remove(po);
+                        }
+                        if (!o.Key.Pk.Fainted && Outcome == BattleOutcome.Ongoing) SwitchPlayer(o.Key.Slot, cmd.Index);
+                    }
                     orders.Remove(o);
                 }
             }
@@ -387,6 +401,7 @@ namespace PokeCreator.Battles
             int s = Stat(b, PokeCreator.Pkmn.Stat.Speed);
             if ((b.Pk.Status ?? "").ToUpperInvariant() == "PARALYSIS" && !HasAbility(b, "QUICKFEET")) s /= 2;
             if (Tailwind[b.Side] > 0) s *= 2;
+            if (Swamp[b.Side] > 0) s /= 4;
             return Math.Max(1, (int)(s * AbilitySpeed(b)));
         }
 
@@ -798,6 +813,7 @@ namespace PokeCreator.Battles
             if (MoveFails(user, target, md, code)) { user.LastMoveFailed = true; Say("But it failed!"); return; }
             if (DampBlocks(user, code)) { user.LastMoveFailed = true; return; }
             if (PresentHeals(user, target, code)) return;
+            if (code == "FirePledge" || code == "GrassPledge" || code == "WaterPledge") PledgeBefore(user, code);
             if (code == "HealAllyOrDamageFoe" && target.Side == user.Side && target != user)
             {
                 int max = target.Pk.TotalHP(P);
@@ -954,6 +970,7 @@ namespace PokeCreator.Battles
             {
                 int chance = md.EffectChance > 0 ? md.EffectChance : 100;
                 if (HasAbility(user, "SERENEGRACE")) chance *= 2;
+                if (Rainbow[user.Side] > 0) chance *= 2;
                 if (Rng.Next(100) < chance) SecondaryEffect(user, target, md, code);
             }
             if (total > 0 && user.Pk.Item == "LIFEORB" && !user.Pk.Fainted && !HasAbility(user, "MAGICGUARD") && !(HasAbility(user, "SHEERFORCE") && md.EffectChance > 0))

@@ -36,7 +36,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Rare move effects: type changes (Soak, Reflect Type, Conversion, Burn Up), Transform, Mimic, Sketch, Trick, Heal Block, Torment, Imprison, rooms, sports, Fling, Natural Gift, Beat Up, Present, Retaliate, Echoed Voice, Round, Fusion moves, Instruct, After You, Quash, Ally Switch, Beak Blast, Octolock...
 - [x] About 240 of 316 abilities
 - [x] Form-changing abilities (Zen Mode, Schooling, Shields Down, Forecast, Flower Gift, Stance Change, Hunger Switch, Power Construct, Battle Bond, Disguise)
-- [ ] Pledge combinations, Pursuit hitting a switching Pokémon
+- [x] Pledge combinations (sea of fire, swamp, rainbow), Pursuit hitting a switching Pokémon
 - [x] Battle animations for moves: Essentials' PkmnAnimations imported and played (Move / OppMove / Common, extra hits, charging turns, type defaults, sounds, flashes, hue), "Battle Effects" option
 - [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
 - [x] Mega Evolution (Mega Ring, Mega Stones / Mega move, AI trainers, reverts after battle)
