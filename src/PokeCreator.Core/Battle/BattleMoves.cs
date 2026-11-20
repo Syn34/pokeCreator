@@ -31,7 +31,7 @@ namespace PokeCreator.Battles
         bool IsGrounded(Battler b)
         {
             if (b.Grounded || Gravity > 0) return true;
-            if (b.AirborneTurns > 0 || TypesOf(b).Contains("FLYING") || HasAbility(b, "LEVITATE") || b.Pk.Item == "AIRBALLOON") return false;
+            if (b.AirborneTurns > 0 || TypesOf(b).Contains("FLYING") || Floats(b) || (b.Pk.Item == "AIRBALLOON" && ItemWorks(b))) return false;
             return true;
         }
 
@@ -212,7 +212,13 @@ namespace PokeCreator.Battles
                     AuroraVeil[side] = ScreenTurns(user); Say("Aurora Veil made " + SideName(side, IsWild) + " stronger against physical and special moves!"); return true;
                 case "StartUserSideDoubleSpeed":
                     if (Tailwind[side] > 0) { Say("But it failed!"); return true; }
-                    Tailwind[side] = 4; Say("The Tailwind blew from behind " + SideName(side, IsWild) + "!"); return true;
+                    Tailwind[side] = 4; Say("The Tailwind blew from behind " + SideName(side, IsWild) + "!");
+                    foreach (var w in Live(side).ToList())
+                    {
+                        if (HasAbility(w, "WINDRIDER") && w.Stages[PokeCreator.Pkmn.Stat.Attack] < 6) { Splash(w); ChangeStat(w, PokeCreator.Pkmn.Stat.Attack, 1); }
+                        if (HasAbility(w, "WINDPOWER") && !w.Charged) { Splash(w); w.Charged = true; Say(Name(w) + " became charged with power!"); }
+                    }
+                    return true;
                 case "StartUserSideImmunityToInflictedStatus":
                     if (Safeguard[side] > 0) { Say("But it failed!"); return true; }
                     Safeguard[side] = 5; Say(Cap(SideName(side, IsWild)) + " cloaked itself in a mystical veil!"); return true;
@@ -709,6 +715,7 @@ namespace PokeCreator.Battles
         /// <summary>Dragon Tail / Circle Throw / Roar in trainer battles: the target is replaced by a random bench Pokémon.</summary>
         void ForceSwitch(Battler target)
         {
+            if (HasAbility(target, "GUARDDOG")) { Splash(target); Say(Name(target) + " stood its ground!"); return; }
             var bench = target.Side == 1 ? FoeBench(target.Slot) : Bench(target.Side);
             if (bench.Count == 0) return;
             int party = bench[Rng.Next(bench.Count)];
@@ -789,7 +796,8 @@ namespace PokeCreator.Battles
                     var sapper = Live(1 - b.Side).FirstOrDefault();
                     int dmg = Math.Min(b.Pk.HP, Math.Max(1, max / 8));
                     Residual(b, dmg, Name(b) + "'s health is sapped by Leech Seed!");
-                    if (sapper != null && sapper.Pk.HP < sapper.Pk.TotalHP(P)) { int f = sapper.Pk.HP; sapper.Pk.HP = Math.Min(sapper.Pk.TotalHP(P), sapper.Pk.HP + dmg); Hp(sapper, f); }
+                    if (sapper != null && HasAbility(b, "LIQUIDOOZE")) { Splash(b); Residual(sapper, dmg, Name(sapper) + " sucked up the liquid ooze!"); }
+                    else if (sapper != null && sapper.Pk.HP < sapper.Pk.TotalHP(P)) { int f = sapper.Pk.HP; sapper.Pk.HP = Math.Min(sapper.Pk.TotalHP(P), sapper.Pk.HP + dmg); Hp(sapper, f); }
                 }
                 if (b.Pk.Fainted) continue;
                 if (b.Nightmare && (b.Pk.Status ?? "").ToUpperInvariant() == "SLEEP") Residual(b, Math.Max(1, max / 4), Name(b) + " is locked in a nightmare!");

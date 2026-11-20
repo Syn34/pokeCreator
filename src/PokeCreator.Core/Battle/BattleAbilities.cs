@@ -83,6 +83,7 @@ namespace PokeCreator.Battles
                     if (BoostedStat(b) >= 0) { Splash(b); Say(Name(b) + "'s " + StatName(BoostedStat(b)) + " was heightened!"); }
                     break;
             }
+            Gen9SwitchIn(b);
             b.StartItem = b.Pk.Item;
             FormAbilities(b, false);
         }
@@ -96,6 +97,7 @@ namespace PokeCreator.Battles
                 if (HasAbility(user, "REFRIGERATE")) return "ICE";
                 if (HasAbility(user, "AERILATE")) return "FLYING";
                 if (HasAbility(user, "GALVANIZE")) return "ELECTRIC";
+                if (HasAbility(user, "DRAGONIZE")) return "DRAGON";
             }
             if (HasAbility(user, "LIQUIDVOICE") && md.Flags.Contains("Sound")) return "WATER";
             return type;
@@ -122,7 +124,7 @@ namespace PokeCreator.Battles
             if ((type == "FAIRY" && OnField.Any(b => HasAbility(b, "FAIRYAURA"))) || (type == "DARK" && OnField.Any(b => HasAbility(b, "DARKAURA"))))
                 m *= auraBreak ? 0.75 : 4.0 / 3;
             if (HasAbility(user, "SUPREMEOVERLORD")) m *= 1 + 0.1 * Math.Min(5, Parties[user.Side].Count(p => p.Fainted));
-            return m * ItemPowerMod(user, target, md, type);
+            return m * ItemPowerMod(user, target, md, type) * Gen9PowerMod(user, target, md, type);
         }
 
         double MoreAttackMod(Battler user, Battler target, bool physical, string type)
@@ -134,8 +136,7 @@ namespace PokeCreator.Battles
             int bs = BoostedStat(user);
             if ((bs == S.Attack && physical) || (bs == S.SpAtk && !physical)) m *= 1.3;
             if ((HasAbility(user, "PLUS") || HasAbility(user, "MINUS")) && !physical) { var al = AllyOf(user); if (al != null && (HasAbility(al, "PLUS") || HasAbility(al, "MINUS"))) m *= 1.5; }
-            if (TargetHas(user, target, "PURIFYINGSALT") && type == "GHOST") m *= 1; // handled in power
-            return m;
+            return m * Gen9AttackMod(user, target, physical);
         }
 
         double MoreDefenseMod(Battler user, Battler target, bool physical)
@@ -144,7 +145,7 @@ namespace PokeCreator.Battles
             if (physical && TargetHas(user, target, "GRASSPELT") && Terrain == "Grassy") m *= 1.5;
             int bs = BoostedStat(target);
             if ((bs == S.Defense && physical) || (bs == S.SpDef && !physical)) m *= 1.3;
-            return m * ItemDefenseMod(target, physical);
+            return m * ItemDefenseMod(target, physical) * Gen9DefenseMod(user, target, physical);
         }
 
         double MoreFinalMod(Battler user, Battler target, MoveData md, string type, double typeMod)
@@ -159,7 +160,7 @@ namespace PokeCreator.Battles
             if (typeMod > 1 && HasAbility(user, "NEUROFORCE")) m *= 1.25;
             var al = AllyOf(target);
             if (al != null && HasAbility(al, "FRIENDGUARD") && user.Side != target.Side) m *= 0.75;
-            return m;
+            return m * Gen9FinalMod(user, target, md);
         }
 
         /// <summary>Priority after Prankster, Gale Wings and Triage.</summary>

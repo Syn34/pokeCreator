@@ -71,6 +71,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Held items in battle: every berry (HP, status, pinch, type-resist, Kee/Maranga/Jaboca/Rowap/Enigma/Custap/Micle), herbs, Weakness Policy, Air Balloon, Eject Button/Pack, Red Card, Black Sludge, orbs, gems, Quick Claw, Metronome, Loaded Dice, seeds, Room Service, Booster Energy, Utility Umbrella, Ring Target, Clear Amulet...
 - [x] Gluttony, Ripen, Cud Chew, Symbiosis, Pickup, Honey Gather, Ball Fetch, Stall, Quick Draw, Mycelium Might order
 
+- [x] Every ability in the data (316): primal weather, Ruin abilities, Protean/Libero, Dancer, Mirror Armor, Opportunist, Emergency Exit, Tera Shell, Legends Z-A megas...
+
 ## Later
 - Plugin system for sharing scripts between projects
 - Localization (message tables)

@@ -241,6 +241,8 @@ namespace PokeCreator.Battles
 
         void CheckAllItems()
         {
+            CheckPrimalEnd();
+            foreach (var b in OnField.Where(x => x != null && !x.Pk.Fainted).ToList()) UpdateMimicry(b);
             foreach (var b in OnField.Where(x => x != null && !x.Pk.Fainted).OrderByDescending(x => Speed(x)).ToList()) CheckHeldItems(b);
         }
 

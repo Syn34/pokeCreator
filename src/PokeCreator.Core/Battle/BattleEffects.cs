@@ -64,6 +64,7 @@ namespace PokeCreator.Battles
         /// <summary>Starts weather from a move or ability: 5 turns (8 with the matching rock).</summary>
         bool StartWeather(string w, Battler by)
         {
+            if (PrimalBlocksWeather()) return false;
             if (Weather == w && WeatherTurns == 0 && w != NoWeather) { Say("But it failed!"); return false; }
             if (Weather == w) { Say("But it failed!"); return false; }
             Weather = w;
@@ -132,6 +133,7 @@ namespace PokeCreator.Battles
                     Splash(b);
                     foreach (var f in Live(1 - b.Side))
                     {
+                        if (HasAbility(f, "GUARDDOG")) { Splash(f); ChangeStat(f, PokeCreator.Pkmn.Stat.Attack, 1); continue; }
                         if (HasAbility(f, "CLEARBODY") || HasAbility(f, "WHITESMOKE") || HasAbility(f, "HYPERCUTTER") || HasAbility(f, "FULLMETALBODY")
                             || HasAbility(f, "INNERFOCUS") || HasAbility(f, "OBLIVIOUS") || HasAbility(f, "OWNTEMPO") || HasAbility(f, "SCRAPPY"))
                             Say(Name(f) + "'s " + AbilityName(f) + " prevents its Attack from being lowered!");
@@ -322,6 +324,7 @@ namespace PokeCreator.Battles
         {
             double m = 1;
             string w = EffWeather;
+            if (HasAbility(user, "MEGASOL")) w = Sun;
             if (Holds(target, "UTILITYUMBRELLA")) w = NoWeather;
             if (w == Rain) { if (type == "WATER") m *= 1.5; else if (type == "FIRE") m *= 0.5; }
             if (w == Sun) { if (type == "FIRE") m *= 1.5; else if (type == "WATER") m *= 0.5; }
@@ -384,7 +387,7 @@ namespace PokeCreator.Battles
             if (has("CLEARBODY") || has("WHITESMOKE") || has("FULLMETALBODY")) return true;
             if (TypesOf(b).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
             if (stat == PokeCreator.Pkmn.Stat.Attack && has("HYPERCUTTER")) return true;
-            if (stat == 6 && has("KEENEYE")) return true;
+            if (stat == 6 && (has("KEENEYE") || has("MINDSEYE") || has("ILLUMINATE"))) return true;
             if (stat == PokeCreator.Pkmn.Stat.Defense && has("BIGPECKS")) return true;
             return false;
         }
@@ -451,7 +454,8 @@ namespace PokeCreator.Battles
             if (HasAbility(user, "BATTLEBOND") && user.Pk.Species == "GRENINJA" && user.Pk.Form == 1)
                 ChangeForm(user, 2, Name(user) + " became fully charged due to its bond with its Trainer!");
             if (HasAbility(user, "MOXIE") && user.Stages[PokeCreator.Pkmn.Stat.Attack] < 6) { Splash(user); ChangeStat(user, PokeCreator.Pkmn.Stat.Attack, 1); }
-            if (HasAbility(user, "BEASTBOOST") && user.Stages[PokeCreator.Pkmn.Stat.Attack] < 6) { Splash(user); ChangeStat(user, PokeCreator.Pkmn.Stat.Attack, 1); }
+            if (HasAbility(user, "BEASTBOOST") && user.Stages[HighestStat(user)] < 6) { Splash(user); ChangeStat(user, HighestStat(user), 1); }
+            Gen9KnockOut(user);
         }
 
         /// <summary>HP healed by Moonlight, Synthesis and Morning Sun.</summary>

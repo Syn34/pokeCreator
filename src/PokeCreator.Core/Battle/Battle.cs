@@ -78,7 +78,7 @@ namespace PokeCreator.Battles
         public string LastHitType;
         public string StartItem, ConsumedBerry, ConsumedItem, CudChewBerry, UsedItemThisTurn;
         public int CudChewTurns, MetronomeCount;
-        public bool MicleBoost, BindBand, Ejected;
+        public bool MicleBoost, BindBand, Ejected, MimicryActive, ProteanUsed, Charged, TeraShellShown;
         // Effects from moves (cleared when the Pokémon leaves the field, as a new Battler is made)
         public int TauntTurns, EncoreTurns, DisableTurns, PerishCount = -1, LockTurns, RolloutCount, FuryCutterCount, StockpileCount, LockOnTurns, AirborneTurns, SubstituteHP;
         public string EncoreMove, DisableMove, LockedMove, LastMoveUsed, PlannedMove, AbilityOverride;
@@ -664,6 +664,8 @@ namespace PokeCreator.Battles
 
             StanceChange(user, md);
             Say(n + " used " + (md.Name ?? md.Id) + "!");
+            ProteanBefore(user, md, code);
+            if (code == "RaiseUserSpDef1PowerUpElectricMove") { user.Charged = true; Say(n + " began charging power!"); }
             _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveUsed, Side = user.Side, Party = user.PartyIndex, Text = md.Id });
             bool selfTarget = md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies" || md.Target == "UserOrNearAlly" || md.Target == "FoeSide" && md.Category == "Status" && code.StartsWith("Add");
 
@@ -679,10 +681,13 @@ namespace PokeCreator.Battles
             {
                 MoveAnim(user, md.Target == "FoeSide" ? (Live(1 - user.Side).FirstOrDefault() ?? user) : user, md);
                 if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
+                if (!user.LastMoveFailed) DancerAfter(user, target, md);
                 return;
             }
             _missedThisMove = false;
+            if (HasAbility(user, "MYCELIUMMIGHT") && md.Category == "Status") _ignoreAbilityMove = true;
             ActOnTargets(user, target, md, code);
+            if (!user.LastMoveFailed) DancerAfter(user, target, md);
             ItemsAfterMove(user, md, _missedThisMove);
             _ignoreAbilityMove = false;
             _lastMoveThisTurn = md.Id;
@@ -726,16 +731,26 @@ namespace PokeCreator.Battles
             {
                 if (user.Pk.Fainted || Outcome != BattleOutcome.Ongoing) break;
                 if (t.Pk.Fainted) continue;
-                if (t.Protected && md.Flags.Contains("CanProtect") && !code.StartsWith("RemoveProtections") && !code.StartsWith("HoopaRemoveProtections")) { Say(Name(t) + " protected itself!"); continue; }
+                double pierce = 1;
+                if (t.Protected && md.Flags.Contains("CanProtect") && !code.StartsWith("RemoveProtections") && !code.StartsWith("HoopaRemoveProtections"))
+                {
+                    bool contactMove = md.Flags.Contains("Contact") && md.Category != "Status";
+                    if (contactMove && HasAbility(user, "UNSEENFIST")) { }
+                    else if (contactMove && HasAbility(user, "PIERCINGDRILL")) pierce = 0.25;
+                    else { Say(Name(t) + " protected itself!"); continue; }
+                }
                 if (t.Invulnerable && md.Accuracy > 0 && !HitsInvulnerable(t, code) && user.LockOnTurns == 0) { Say(Name(user) + "'s attack missed!"); user.LastMoveFailed = true; continue; }
                 if (t.SubstituteHP > 0 && md.Category == "Status" && t.Side != user.Side && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR")) { Say("But it failed!"); user.LastMoveFailed = true; continue; }
                 if (AbilityAbsorbs(user, t, md, MoveType(user, md, code))) continue;
+                if (Gen9Absorbs(user, t, md, MoveType(user, md, code), code)) continue;
                 if (AbilityStopsMove(user, t, md, code)) { user.LastMoveFailed = true; continue; }
                 if (!Hits(user, t, md, code)) { user.LastMoveFailed = true; _missedThisMove = true; Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
                 if (!animShown) { MoveAnim(user, t, md); animShown = true; }
                 if (MagicBounce(user, t, md, code)) continue;
+                double spreadBefore = _spread; _spread *= pierce;
                 if (md.Category == "Status") StatusMove(user, t, md, code);
                 else DamagingMove(user, t, md, code);
+                _spread = spreadBefore;
             }
             _spread = 1;
         }
@@ -785,7 +800,7 @@ namespace PokeCreator.Battles
             double mod = AccuracyMod(user, target, md, code, out always);
             if (always) return true;
             int evade = TargetHas(user, target, "UNAWARE") || target.Foresight ? Math.Min(0, target.Stages[7]) : target.Stages[7];
-            if (HasAbility(user, "KEENEYE") && evade > 0) evade = 0;
+            if ((HasAbility(user, "KEENEYE") || HasAbility(user, "MINDSEYE") || HasAbility(user, "ILLUMINATE")) && evade > 0) evade = 0;
             double acc = md.Accuracy * mod * AccMult(Math.Max(-6, Math.Min(6, user.Stages[6] - evade)));
             return Rng.Next(100) < acc;
         }
@@ -838,6 +853,7 @@ namespace PokeCreator.Battles
             MoreBeforeDamage(user, target, md, code);
             string mtype = MoveType(user, md, code);
             if (PowderExplodes(user, mtype)) { user.LastMoveFailed = true; return; }
+            if (PrimalStopsMove(mtype)) { user.LastMoveFailed = true; return; }
             double typeMod = md.Id == "STRUGGLE" ? 1 : EffectivenessOn(mtype, target);
             if (code == "EffectivenessIncludesFlyingType" && typeMod > 0) typeMod *= EffectivenessOn("FLYING", target);
             if (typeMod == 0 && mtype == "GROUND" && TypesOf(target).Contains("FLYING") && (IsGrounded(target) || code == "HitsTargetInSkyGroundsTarget"))
@@ -847,8 +863,11 @@ namespace PokeCreator.Battles
                 typeMod = TypesOf(target).Where(t => t != "GHOST").Aggregate(1.0, (acc, t) => acc * TypeVs(mtype, t));
             if (typeMod == 0 && HasAbility(user, "SCRAPPY") && (mtype == "NORMAL" || mtype == "FIGHTING") && TypesOf(target).Contains("GHOST"))
                 typeMod = TypesOf(target).Where(t => t != "GHOST").Aggregate(1.0, (acc, t) => acc * TypeVs(mtype, t));
+            if (typeMod == 0 && HasAbility(user, "MINDSEYE") && (mtype == "NORMAL" || mtype == "FIGHTING") && TypesOf(target).Contains("GHOST"))
+                typeMod = TypesOf(target).Where(t => t != "GHOST").Aggregate(1.0, (acc, t) => acc * TypeVs(mtype, t));
             if (typeMod == 0 && Holds(target, "RINGTARGET"))
                 typeMod = TypesOf(target).Aggregate(1.0, (acc, t) => { double v = TypeVs(mtype, t); return acc * (v == 0 ? 1 : v); });
+            typeMod = TeraShell(user, target, StrongWindsMod(mtype, target, typeMod));
             if (typeMod == 0) { Say("It doesn't affect " + NameL(target) + "..."); return; }
             if (typeMod <= 1 && md.Id != "STRUGGLE" && TargetHas(user, target, "WONDERGUARD")) { Splash(target); Say("It doesn't affect " + NameL(target) + "..."); return; }
             if ((code == "OHKO" || code.StartsWith("OHKO")) && TargetHas(user, target, "STURDY")) { Splash(target); Say("It doesn't affect " + NameL(target) + "..."); return; }
@@ -970,6 +989,8 @@ namespace PokeCreator.Battles
             }
             if (total > 0) ContactAbilities(user, target, md);
             if (total > 0) DamagedAbilities(user, target, md, mtype, anyCrit, hpStart);
+            if (total > 0) Gen9Damaged(user, target, md, mtype, hpStart, md.Flags.Contains("Contact") && !HasAbility(user, "LONGREACH") && !Holds(user, "PROTECTIVEPADS") && !Holds(user, "PUNCHINGGLOVE"));
+            if (target.Pk.Fainted && hpStart > 0) SoulHeart();
             ItemsAfterHit(user, target, md, mtype, typeMod, total, md.Flags.Contains("Contact") && !HasAbility(user, "LONGREACH") && !Holds(user, "PROTECTIVEPADS") && !Holds(user, "PUNCHINGGLOVE"));
             DamagingAfterEffects(user, target, md, code, total);
             if ((code.StartsWith("Recoil") && !HasAbility(user, "ROCKHEAD") && !HasAbility(user, "MAGICGUARD")) || md.Id == "STRUGGLE")
@@ -980,6 +1001,8 @@ namespace PokeCreator.Battles
             if (code.StartsWith("HealUserBy") && total > 0 && !user.Pk.Fainted)
             {
                 int heal = code.Contains("ThreeQuarters") ? total * 3 / 4 : Math.Max(1, total / 2);
+                if (Holds(user, "BIGROOT")) heal = heal * 13 / 10;
+                if (TargetHas(user, target, "LIQUIDOOZE")) { Splash(target); Residual(user, heal, Name(user) + " sucked up the liquid ooze!"); heal = 0; }
                 int f = user.Pk.HP; user.Pk.HP = Math.Min(user.Pk.TotalHP(P), user.Pk.HP + heal);
                 if (user.Pk.HP > f) { Hp(user, f); Say(Name(target) + " had its energy drained!"); }
             }
@@ -1160,6 +1183,7 @@ namespace PokeCreator.Battles
                 Splash(b); Say(Name(b) + "'s " + StatName(stat) + " was not lowered!");
                 return false;
             }
+            if (MirrorArmor(b, stat, amount, source)) return false;
             if (amount < 0 && source != null && source.Side != b.Side && Holds(b, "CLEARAMULET"))
             {
                 Say("The effects of " + NameL(b) + "'s Clear Amulet prevent its stats from being lowered!");
@@ -1179,6 +1203,7 @@ namespace PokeCreator.Battles
             if (nv == old) { Say(who + (amount > 0 ? " won't go any higher!" : " won't go any lower!")); return false; }
             b.Stages[stat] = nv;
             if (nv < old) b.StatsLoweredThisTurn = true;
+            if (nv > old) CopyBoosts(b, stat, nv - old);
             int d = Math.Abs(nv - old);
             _ev.Add(new BattleEvent { Kind = BattleEventKind.StatChange, Side = b.Side, Party = b.PartyIndex, Value = amount });
             Say(who + (amount > 0 ? (d >= 3 ? " rose drastically!" : d == 2 ? " rose sharply!" : " rose!") : (d >= 3 ? " severely fell!" : d == 2 ? " harshly fell!" : " fell!")));
@@ -1239,6 +1264,7 @@ namespace PokeCreator.Battles
                 case "FROZEN": Say(Name(b) + " was frozen solid!"); break;
             }
             SynchronizeStatus(b, status, source);
+            if ((status == "POISON" || status == "TOXIC") && source != null && source != b && HasAbility(source, "POISONPUPPETEER") && !b.Pk.Fainted) { Splash(source); Confuse(b, false); }
             return true;
         }
 
@@ -1348,6 +1374,7 @@ namespace PokeCreator.Battles
                 if (b.Pk.Fainted) continue;
                 EndOfTurnAbilities(b);
                 MoreEndOfTurnAbilities(b);
+                Gen9EndOfTurn(b);
                 if (b.Pk.Fainted) continue;
                 int max = b.Pk.TotalHP(P);
                 string st = (b.Pk.Status ?? "").ToUpperInvariant();
