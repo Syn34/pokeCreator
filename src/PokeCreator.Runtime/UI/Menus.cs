@@ -586,7 +586,24 @@ namespace PokeCreator.Runtime.UI
 
         protected override void Update()
         {
-            if (Input.Trigger(Button.Cancel) || Input.Trigger(Button.Action)) { Cancel(); Close(); }
+            if (Input.Trigger(Button.Action)) { _back = !_back; Game.Audio.PlaySe("GUI trainer card flip"); return; }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); }
+        }
+        bool _back;
+
+        void DrawBack(Gfx g)
+        {
+            Ui.Text(g, 56, 44, "PLAY RECORD");
+            int y = 92;
+            foreach (var line in World.GameStats.CardLines)
+            {
+                Ui.Text(g, 56, y, line[0]);
+                object v = World.GameStats.Get(Game, line[1]);
+                Ui.TextRight(g, g.Width - 56, y, line[1] == "money_spent_at_marts" ? "$" + Convert.ToInt32(v).ToString("N0") : Convert.ToInt32(v).ToString("N0"));
+                y += 32;
+            }
+            int hof = World.GameStats.Int(Game, "time_to_hall_of_fame");
+            if (hof > 0) { Ui.Text(g, 56, y, "Hall of Fame"); Ui.TextRight(g, g.Width - 56, y, Ui.PlayTime(hof * 60L)); }
         }
 
         public override void Draw(Gfx g)
@@ -594,6 +611,7 @@ namespace PokeCreator.Runtime.UI
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 160, 232), new Color(40, 88, 176));
             Ui.Panel(g, 24, 24, g.Width - 48, g.Height - 48, new Color(248, 240, 216), new Color(176, 136, 72));
             var s = Game.State;
+            if (_back) { DrawBack(g); return; }
             Ui.Text(g, 56, 44, "TRAINER CARD");
             Ui.TextRight(g, g.Width - 56, 44, "IDNo. " + s.TrainerId.ToString("00000"));
             Ui.Text(g, 56, 104, "Name");    Ui.TextRight(g, 300, 104, s.PlayerName);

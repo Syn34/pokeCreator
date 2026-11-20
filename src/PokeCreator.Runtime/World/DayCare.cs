@@ -209,6 +209,7 @@ namespace PokeCreator.Runtime.World
             egg.MetLevel = 1; egg.MetMap = g.Map != null ? g.Map.Id : egg.MetMap;
             egg.Happiness = 120;
             g.State.Register(egg);
+            GameStats.Inc(g, "eggs_hatched");
             string name = egg.Name(g.Project);
             g.Message.Show("Oh?", null, -1, _ =>
             {

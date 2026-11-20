@@ -21,8 +21,14 @@ namespace PokeCreator.Runtime.World
         public int StartY { get; set; }
         public int StartDir { get; set; }
         public int Place { get; set; }
+        /// <summary>When the last contest was held (DateTime ticks) — pbContestHeld? is true for a day after.</summary>
+        public long LastContest { get; set; }
+        /// <summary>The judged top places (name, Pokémon, score) once pbStartJudging ran.</summary>
+        public List<ContestPlace> Results { get; set; }
         public BugContestState() { LeftBehind = new List<Pokemon>(); Place = -1; }
     }
+
+    public class ContestPlace { public string Name { get; set; } public string Pokemon { get; set; } public int Score { get; set; } }
 
     /// <summary>
     /// The Bug-Catching Contest (pbBugContestState): the player enters with one Pokémon and some Sport Balls, catches
@@ -64,7 +70,8 @@ namespace PokeCreator.Runtime.World
         public static void Start(Game g, int balls)
         {
             var s = State(g);
-            s.InProgress = true; s.Undecided = false; s.Caught = null; s.Place = -1;
+            s.InProgress = true; s.Undecided = false; s.Caught = null; s.Place = -1; s.Results = null;
+            s.LastContest = DateTime.Now.Ticks;
             s.Balls = balls > 0 ? balls : Math.Max(1, g.Project.Settings.BugContestBalls);
             s.EndsAt = DateTime.Now.AddMinutes(Math.Max(1, g.Project.Settings.BugContestMinutes)).Ticks;
             s.StartMap = g.Map.Id; s.StartX = g.Player.X; s.StartY = g.Player.Y; s.StartDir = g.Player.Direction;
@@ -127,6 +134,43 @@ namespace PokeCreator.Runtime.World
         /// pbBugContestState.pbJudge: scores the player's catch against three other contestants, announces the top three,
         /// gives the player's prize, and sends the caught Pokémon to the party (or the PC).
         /// </summary>
+        /// <summary>pbStartJudging: scores the player's catch against three contestants (Place 0-2, or 3 when not placed).</summary>
+        public static void ComputeResults(Game g)
+        {
+            var s = State(g);
+            if (s.InProgress) End(g, false);
+            var table = g.Project.Encounters.SelectMany(e => e.Methods.Where(m => m.Type == "BugContest")).SelectMany(m => m.Slots).ToList();
+            var results = new List<ContestPlace>();
+            foreach (var n in Contestants.OrderBy(_ => g.Rng.Next()).Take(3))
+            {
+                if (table.Count == 0) break;
+                var slot = table[g.Rng.Next(table.Count)];
+                var pk = Pokemon.Create(g.Project, slot.Species, g.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1), g.Rng);
+                pk.HP = Math.Max(1, pk.TotalHP(g.Project) * (40 + g.Rng.Next(61)) / 100);
+                results.Add(new ContestPlace { Name = n, Pokemon = pk.Name(g.Project), Score = Score(g, pk) });
+            }
+            while (results.Count < 3) results.Add(new ContestPlace { Name = Contestants[results.Count], Pokemon = "Caterpie", Score = 100 + results.Count });
+            if (s.Caught != null) results.Add(new ContestPlace { Name = g.State.PlayerName, Pokemon = s.Caught.Name(g.Project), Score = Score(g, s.Caught) });
+            results = results.OrderByDescending(r => r.Score).ToList();
+            int place = s.Caught != null ? results.FindIndex(r => r.Name == g.State.PlayerName) : -1;
+            s.Place = place < 0 || place > 2 ? 3 : place;
+            s.Results = results.Take(3).ToList();
+            s.Undecided = false;
+        }
+
+        /// <summary>pbEnd after judging: the caught Pokémon joins the party (or the PC).</summary>
+        public static void FinishJudged(Game g)
+        {
+            var s = State(g);
+            if (s.InProgress) End(g, false);
+            var caught = s.Caught; s.Caught = null; s.Undecided = false;
+            if (caught == null) return;
+            caught.OTName = g.State.PlayerName; caught.OTId = g.State.TrainerId;
+            g.State.Register(caught);
+            if (g.State.Party.Count < GameState.MaxParty) g.State.Party.Add(caught);
+            else { g.State.Storage.Add(caught); g.Message.Show(caught.Name(g.Project) + " was sent to the PC."); }
+        }
+
         public static void Judge(Game g, Action done)
         {
             var s = State(g);

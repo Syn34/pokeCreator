@@ -129,6 +129,7 @@ namespace PokeCreator.Runtime.UI
                 if (c != 0) { _mode = Mode.Buy; return; }
                 if (Funds < cost) { Game.Message.Show(BattlePoints ? "You don't have enough BP." : "You don't have enough money.", null, -1, _ => _mode = Mode.Buy); return; }
                 Funds -= cost; Game.State.AddItem(_item.Id, _qty);
+                if (!BattlePoints) { World.GameStats.Inc(Game, "money_spent_at_marts", cost); World.GameStats.Inc(Game, "mart_items_bought", _qty); }
                 Game.Audio.PlaySe("Mart buy item");
                 bool bonus = !BattlePoints && _item.Id == "POKEBALL" && _qty >= 10 && Item("PREMIERBALL") != null;
                 if (bonus) Game.State.AddItem("PREMIERBALL", 1);

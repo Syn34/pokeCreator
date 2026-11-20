@@ -318,6 +318,7 @@ namespace PokeCreator.Runtime.UI
             string oldSpeciesName = _pk.Data(p) != null ? _pk.Data(p).Name : _pk.Species;
             var moves = Growth.Evolve(p, _pk, _newSpecies);
             Game.State.Register(_pk);
+            World.GameStats.Inc(Game, "evolution_count");
             Game.Audio.StopBgm();
             Game.Audio.PlayMe("Evolution success");
             string newName = _pk.Data(p) != null ? _pk.Data(p).Name : _newSpecies;

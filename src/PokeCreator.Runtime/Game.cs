@@ -229,6 +229,7 @@ namespace PokeCreator.Runtime
             Player = new Player(this);
             Player.Look = Project.Players.Count > 0 && State.PlayerCharacter >= 0 ? Project.Players[Math.Min(State.PlayerCharacter, Project.Players.Count - 1)] : null;
             Player.CharacterName = Player.WalkCharset;
+            KeepDungeonLayout = true;
             SetupMap(d.MapId, d.X, d.Y, d.Direction);
             Player.Surfing = d.Surfing;
             Player.Cycling = d.Cycling && !d.Surfing;
@@ -336,6 +337,9 @@ namespace PokeCreator.Runtime
         public T FindScene<T>() where T : Scene { return _scenes.OfType<T>().LastOrDefault(); }
 
         // ------------------------------------------------------------------ maps
+        /// <summary>Set while loading a save, so a random dungeon keeps the layout it had.</summary>
+        public bool KeepDungeonLayout;
+
         public void SetupMap(int id, int x, int y, int dir)
         {
             StrengthActive = false; // Strength lasts until the player leaves the map
@@ -344,6 +348,8 @@ namespace PokeCreator.Runtime
             if (State != null) State.Visited.Add(id);
             var data = Project.LoadMap(id);
             if (data == null) throw new Exception("Map " + id + " does not exist in this project.");
+            data = World.Dungeon.Prepare(this, data, KeepDungeonLayout, ref x, ref y);
+            KeepDungeonLayout = false;
             GameMap.BridgeHeight = 0;
             Map = new GameMap(Project, data, this, true);
             Map.LoadNeighbors(Project, this);
@@ -629,6 +635,7 @@ namespace PokeCreator.Runtime
             {
                 LastOutcome = o; ResumeOutcome = o;
                 if (!setup.Facility) World.Pokerus.AfterBattle(this);
+                if (!setup.Link) World.GameStats.OnBattleEnd(this, setup.Wild, o);
                 foreach (var pk in State.Party.Where(p => p.ShadowPokemon && b.SentOut.Contains(p) && !p.Fainted)) PokeCreator.Pkmn.Shadow.AdjustHeart(pk, -100);
                 Script.GameEvents.RaiseBattleEnded(this, o);
                 if (end != null) end(o);

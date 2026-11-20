@@ -163,8 +163,28 @@ namespace PokeCreator.Runtime.Script
                     BugContest.SetPokemon(_game, Math.Max(0, _game.Party.FindIndex(PokeCreator.Battles.Battle.Able)));
                 BugContest.Start(_game, a.Count > 0 ? ToInt(a[0]) : 0); return true;
             });
-            Register("pbBugContestState.pbEnd", (c, a) => { BugContest.End(_game, false); return true; });
-            Register("pbBugContestState.pbStartJudging", (c, a) => { BugContest.End(_game, false); return true; });
+            Register("pbBugContestState.pbEnd", (c, a) =>
+            {
+                var bs = BugContest.State(_game);
+                if (bs.Results != null) { BugContest.FinishJudged(_game); bs.Results = null; } else BugContest.End(_game, false);
+                return true;
+            });
+            Register("pbBugContestState.pbStartJudging", (c, a) => { BugContest.ComputeResults(_game); return true; });
+            Register("pbBugContestState.pbGetPlaceInfo", (c, a) =>
+            {
+                var bs = BugContest.State(_game);
+                int i = ToInt(Arg(a, 0));
+                if (bs.Results == null || i < 0 || i >= bs.Results.Count) return null;
+                var r = bs.Results[i];
+                _game.State.SetStr(1, r.Name); _game.State.SetStr(2, r.Pokemon); _game.State.SetVar(3, r.Score);
+                return new List<object> { r.Name, r.Pokemon, r.Score };
+            });
+            Register("pbBugContestState.pbContestHeld?", (c, a) =>
+            {
+                var bs = _game.State.Extras.BugContest;
+                return bs != null && bs.LastContest > 0 && DateTime.Now.Ticks - bs.LastContest < TimeSpan.TicksPerDay;
+            });
+            Register("pbBugContestState.decision", (c, a) => BugContest.State(_game).Place);
             Register("pbBugContestState.pbJudge", (c, a) => { BugContest.Judge(_game, null); return true; });
             Register("pbBugContestState.place", (c, a) => BugContest.State(_game).Place);
             Register("pbBugContestState.ballcount", (c, a) => BugContest.State(_game).Balls);

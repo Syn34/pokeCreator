@@ -116,7 +116,6 @@ namespace PokeCreator.Runtime.Script
             e = e.Trim();
             if (e.Length == 0) return null;
             if (e.StartsWith("(") && MatchingParen(e, 0) == e.Length - 1) return Eval(e.Substring(1, e.Length - 2), ctx);
-            if (Regex.IsMatch(e, @"^\$stats\.\w+[?!]?$")) return 0; // play statistics aren't tracked
 
             // Boolean operators (lowest precedence)
             foreach (var op in new[] { "||", " or ", "&&", " and " })
@@ -211,6 +210,10 @@ namespace PokeCreator.Runtime.Script
             if (m.Success) return SettingsConstant(m.Groups[1].Value);
             if (e == "$player.coins" || e == "$Trainer.coins") return _game.State.Coins;
             if (e == "$player.battle_points") return _game.State.BattlePoints;
+            m = Regex.Match(e, @"^\$stats\.set_time_to_(\w+?)(?:\((.*)\))?$");
+            if (m.Success) { World.GameStats.SetTimeTo(_game, m.Groups[1].Value + (m.Groups[2].Success && m.Groups[2].Value != "" ? "_" + Eval(m.Groups[2].Value, ctx) : "")); return true; }
+            m = Regex.Match(e, @"^\$stats\.(\w+)$");
+            if (m.Success) return World.GameStats.Get(_game, m.Groups[1].Value);
             if (e == "$player.badge_count" || e == "$Trainer.numbadges") return _game.State.Badges.Count;
             m = Regex.Match(e, @"^\$(?:player|Trainer)\.badges\[(.+)\]$");
             if (m.Success) return _game.State.Badges.Contains(ToInt(Eval(m.Groups[1].Value, ctx)));
@@ -371,9 +374,17 @@ namespace PokeCreator.Runtime.Script
                 SetMember(_locals[lm.Groups[1].Value], lm.Groups[2].Value, lm.Groups[3].Success ? Eval(lm.Groups[3].Value, ctx) : null, val);
                 return;
             }
-            if (lhs.StartsWith("$stats.")) return; // play statistics aren't tracked
+            if (lhs.StartsWith("$stats.")) { World.GameStats.Set(_game, lhs.Substring(7), ToInt(val)); return; }
             if (lhs == "$PokemonGlobal.encounter_version") { _game.State.Extras.EncounterVersion = ToInt(val); return; }
+            if (lhs == "$PokemonGlobal.dungeon_area") { _game.State.Extras.DungeonArea = val == null ? null : Convert.ToString(val, CultureInfo.InvariantCulture); return; }
+            if (lhs == "$PokemonGlobal.dungeon_version") { _game.State.Extras.DungeonVersion = ToInt(val); return; }
             WarnOnce("Can't assign to " + lhs);
+        }
+
+        void RememberMoved(GameEvent ch)
+        {
+            if (_game.State.Extras.MovedEvents == null) _game.State.Extras.MovedEvents = new Dictionary<string, List<int>>();
+            _game.State.Extras.MovedEvents[_game.Map.Id + "," + ch.Id] = new List<int> { -1, -1, 2 };
         }
 
         // ------------------------------------------------------------------ built-in commands
@@ -447,6 +458,8 @@ namespace PokeCreator.Runtime.Script
             Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
             Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game) || (_game.State.Extras.Frontier != null && _game.State.Extras.Frontier.InChallenge));
             Register("$PokemonGlobal.encounter_version", (c, a) => _game.State.Extras.EncounterVersion);
+            Register("$PokemonGlobal.dungeon_area", (c, a) => _game.State.Extras.DungeonArea);
+            Register("$PokemonGlobal.dungeon_version", (c, a) => _game.State.Extras.DungeonVersion);
             Register("pbFirstAblePokemon", (c, a) =>
             {
                 int i = _game.State.Party.FindIndex(PokeCreator.Battles.Battle.Able);
@@ -513,11 +526,16 @@ namespace PokeCreator.Runtime.Script
                 route.List.Add(new PokeCreator.Maps.EventCommand(25, 0));             // face the player
                 route.List.Add(new PokeCreator.Maps.EventCommand(0, 0));
                 ch.ForceMoveRoute(route);
+                RememberMoved(ch);
                 _game.Player.TurnToward(ch);
                 c.WaitForMoves();
                 return true;
             });
             Register("pbMapInterpreter", (c, a) => c);
+            Register("$PokemonMap.addMovedEvent", (c, a) => { var ch = (a.Count > 0 ? a[0] : null) as GameEvent ?? (c != null ? c.GetCharacter(0) as GameEvent : null); if (ch != null) RememberMoved(ch); return true; });
+            Register("$PokemonMap.movedEvent?", (c, a) => { var ch = (a.Count > 0 ? a[0] : null) as GameEvent; return ch != null && _game.State.Extras.MovedEvents != null && _game.State.Extras.MovedEvents.ContainsKey(_game.Map.Id + "," + ch.Id); });
+            Register("$player.last_party", (c, a) => _game.State.Party.LastOrDefault());
+            Register("$Trainer.last_party", (c, a) => _game.State.Party.LastOrDefault());
 
             Register("pbReceiveItem", (c, a) => GiveItem(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1, "obtained"));
             Register("pbItemBall", (c, a) => GiveItem(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1, "found"));

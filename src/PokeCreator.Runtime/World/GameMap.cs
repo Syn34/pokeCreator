@@ -116,6 +116,18 @@ namespace PokeCreator.Runtime.World
             Tileset = p.GetTileset(data.TilesetId) ?? new TilesetData();
             Info = p.GetMapInfo(data.Id);
             if (withEvents) foreach (var e in data.Events) Events.Add(new GameEvent(game, this, e));
+            // Events remembered as moved (pbNoticePlayer) stay where they were when the game was saved on this map
+            var moved = withEvents && game != null && game.State != null ? game.State.Extras.MovedEvents : null;
+            if (moved != null)
+            {
+                string prefix = data.Id + ",";
+                foreach (var k in moved.Keys.Where(k => !k.StartsWith(prefix)).ToList()) moved.Remove(k);
+                foreach (var ev in Events)
+                {
+                    List<int> pos;
+                    if (moved.TryGetValue(prefix + ev.Id, out pos) && pos != null && pos.Count >= 3 && pos[0] >= 0) { ev.MoveTo(pos[0], pos[1]); ev.Direction = pos[2]; }
+                }
+            }
         }
 
         public string DisplayName

@@ -103,6 +103,12 @@ namespace PokeCreator.Runtime.World
         public static void Save(Game g)
         {
             var s = g.State;
+            if (s.Extras.MovedEvents != null && g.Map != null)
+                foreach (var ev in g.Map.Events)
+                {
+                    string key = g.Map.Id + "," + ev.Id;
+                    if (s.Extras.MovedEvents.ContainsKey(key)) s.Extras.MovedEvents[key] = new List<int> { ev.X, ev.Y, ev.Direction };
+                }
             var d = new SaveData
             {
                 GameTitle = g.Project.Settings.Title, SavedAt = DateTime.Now.ToString("s"),

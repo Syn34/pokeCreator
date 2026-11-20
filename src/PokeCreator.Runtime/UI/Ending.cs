@@ -80,6 +80,7 @@ namespace PokeCreator.Runtime.UI
             _finished = true;
             Game.Message.Show("Welcome to the Hall of Fame!", null, -1, _ =>
             {
+                World.GameStats.SetTimeTo(Game, "hall_of_fame"); World.GameStats.Inc(Game, "hall_of_fame_entry_count");
                 Game.State.HallOfFame.Add(new HallOfFameEntry { Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Team = _team });
                 try { SaveSystem.Save(Game); } catch (Exception ex) { Console.WriteLine("Hall of Fame save failed: " + ex.Message); }
                 Close();
