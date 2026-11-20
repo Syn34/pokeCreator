@@ -35,6 +35,9 @@ namespace PokeCreator.Runtime.World
         public int HealMap, HealX, HealY, HealDir;
         /// <summary>Steps left on a Repel.</summary>
         public int RepelSteps;
+        /// <summary>Game Corner coins, Battle Points and gym badges (0-based, as $player.badges[n]).</summary>
+        public int Coins, BattlePoints;
+        public readonly HashSet<int> Badges = new HashSet<int>();
         /// <summary>Teams entered into the Hall of Fame, newest last.</summary>
         public List<HallOfFameEntry> HallOfFame = new List<HallOfFameEntry>();
         /// <summary>Pokémon left at the Day Care, its egg counter and whether an Egg is waiting.</summary>

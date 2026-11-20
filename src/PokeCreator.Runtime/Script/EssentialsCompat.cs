@@ -32,8 +32,12 @@ namespace PokeCreator.Runtime.Script
         public void Register(string name, Handler h) { _commands[name] = h; }
 
         // ------------------------------------------------------------------ entry points
+        /// <summary>Ruby local variables (pkmn = pbGetPokemon(1)) for the script being run.</summary>
+        Dictionary<string, object> _locals = new Dictionary<string, object>();
+
         public void RunScript(string script, Interpreter ctx)
         {
+            _locals = new Dictionary<string, object>();
             var stmts = SplitStatements(script).ToList();
             for (int i = 0; i < stmts.Count; i++)
             {
@@ -73,6 +77,7 @@ namespace PokeCreator.Runtime.Script
 
         public bool Evaluate(string expr, Interpreter ctx)
         {
+            _locals = new Dictionary<string, object>();
             try { return Truthy(Eval(expr.Trim(), ctx)); }
             catch (Exception ex) { WarnOnce("Condition error in \"" + expr + "\": " + ex.Message); return false; }
         }
@@ -200,6 +205,24 @@ namespace PokeCreator.Runtime.Script
             m = Regex.Match(e, @"^\$(?:player|Trainer)\.(?:pokedex\.)?(seen_count|owned_count|pokedexSeen|pokedexOwned)$");
             if (m.Success) return m.Groups[1].Value.StartsWith("seen") || m.Groups[1].Value == "pokedexSeen" ? _game.State.Seen.Count : _game.State.Caught.Count;
 
+            m = Regex.Match(e, @"^Settings::(\w+)$");
+            if (m.Success) return SettingsConstant(m.Groups[1].Value);
+            if (e == "$player.coins" || e == "$Trainer.coins") return _game.State.Coins;
+            if (e == "$player.battle_points") return _game.State.BattlePoints;
+            if (e == "$player.badge_count" || e == "$Trainer.numbadges") return _game.State.Badges.Count;
+            m = Regex.Match(e, @"^\$(?:player|Trainer)\.badges\[(.+)\]$");
+            if (m.Success) return _game.State.Badges.Contains(ToInt(Eval(m.Groups[1].Value, ctx)));
+
+            // Indexing a local: pkmn.iv[:HP]
+            m = Regex.Match(e, @"^([a-z_]\w*(?:\.\w+[?!]?)*)\[(.+)\]$");
+            if (m.Success && _locals.ContainsKey(m.Groups[1].Value.Split('.')[0]))
+            {
+                var coll = Eval(m.Groups[1].Value, ctx);
+                var idx = Eval(m.Groups[2].Value, ctx);
+                var ivs = coll as List<int>;
+                if (ivs != null) { int s = StatIndex(idx); return s >= 0 && s < ivs.Count ? (object)ivs[s] : null; }
+            }
+
             // Method call:  name(args)  or  Obj.name(args)  or bare name
             m = Regex.Match(e, @"^([\$@]?[\w:.]+[?!]?)\s*(?:\((.*)\))?\s*(\{.*\})?$", RegexOptions.Singleline);
             if (m.Success)
@@ -208,6 +231,15 @@ namespace PokeCreator.Runtime.Script
                 var args = m.Groups[2].Success && m.Groups[2].Value.Trim().Length > 0
                     ? SplitTopLevel(m.Groups[2].Value, ',').Select(a => Eval(a, ctx)).ToList()
                     : new List<object>();
+                // Local variables and their members: pkmn, pkmn.name, data.price
+                string first = name.Split('.')[0];
+                if (Regex.IsMatch(first, @"^[a-z_]\w*$") && _locals.ContainsKey(first))
+                {
+                    object obj = _locals[first];
+                    var members = name.Split('.').Skip(1).ToList();
+                    for (int k = 0; k < members.Count; k++) obj = Member(obj, members[k], k == members.Count - 1 ? args : new List<object>());
+                    return obj;
+                }
                 return Call(name, args, ctx);
             }
             WarnOnce("Can't understand script: " + e);
@@ -248,6 +280,19 @@ namespace PokeCreator.Runtime.Script
                 return;
             }
             if (lhs == "$scene" && Convert.ToString(val) == "Scene_Credits") { _game.PushScene(new UI.CreditsScene(_game)); return; }
+            if (lhs == "$player.coins" || lhs == "$Trainer.coins") { _game.State.Coins = Math.Max(0, Math.Min(99999, ToInt(val))); return; }
+            if (lhs == "$player.battle_points") { _game.State.BattlePoints = Math.Max(0, Math.Min(9999, ToInt(val))); return; }
+            var bm = Regex.Match(lhs, @"^\$(?:player|Trainer)\.badges\[(.+)\]$");
+            if (bm.Success) { int b = ToInt(Eval(bm.Groups[1].Value, ctx)); if (Truthy(val)) _game.State.Badges.Add(b); else _game.State.Badges.Remove(b); _game.Map.RefreshEvents(); return; }
+            if (lhs.StartsWith("$player.") && (lhs.EndsWith("_storage_creator") || lhs.EndsWith("mystery_gift_unlocked"))) { if (Truthy(val)) _game.State.Flags.Add(lhs.Substring(8)); else _game.State.Flags.Remove(lhs.Substring(8)); return; }
+            // Locals: x = ..., pkmn.item = :LEFTOVERS, pkmn.iv[:HP] = 20
+            if (Regex.IsMatch(lhs, @"^[a-z_]\w*$")) { _locals[lhs] = val; return; }
+            var lm = Regex.Match(lhs, @"^([a-z_]\w*)\.(\w+)(?:\[(.+)\])?$");
+            if (lm.Success && _locals.ContainsKey(lm.Groups[1].Value))
+            {
+                SetMember(_locals[lm.Groups[1].Value], lm.Groups[2].Value, lm.Groups[3].Success ? Eval(lm.Groups[3].Value, ctx) : null, val);
+                return;
+            }
             if (lhs.StartsWith("$stats.")) return; // play statistics aren't tracked
             WarnOnce("Can't assign to " + lhs);
         }
@@ -342,9 +387,103 @@ namespace PokeCreator.Runtime.Script
             Register("$bag.has?", (c, a) => _game.State.Bag.ContainsKey(Str(a, 0)));
             Register("$PokemonBag.pbStoreItem", (c, a) => { _game.State.AddItem(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1); return true; });
 
-            Register("pbAddPokemon", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, true));
-            Register("pbAddPokemonSilent", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false));
-            Register("pbAddToParty", (c, a) => AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, true));
+            Register("pbAddPokemon", (c, a) => AddPokemonArg(a, true));
+            Register("pbAddPokemonSilent", (c, a) => AddPokemonArg(a, false));
+            Register("pbAddToParty", (c, a) => AddPokemonArg(a, true));
+            Register("pbAddToPartySilent", (c, a) => AddPokemonArg(a, false));
+            Register("Pokemon.new", (c, a) =>
+            {
+                var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, _game.Rng);
+                pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId;
+                return pk;
+            });
+            Register("GameData::Item.get", (c, a) => _game.Project.Items.FirstOrDefault(i => i.Id == Str(a, 0)));
+            Register("GameData::Species.get", (c, a) => _game.Project.Species.FirstOrDefault(s => s.Id == Str(a, 0) && s.Form == 0));
+            Register("GameData::Move.get", (c, a) => _game.Project.Moves.FirstOrDefault(m => m.Id == Str(a, 0)));
+            Register("GameData::Item.exists?", (c, a) => _game.Project.Items.Any(i => i.Id == Str(a, 0)));
+            Register("GameData::Species.exists?", (c, a) => _game.Project.Species.Any(s => s.Id == Str(a, 0)));
+            Register("get_self.onEvent?", (c, a) => { var ev = c == null || _game.Map == null ? null : _game.Map.Events.FirstOrDefault(x => x.Id == c.EventId); return ev != null && ev.X == _game.Player.X && ev.Y == _game.Player.Y; });
+            foreach (var f in new[] { "Followers.hide_followers", "Followers.put_followers_on_player", "Followers.follow_into_door", "Followers.add", "Followers.remove", "Followers.clear", "Followers.toggle", "Followers.update", "Followers.move_followers", "Followers.turn_followers" })
+                Register(f, (c, a) => true);
+            Register("pbPokerus?", (c, a) => false);
+            Register("pbCaveEntrance", (c, a) => true);
+            Register("pbCaveExit", (c, a) => true);
+            Register("pbCaveEntranceEx", (c, a) => true);
+            Register("pbCaveExitEx", (c, a) => true);
+            Register("$player.pokedex.unlock", (c, a) => true);
+            Register("$player.pokedex.lock", (c, a) => true);
+            Register("pbTrainerCheck", (c, a) => true);
+            Register("$player.first_pokemon", (c, a) => _game.State.Party.FirstOrDefault(p => !p.IsEgg && !p.Fainted));
+            Register("$player.first_party", (c, a) => _game.State.Party.FirstOrDefault());
+            Register("Pokemon.play_cry", (c, a) => { var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, Str(a, 0), 1, _game.Rng); _game.Audio.PlayCry(pk); return true; });
+            Register("pbAddForeignPokemon", (c, a) =>
+            {
+                // pbAddForeignPokemon(species, level, owner, nickname, gender)
+                var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, _game.Rng);
+                if (pk.Data(_game.Project) == null || _game.State.Party.Count >= GameState.MaxParty) return false;
+                pk.OTName = a.Count > 2 ? Str(a, 2) : "Stranger"; pk.OTId = _game.Rng.Next(65536);
+                if (a.Count > 3 && Str(a, 3).Length > 0) pk.Nickname = Str(a, 3);
+                _game.State.Party.Add(pk); _game.State.Register(pk);
+                _game.Audio.PlayMe("Pkmn get");
+                _game.Message.Show("\\PN received a Pokémon from " + pk.OTName + ".");
+                return true;
+            });
+            Register("pbStartTrade", (c, a) =>
+            {
+                // pbStartTrade(partyIndex, newSpecies, nickname, trainerName, gender)
+                int i = ToInt(Arg(a, 0));
+                if (i < 0 || i >= _game.State.Party.Count) return false;
+                var old = _game.State.Party[i];
+                var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, Str(a, 1), old.Level, _game.Rng);
+                if (pk.Data(_game.Project) == null) return false;
+                pk.OTName = a.Count > 3 ? Str(a, 3) : "Stranger"; pk.OTId = _game.Rng.Next(65536);
+                if (a.Count > 2 && Str(a, 2).Length > 0) pk.Nickname = Str(a, 2);
+                pk.MetMap = _game.Map.Id;
+                _game.State.Party[i] = pk; _game.State.Register(pk);
+                string oldName = old.Name(_game.Project), newName = pk.Name(_game.Project);
+                _game.Audio.PlayMe("Evolution success");
+                _game.Message.Show("For " + pk.OTName + "'s " + newName + ", \\PN sent over " + oldName + ".", null, -1, _ =>
+                    _game.Message.Show(pk.OTName + " sent over " + newName + ".\\nTake good care of " + newName + "!", null, -1, __ =>
+                    {
+                        // Trade evolutions
+                        var to = PokeCreator.Pkmn.Growth.CheckTradeEvolution(_game.Project, pk, old);
+                        if (to != null) _game.PushScene(new UI.EvolutionScene(_game, pk, to, false, null));
+                    }));
+                return true;
+            });
+            Register("pbMoveTutorChoose", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                string move = Str(a, 0);
+                _game.PromptPending = true;
+                Func<PokeCreator.Pkmn.Pokemon, bool> able = pk => !pk.IsEgg && PokeCreator.Pkmn.Growth.CanLearnFromItem(_game.Project, pk, move) && !pk.Moves.Any(m => m.Id == move);
+                _game.PushScene(new UI.PartyScene(_game, "Teach which Pokémon?", pk => able(pk) ? "ABLE" : "NOT ABLE", (i, close) =>
+                {
+                    var pk = _game.State.Party[i];
+                    if (!able(pk)) { _game.Audio.PlaySe("GUI sel buzzer"); return; }
+                    close();
+                    UI.ItemFlow.LearnMove(_game, pk, move, learned => _game.SetPrompt(c, learned));
+                }, () => _game.SetPrompt(c, false)));
+                return false;
+            });
+            Register("pbBoxesFull?", (c, a) => _game.State.Party.Count >= GameState.MaxParty && _game.State.Storage.Count >= 40 * 30);
+            Register("pbGetStorageCreator", (c, a) => "someone");
+            Register("$player.seen_storage_creator", (c, a) => _game.State.Flags.Contains("seen_storage_creator"));
+            Register("pbSaveScreen", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                _game.Message.Show("Would you like to save the game?", new List<string> { "Yes", "No" }, 1, k =>
+                {
+                    if (k != 0) { _game.SetPrompt(c, false); return; }
+                    SaveSystem.Save(_game);
+                    _game.Audio.PlaySe("GUI save game");
+                    _game.Message.Show("\\PN saved the game.", null, -1, _ => _game.SetPrompt(c, true));
+                });
+                return false;
+            });
             Handler heal = (c, a) => { foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; };
             Register("pbHealAll", heal);
             Register("$player.heal_party", heal);
@@ -405,7 +544,7 @@ namespace PokeCreator.Runtime.Script
                 if (!_commands.ContainsKey(n)) Register(n, noop);
             Register("Phone.can_add?", (c, a) => false);
 
-            Register("pbGetPokemon", (c, a) => null);
+            Register("pbGetPokemon", (c, a) => { int i = _game.State.GetVar(ToInt(Arg(a, 0))); return i >= 0 && i < _game.State.Party.Count ? _game.State.Party[i] : null; });
             Register("pbPartyCount", (c, a) => _game.Party.Count);
             Register("pbChooseNonEggPokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg); return true; });
             Register("pbChoosePokemon", (c, a) => { ChoosePokemon(a, pk => true); return true; });
@@ -522,11 +661,25 @@ namespace PokeCreator.Runtime.Script
             return asBool ? (object)true : 1;
         }
 
+        object AddPokemonArg(List<object> a, bool announce)
+        {
+            var given = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
+            if (given != null) return AddPokemon(given, announce);
+            return AddPokemon(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, announce);
+        }
+
         object AddPokemon(string species, int level, bool announce)
         {
             var pk = PokeCreator.Pkmn.Pokemon.Create(_game.Project, species, level, _game.Rng);
             if (pk.Data(_game.Project) == null) { WarnOnce("Unknown species " + species); return false; }
-            pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId; pk.MetMap = _game.Map.Id;
+            return AddPokemon(pk, announce);
+        }
+
+        object AddPokemon(PokeCreator.Pkmn.Pokemon pk, bool announce)
+        {
+            if (pk.Data(_game.Project) == null) { WarnOnce("Unknown species " + pk.Species); return false; }
+            if (string.IsNullOrEmpty(pk.OTName)) { pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId; }
+            pk.MetMap = _game.Map.Id;
             bool toParty = _game.State.Party.Count < GameState.MaxParty;
             if (toParty) _game.State.Party.Add(pk); else _game.State.Storage.Add(pk);
             _game.State.Register(pk);
@@ -553,6 +706,113 @@ namespace PokeCreator.Runtime.Script
 
         // ------------------------------------------------------------------ parsing helpers
         static object Arg(List<object> a, int i) { return i < a.Count ? a[i] : null; }
+
+        static int StatIndex(object key)
+        {
+            string k = Convert.ToString(key).ToUpperInvariant();
+            switch (k) { case "HP": return 0; case "ATTACK": return 1; case "DEFENSE": return 2; case "SPECIAL_ATTACK": case "SPATK": return 3; case "SPECIAL_DEFENSE": case "SPDEF": return 4; case "SPEED": return 5; }
+            int n; return int.TryParse(k, out n) ? n : -1;
+        }
+
+        static object SettingsConstant(string name)
+        {
+            switch (name)
+            {
+                case "MAX_COINS": return 99999;
+                case "MAX_BATTLE_POINTS": return 9999;
+                case "MAX_MONEY": return 999999;
+                case "MAX_PLAYER_NAME_SIZE": return 10;
+                case "MAX_PARTY_SIZE": return GameState.MaxParty;
+                case "MAXIMUM_LEVEL": return PokeCreator.Pkmn.GrowthRates.MaxLevel;
+                case "NUM_STORAGE_BOXES": return 40;
+                case "EGG_LEVEL": return 1;
+                default: return 0;
+            }
+        }
+
+        /// <summary>Reads a member of an object held in a local variable (Pokémon, item, species, move data).</summary>
+        object Member(object obj, string member, List<object> args)
+        {
+            if (obj == null) return null;
+            var pk = obj as PokeCreator.Pkmn.Pokemon;
+            var P = _game.Project;
+            if (pk != null)
+            {
+                switch (member)
+                {
+                    case "name": return pk.Name(P);
+                    case "speciesName": return pk.Data(P) != null ? pk.Data(P).Name : pk.Species;
+                    case "species": return pk.Species;
+                    case "level": return pk.Level;
+                    case "form": return pk.Form;
+                    case "item": return pk.Item;
+                    case "hasItem?": return args.Count == 0 ? !string.IsNullOrEmpty(pk.Item) : pk.Item == Convert.ToString(args[0]);
+                    case "isSpecies?": return pk.Species == Convert.ToString(args.Count > 0 ? args[0] : null);
+                    case "shiny?": return pk.Shiny;
+                    case "male?": return pk.Gender == "M";
+                    case "female?": return pk.Gender == "F";
+                    case "egg?": case "isEgg?": return pk.IsEgg;
+                    case "fainted?": return pk.Fainted;
+                    case "able?": return !pk.Fainted && !pk.IsEgg;
+                    case "hp": return pk.HP;
+                    case "totalhp": return pk.TotalHP(P);
+                    case "nature": return pk.Nature;
+                    case "happiness": return pk.Happiness;
+                    case "ability": case "ability_id": return pk.AbilityId(P);
+                    case "iv": return pk.IV;
+                    case "ev": return pk.EV;
+                    case "owner": case "ot": return pk.OTName;
+                    case "hasType?": return pk.Types(P).Contains(Convert.ToString(args.Count > 0 ? args[0] : null));
+                    case "hasMove?": case "knowsMove?": return pk.Moves.Any(m => m.Id == Convert.ToString(args.Count > 0 ? args[0] : null));
+                    case "learn_move":
+                        {
+                            string id = Convert.ToString(args.Count > 0 ? args[0] : null);
+                            var md = P.Moves.FirstOrDefault(x => x.Id == id);
+                            if (md != null && !pk.Moves.Any(x => x.Id == id)) { if (pk.Moves.Count >= 4) pk.Moves.RemoveAt(0); pk.Moves.Add(new PokeCreator.Pkmn.PokemonMove { Id = id, PP = md.TotalPP }); }
+                            return true;
+                        }
+                    case "heal": pk.Heal(P); return true;
+                    case "calc_stats": return true;
+                    case "giveRibbon": case "record_first_moves": case "reset_moves": return true;
+                }
+                WarnOnce("Unsupported Pokémon member: " + member);
+                return null;
+            }
+            // Data records (GameData::Item.get(x).name ...): properties by name
+            if (member == "name" || member == "real_name")
+            {
+                var prop = obj.GetType().GetProperty("Name");
+                if (prop != null) return prop.GetValue(obj, null);
+            }
+            if (member == "id") { var prop = obj.GetType().GetProperty("Id"); if (prop != null) return prop.GetValue(obj, null); }
+            string pascal = string.Concat(member.TrimEnd('?', '!').Split('_').Select(w => w.Length == 0 ? "" : char.ToUpperInvariant(w[0]) + w.Substring(1)));
+            var pp = obj.GetType().GetProperty(pascal);
+            if (pp != null) return pp.GetValue(obj, null);
+            WarnOnce("Unsupported member: " + obj.GetType().Name + "." + member);
+            return null;
+        }
+
+        void SetMember(object obj, string member, object index, object val)
+        {
+            var pk = obj as PokeCreator.Pkmn.Pokemon;
+            if (pk == null) { WarnOnce("Can't set " + member); return; }
+            switch (member)
+            {
+                case "item": pk.Item = val == null ? null : Convert.ToString(val); return;
+                case "form": pk.Form = ToInt(val); return;
+                case "level": pk.Level = Math.Max(1, Math.Min(PokeCreator.Pkmn.GrowthRates.MaxLevel, ToInt(val))); return;
+                case "name": pk.Nickname = Convert.ToString(val); return;
+                case "shiny": pk.Shiny = Truthy(val); return;
+                case "nature": pk.Nature = Convert.ToString(val); return;
+                case "happiness": pk.Happiness = ToInt(val); return;
+                case "ability": pk.Ability = Convert.ToString(val); return;
+                case "owner": case "ot": pk.OTName = Convert.ToString(val); return;
+                case "gender": pk.Gender = ToInt(val) == 1 ? "F" : ToInt(val) == 0 ? "M" : ""; return;
+                case "iv": { int s = StatIndex(index); if (s >= 0 && s < 6) pk.IV[s] = Math.Max(0, Math.Min(31, ToInt(val))); return; }
+                case "ev": { int s = StatIndex(index); if (s >= 0 && s < 6) pk.EV[s] = Math.Max(0, Math.Min(252, ToInt(val))); return; }
+            }
+            WarnOnce("Can't set Pokémon member " + member);
+        }
 
         /// <summary>pbChoosePokemon(var, nameVar): the party screen; var = index (-1 if cancelled), nameVar = name.</summary>
         void ChoosePokemon(List<object> a, Func<PokeCreator.Pkmn.Pokemon, bool> allowed)

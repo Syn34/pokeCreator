@@ -100,6 +100,26 @@ namespace PokeCreator.Pkmn
             return Check(p, pk, ctx, item, true);
         }
 
+        /// <summary>The species this Pokémon evolves into after being traded for another (or null). Uses up a TradeItem.</summary>
+        public static string CheckTradeEvolution(Project p, Pokemon pk, Pokemon tradedFor)
+        {
+            var d = pk.Data(p);
+            if (d == null || pk.IsEgg || pk.Item == "EVERSTONE") return null;
+            foreach (var evo in d.Evolutions)
+            {
+                if (string.IsNullOrEmpty(evo.Species) || p.Species.All(s => s.Id != evo.Species)) continue;
+                switch (evo.Method ?? "")
+                {
+                    case "Trade": return evo.Species;
+                    case "TradeMale": if (pk.Gender == "M") return evo.Species; break;
+                    case "TradeFemale": if (pk.Gender == "F") return evo.Species; break;
+                    case "TradeItem": if (pk.Item == evo.Parameter) { pk.Item = null; return evo.Species; } break;
+                    case "TradeSpecies": if (tradedFor != null && tradedFor.Species == evo.Parameter) return evo.Species; break;
+                }
+            }
+            return null;
+        }
+
         static string Check(Project p, Pokemon pk, EvolutionContext ctx, string item, bool byItem)
         {
             var d = pk.Data(p);

@@ -47,6 +47,9 @@ namespace PokeCreator.Runtime.World
         public List<int> EscapePoint { get; set; }
         public List<DayCareSlot> DayCare { get; set; }
         public List<HallOfFameEntry> HallOfFame { get; set; }
+        public int Coins { get; set; }
+        public int BattlePoints { get; set; }
+        public List<int> Badges { get; set; }
         public int DayCareEggSteps { get; set; }
         public bool DayCareEgg { get; set; }
         public SaveData()
@@ -119,6 +122,8 @@ namespace PokeCreator.Runtime.World
                 EscapePoint = s.EscapePoint,
                 DayCare = s.DayCare.Count > 0 ? s.DayCare : null,
                 HallOfFame = s.HallOfFame.Count > 0 ? s.HallOfFame : null,
+                Coins = s.Coins, BattlePoints = s.BattlePoints,
+                Badges = s.Badges.Count > 0 ? s.Badges.OrderBy(b => b).ToList() : null,
                 DayCareEggSteps = s.DayCareEggSteps,
                 DayCareEgg = s.DayCareEgg,
                 PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,
@@ -153,6 +158,8 @@ namespace PokeCreator.Runtime.World
             s.EscapePoint = d.EscapePoint;
             s.DayCare = d.DayCare ?? new List<DayCareSlot>();
             s.HallOfFame = d.HallOfFame ?? new List<HallOfFameEntry>();
+            s.Coins = d.Coins; s.BattlePoints = d.BattlePoints;
+            s.Badges.Clear(); if (d.Badges != null) foreach (var b in d.Badges) s.Badges.Add(b);
             s.DayCareEggSteps = d.DayCareEggSteps;
             s.DayCareEgg = d.DayCareEgg;
             s.PcItems.Clear(); if (d.PcItems != null) foreach (var kv in d.PcItems) s.PcItems[kv.Key] = kv.Value;
