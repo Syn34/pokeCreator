@@ -410,7 +410,11 @@ namespace PokeCreator.Runtime.UI
     /// <summary>Pokédex: every species in order, seen and caught counts; Action opens an entry.</summary>
     public class PokedexScene : Scene
     {
-        readonly List<SpeciesData> _list;
+        List<SpeciesData> _list;
+        List<SpeciesData> _full;
+        readonly Dictionary<string, int> _numbers = new Dictionary<string, int>();
+        CommandList _popup;
+        string _searchNote;
         int _index, _scroll;
         const int Rows = 8;
 
@@ -454,6 +458,8 @@ namespace PokeCreator.Runtime.UI
                 _title = DexName(g, dex);
             }
             else _list = g.Project.Species.Where(s => s.Form == 0).ToList();
+            _full = _list.ToList();
+            for (int k = 0; k < _full.Count; k++) _numbers[_full[k].Id] = k + 1;
             // Start on the last species the player has seen
             int last = _list.FindLastIndex(s => g.State.Seen.Contains(s.Id));
             _index = Math.Max(0, last); _scroll = Math.Max(0, _index - Rows / 2);
@@ -461,7 +467,9 @@ namespace PokeCreator.Runtime.UI
 
         protected override void Update()
         {
-            int n = _list.Count; if (n == 0) { if (Input.Trigger(Button.Cancel)) Close(); return; }
+            if (_popup != null) { SearchMenu(); return; }
+            if (Input.Trigger(Button.Menu) || Input.Trigger(Button.Run)) { Decide(); OpenSearch(); return; }
+            int n = _list.Count; if (n == 0) { if (Input.Trigger(Button.Cancel)) { if (_searchNote != null) ResetSearch(); else Close(); } return; }
             int old = _index;
             if (Input.Repeat(Button.Down)) _index = Math.Min(n - 1, _index + 1);
             if (Input.Repeat(Button.Up)) _index = Math.Max(0, _index - 1);
@@ -470,7 +478,7 @@ namespace PokeCreator.Runtime.UI
             if (_index != old) Cursor();
             if (_index < _scroll) _scroll = _index;
             if (_index >= _scroll + Rows) _scroll = _index - Rows + 1;
-            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); if (_searchNote != null) ResetSearch(); else Close(); return; }
             if (Input.Trigger(Button.Action))
             {
                 if (!Game.State.Seen.Contains(_list[_index].Id)) { Buzz(); return; }
@@ -478,6 +486,46 @@ namespace PokeCreator.Runtime.UI
                 Game.PushScene(new PokedexEntryScene(Game, _list, _index, i => { _index = i; _scroll = Math.Max(0, Math.Min(_index - Rows / 2, _list.Count - Rows)); }));
             }
         }
+
+        // ---- Search (Menu key): sort the seen Pokémon or show only one type
+        int _searchStep; // 0 = main, 1 = sort, 2 = type
+        void OpenSearch() { _searchStep = 0; _popup = new CommandList(new[] { "Sort", "Type", "Name starts with", "Show all", "Cancel" }); }
+
+        void SearchMenu()
+        {
+            int r = _popup.Update(this, Cursor);
+            if (r == -2) { Cancel(); _popup = null; return; }
+            if (r < 0) return;
+            string cmd = _popup.Items[r]; _popup = null;
+            if (cmd == "Cancel") return;
+            var seen = _full.Where(x => Game.State.Seen.Contains(x.Id)).ToList();
+            if (_searchStep == 0)
+            {
+                if (cmd == "Sort") { _searchStep = 1; _popup = new CommandList(new[] { "Numerical", "A to Z", "Heaviest", "Lightest", "Tallest", "Smallest", "Cancel" }); }
+                else if (cmd == "Type") { _searchStep = 2; _popup = new CommandList(Game.Project.Types.Where(t => !t.IsPseudoType).Select(t => t.Name ?? t.Id).Concat(new[] { "Cancel" })); }
+                else if (cmd == "Name starts with") Game.AskName("First letters?", "", 10, text => { if (!string.IsNullOrEmpty(text)) Apply(seen.Where(x => (x.Name ?? x.Id).StartsWith(text, StringComparison.OrdinalIgnoreCase)).ToList(), "Starts with " + text); }, null);
+                else ResetSearch();
+                return;
+            }
+            if (_searchStep == 1)
+            {
+                switch (cmd)
+                {
+                    case "Numerical": ResetSearch(); break;
+                    case "A to Z": Apply(seen.OrderBy(x => x.Name ?? x.Id).ToList(), "A to Z"); break;
+                    case "Heaviest": Apply(seen.OrderByDescending(x => x.Weight).ToList(), "Heaviest"); break;
+                    case "Lightest": Apply(seen.OrderBy(x => x.Weight).ToList(), "Lightest"); break;
+                    case "Tallest": Apply(seen.OrderByDescending(x => x.Height).ToList(), "Tallest"); break;
+                    case "Smallest": Apply(seen.OrderBy(x => x.Height).ToList(), "Smallest"); break;
+                }
+                return;
+            }
+            var type = Game.Project.Types.FirstOrDefault(t => (t.Name ?? t.Id) == cmd);
+            if (type != null) Apply(seen.Where(x => x.Types.Contains(type.Id)).ToList(), (type.Name ?? type.Id) + " type");
+        }
+
+        void Apply(List<SpeciesData> list, string note) { _list = list; _searchNote = note; _index = 0; _scroll = 0; }
+        void ResetSearch() { _list = _full.ToList(); _searchNote = null; _index = 0; _scroll = 0; }
 
         public override void Draw(Gfx g)
         {
@@ -500,11 +548,15 @@ namespace PokeCreator.Runtime.UI
                 if (i == _index) g.FillRect(222, y - 2, g.Width - 236, lh - 2, new Color(248, 216, 120));
                 bool seen = Game.State.Seen.Contains(s.Id), caught = Game.State.Caught.Contains(s.Id);
                 if (caught) { g.FillRect(232, y + 10, 14, 14, new Color(232, 56, 48)); g.FillRect(232, y + 16, 14, 2, new Color(40, 40, 48)); g.FillRect(237, y + 14, 4, 6, new Color(248, 248, 248)); }
-                Ui.Text(g, 254, y, (i + 1).ToString("000"));
+                int num; _numbers.TryGetValue(s.Id, out num);
+                Ui.Text(g, 254, y, num.ToString("000"));
                 Ui.Text(g, 310, y, seen ? (s.Name ?? s.Id) : "-----");
             }
             Ui.Box(g, 8, 304, 200, 64);
-            Ui.Text(g, 20, 314, cur == null ? "" : (_index + 1).ToString("000") + " " + (Game.State.Seen.Contains(cur.Id) ? cur.Name : "?????"));
+            int cn = 0; if (cur != null) _numbers.TryGetValue(cur.Id, out cn);
+            Ui.Text(g, 20, 314, _searchNote ?? (cur == null ? "" : cn.ToString("000") + " " + (Game.State.Seen.Contains(cur.Id) ? cur.Name : "?????")));
+            if (_list.Count == 0) Ui.TextCenter(g, 216 + (g.Width - 224) / 2, 180, "No matching Pokémon.");
+            if (_popup != null) { int w = _popup.Width(g); _popup.Draw(g, g.Width - w - 8, g.Height - _popup.Height(g) - 8); }
         }
     }
 
