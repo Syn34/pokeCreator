@@ -13,7 +13,7 @@ using PokeCreator.Studio.Controls;
 
 namespace PokeCreator.Studio.Editors
 {
-    public enum MapTool { Pencil, Rectangle, Fill, Eraser }
+    public enum MapTool { Pencil, Rectangle, Fill, Eraser, Select }
 
     /// <summary>Map document: palette on the left, canvas in the middle, toolbar on top.</summary>
     public class MapEditor : UserControl, IDocument
@@ -89,8 +89,9 @@ namespace PokeCreator.Studio.Editors
             foreach (MapTool tool in Enum.GetValues(typeof(MapTool)))
             {
                 var tl = tool;
-                string icon = tool == MapTool.Pencil ? "tool-pencil" : tool == MapTool.Rectangle ? "tool-rect" : tool == MapTool.Fill ? "tool-fill" : "tool-eraser";
-                var b = new ToolStripButton(tool.ToString(), Icons.Get(icon)) { DisplayStyle = ToolStripItemDisplayStyle.Image, ToolTipText = tool.ToString(), AutoToolTip = false, Padding = new Padding(3) };
+                string icon = tool == MapTool.Pencil ? "tool-pencil" : tool == MapTool.Rectangle ? "tool-rect" : tool == MapTool.Fill ? "tool-fill" : tool == MapTool.Eraser ? "tool-eraser" : "tool-select";
+                string tip = tool == MapTool.Select ? "Select (drag an area, then Ctrl+C / Ctrl+X / Delete; Ctrl+V pastes)" : tool.ToString();
+                var b = new ToolStripButton(tool.ToString(), Icons.Get(icon)) { DisplayStyle = ToolStripItemDisplayStyle.Image, ToolTipText = tip, AutoToolTip = false, Padding = new Padding(3) };
                 b.Click += (s, e) => SetTool(tl);
                 _toolButtons.Add(b); t.Items.Add(b);
             }
@@ -155,6 +156,7 @@ namespace PokeCreator.Studio.Editors
         void SetTool(MapTool t)
         {
             Tool = t;
+            if (_canvas != null) { _canvas.CancelPaste(); if (t != MapTool.Select) _canvas.ClearSelection(); }
             for (int i = 0; i < _toolButtons.Count; i++) _toolButtons[i].Checked = (MapTool)i == t;
         }
 
@@ -170,7 +172,10 @@ namespace PokeCreator.Studio.Editors
             }
             var ev = _map.Events == null ? null : _map.Events.FirstOrDefault(e => e != null && e.X == x && e.Y == y);
             if (ev != null) s += "   event " + ev.Id + ": " + ev.Name;
-            s += "     Left: paint   Right: pick tile   Events layer: double-click to edit, right-click for menu";
+            if (_canvas.Pasting) s += "     Click to paste (all layers)   Esc or right-click: stop pasting";
+            else if (Layer == 3) s += "     Double-click: edit   Right-click: menu   Ctrl+C / Ctrl+V: copy / paste event";
+            else if (Tool == MapTool.Select) s += "     Drag to select   Ctrl+C copy   Ctrl+X cut   Delete clear   Ctrl+V paste";
+            else s += "     Left: paint   Right: pick tile (drag to pick an area)   Ctrl+V: paste";
             _info.Text = s;
         }
 
@@ -242,6 +247,15 @@ namespace PokeCreator.Studio.Editors
             if (keyData == (Keys.Control | Keys.Z)) { Undo(); return true; }
             if (keyData == (Keys.Control | Keys.Y)) { Redo(); return true; }
             if (keyData == Keys.Delete && Layer == 3) { _canvas.DeleteSelectedEvent(); return true; }
+            if (!(ActiveControl is TextBoxBase) && !(ActiveControl is ComboBox))
+            {
+                if (keyData == (Keys.Control | Keys.C)) { if (Layer == 3) _canvas.CopySelectedEvent(); else _canvas.CopySelection(false); return true; }
+                if (keyData == (Keys.Control | Keys.X)) { if (Layer == 3) { _canvas.CopySelectedEvent(); _canvas.DeleteSelectedEvent(); } else _canvas.CopySelection(true); return true; }
+                if (keyData == (Keys.Control | Keys.V)) { if (Layer == 3) _canvas.PasteEventAtHover(); else { _canvas.BeginPaste(); ShowInfo(_canvas.HoverCell.X, _canvas.HoverCell.Y); } return true; }
+                if (keyData == Keys.Delete && _canvas.HasSelection) { _canvas.ClearSelectedTiles(); return true; }
+                if (keyData == (Keys.Control | Keys.A) && Layer < 3) { SetTool(MapTool.Select); _canvas.SelectAll(); return true; }
+                if (keyData == Keys.Escape) { _canvas.CancelPaste(); _canvas.ClearSelection(); return true; }
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -381,10 +395,17 @@ namespace PokeCreator.Studio.Editors
         }
 
         /// <summary>The selected brush: tile IDs [y][x].</summary>
+        int[,] _custom; // a block picked from the map with right-drag
+
+        /// <summary>Uses a block of tiles picked from the map as the brush, until a palette tile is chosen.</summary>
+        public void SetCustomBrush(int[,] b) { _custom = b; Invalidate(); if (SelectionChanged != null) SelectionChanged(); }
+        public Size BrushSize { get { if (_custom != null) return new Size(_custom.GetLength(1), _custom.GetLength(0)); var r = Selection; return r.Size; } }
+
         public int[,] Brush
         {
             get
             {
+                if (_custom != null) return (int[,])_custom.Clone();
                 var r = Selection;
                 var b = new int[r.Height, r.Width];
                 for (int y = 0; y < r.Height; y++) for (int x = 0; x < r.Width; x++) b[y, x] = IdAt(r.X + x, r.Y + y, _slot);
@@ -398,7 +419,7 @@ namespace PokeCreator.Studio.Editors
             if (id == 0) p = new Point(0, 0);
             else if (id < TilesetData.FirstTile) p = new Point(id / 48, 0);
             else { Slot = TilesetData.SlotOf(id); int i = TilesetData.IndexOf(id); p = new Point(i % 8, i / 8 + 1); }
-            _selStart = _selEnd = p;
+            _selStart = _selEnd = p; _custom = null;
             Invalidate();
             var parent = Parent as ScrollableControl;
             if (parent != null) parent.ScrollControlIntoView(this);
@@ -408,7 +429,7 @@ namespace PokeCreator.Studio.Editors
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            _selStart = _selEnd = Cell(e.Location); _dragging = true; Invalidate();
+            _selStart = _selEnd = Cell(e.Location); _dragging = true; _custom = null; Invalidate();
         }
         protected override void OnMouseMove(MouseEventArgs e) { if (_dragging) { _selEnd = Cell(e.Location); Invalidate(); } }
         protected override void OnMouseUp(MouseEventArgs e) { _dragging = false; if (SelectionChanged != null) SelectionChanged(); }
@@ -429,6 +450,7 @@ namespace PokeCreator.Studio.Editors
             g.DrawLine(Pens.DimGray, 0, 32, Width, 32);
             var r = Selection;
             var rect = new Rectangle(r.X * 32, r.Y * 32, r.Width * 32 - 1, r.Height * 32 - 1);
+            if (_custom != null) { g.DrawString("Brush picked from the map (" + _custom.GetLength(1) + "×" + _custom.GetLength(0) + ")", Font, Brushes.Gray, 4, Height - 18); return; }
             using (var pen = new Pen(Color.White, 3)) g.DrawRectangle(pen, rect);
             using (var pen = new Pen(Color.Black, 1)) g.DrawRectangle(pen, rect);
         }
@@ -448,8 +470,19 @@ namespace PokeCreator.Studio.Editors
         int _zoom = 100;
         public bool DimOthers = true, ShowGrid, ShowPassability;
         Point _hover = new Point(-1, -1), _dragStart, _dragEnd;
-        bool _painting, _rectDragging, _movingEvent;
-        MapEvent _selectedEvent, _clipboard;
+        bool _painting, _rectDragging, _movingEvent, _selecting, _picking;
+        MapEvent _selectedEvent;
+        static MapEvent _clipboard;         // copied event (shared by all maps)
+        static TileClip _tileClip;          // copied tiles (shared by all maps)
+        Rectangle _sel = Rectangle.Empty;   // selected area (Select tool)
+        bool _pasting;
+
+        /// <summary>Tiles copied from a map: all three layers.</summary>
+        class TileClip { public int W, H; public int[][,] Layers = new int[3][,]; }
+
+        public bool Pasting { get { return _pasting; } }
+        public bool HasSelection { get { return _sel.Width > 0 && _sel.Height > 0; } }
+        public Point HoverCell { get { return _hover; } }
         public Point SelectedCell = new Point(-1, -1);
         public event Action<int, int> Hover;
 
@@ -565,11 +598,20 @@ namespace PokeCreator.Studio.Editors
             {
                 Rectangle r;
                 if (_rectDragging) r = CellRect(_dragStart, _dragEnd);
-                else if (_ed.Layer < 3) { var br = _ed.PaletteControl.Selection; r = new Rectangle(_hover.X, _hover.Y, _ed.Tool == MapTool.Pencil ? br.Width : 1, _ed.Tool == MapTool.Pencil ? br.Height : 1); }
+                else if (_pasting && _tileClip != null) r = new Rectangle(_hover.X, _hover.Y, _tileClip.W, _tileClip.H);
+                else if (_picking || _selecting) r = CellRect(_dragStart, _dragEnd);
+                else if (_ed.Layer < 3) { var br = _ed.PaletteControl.BrushSize; r = new Rectangle(_hover.X, _hover.Y, _ed.Tool == MapTool.Pencil ? br.Width : 1, _ed.Tool == MapTool.Pencil ? br.Height : 1); }
                 else r = new Rectangle(_hover.X, _hover.Y, 1, 1);
                 var pr = new Rectangle(r.X * c, r.Y * c, r.Width * c - 1, r.Height * c - 1);
-                using (var pen = new Pen(Color.White, 2)) g.DrawRectangle(pen, pr);
+                if (_pasting && _tileClip != null) DrawClip(g, _tileClip, _hover.X, _hover.Y, c);
+                using (var pen = new Pen(_pasting ? Color.Cyan : _picking ? Color.Orange : Color.White, 2)) g.DrawRectangle(pen, pr);
                 g.DrawRectangle(Pens.Black, pr);
+            }
+            if (HasSelection && !_selecting)
+            {
+                var sr = new Rectangle(_sel.X * c, _sel.Y * c, _sel.Width * c - 1, _sel.Height * c - 1);
+                using (var fill = new SolidBrush(Color.FromArgb(40, 80, 160, 255))) g.FillRectangle(fill, sr);
+                using (var pen = new Pen(Color.Yellow, 2) { DashStyle = DashStyle.Dash }) g.DrawRectangle(pen, sr);
             }
         }
 
@@ -681,14 +723,21 @@ namespace PokeCreator.Studio.Editors
             if (!_map.Valid(cell.X, cell.Y)) return;
             SelectedCell = cell;
             if (_ed.Layer == 3) { EventMouseDown(e, cell); return; }
+            if (_pasting)
+            {
+                if (e.Button == MouseButtons.Right) { CancelPaste(); return; }
+                if (e.Button == MouseButtons.Left) PasteAt(cell.X, cell.Y);
+                return;
+            }
             if (e.Button == MouseButtons.Right)
             {
-                // Eyedropper: pick the top-most tile on the current layer
-                int id = _map.GetTile(cell.X, cell.Y, _ed.Layer);
-                _ed.PaletteControl.SelectId(id >= 48 && id < 384 ? (id / 48) * 48 : id);
+                // Eyedropper: click picks one tile; drag picks an area of the current layer as the brush
+                _picking = true; _dragStart = _dragEnd = cell; Invalidate();
                 return;
             }
             if (e.Button != MouseButtons.Left) return;
+            if (_ed.Tool == MapTool.Select) { _selecting = true; _sel = Rectangle.Empty; _dragStart = _dragEnd = cell; Invalidate(); return; }
+            ClearSelection();
             _ed.Snapshot();
             switch (_ed.Tool)
             {
@@ -710,7 +759,7 @@ namespace PokeCreator.Studio.Editors
                 var old = _hover; _hover = cell;
                 if (Hover != null) Hover(cell.X, cell.Y);
                 if (_painting && _map.Valid(cell.X, cell.Y)) Stamp(cell.X, cell.Y);
-                if (_rectDragging) { _dragEnd = new Point(Math.Max(0, Math.Min(_map.Width - 1, cell.X)), Math.Max(0, Math.Min(_map.Height - 1, cell.Y))); }
+                if (_rectDragging || _selecting || _picking) { _dragEnd = new Point(Math.Max(0, Math.Min(_map.Width - 1, cell.X)), Math.Max(0, Math.Min(_map.Height - 1, cell.Y))); }
                 if (_movingEvent && _selectedEvent != null && _map.Valid(cell.X, cell.Y) && !_map.Events.Any(ev => ev != _selectedEvent && ev.X == cell.X && ev.Y == cell.Y))
                 { _selectedEvent.X = cell.X; _selectedEvent.Y = cell.Y; _ed.MarkDirty(); }
                 Invalidate();
@@ -720,6 +769,25 @@ namespace PokeCreator.Studio.Editors
         protected override void OnMouseUp(MouseEventArgs e)
         {
             if (_rectDragging) { _rectDragging = false; FillRect(CellRect(_dragStart, _dragEnd)); }
+            if (_selecting) { _selecting = false; _sel = CellRect(_dragStart, _dragEnd); Invalidate(); }
+            if (_picking)
+            {
+                _picking = false;
+                var r = CellRect(_dragStart, _dragEnd);
+                int layer = _ed.Layer;
+                if (r.Width == 1 && r.Height == 1)
+                {
+                    int id = _map.GetTile(r.X, r.Y, layer);
+                    _ed.PaletteControl.SelectId(id >= 48 && id < 384 ? (id / 48) * 48 : id);
+                }
+                else
+                {
+                    var b = new int[r.Height, r.Width];
+                    for (int y = 0; y < r.Height; y++) for (int x = 0; x < r.Width; x++) b[y, x] = _map.GetTile(r.X + x, r.Y + y, layer);
+                    _ed.PaletteControl.SetCustomBrush(b);
+                }
+                Invalidate();
+            }
             _painting = false; _movingEvent = false;
         }
 
@@ -763,6 +831,82 @@ namespace PokeCreator.Studio.Editors
         }
 
         static MapEvent Clone(MapEvent ev) { return Json.Json.Deserialize<MapEvent>(Json.Json.Write(ev)); }
+
+        // ------------------------------------------------------------------ copy / paste
+        public void CopySelectedEvent() { if (_selectedEvent != null) _clipboard = Clone(_selectedEvent); }
+
+        public void PasteEventAtHover()
+        {
+            if (_clipboard == null) return;
+            var cell = _map.Valid(_hover.X, _hover.Y) ? _hover : SelectedCell;
+            if (!_map.Valid(cell.X, cell.Y) || _map.Events.Any(e => e.X == cell.X && e.Y == cell.Y)) return;
+            PasteEvent(cell);
+        }
+
+        public void ClearSelection() { if (HasSelection || _selecting) { _sel = Rectangle.Empty; _selecting = false; Invalidate(); } }
+        public void SelectAll() { _sel = new Rectangle(0, 0, _map.Width, _map.Height); Invalidate(); }
+
+        /// <summary>Copies the selected area (all three layers); with cut, also clears it.</summary>
+        public void CopySelection(bool cut)
+        {
+            if (!HasSelection) return;
+            var clip = new TileClip { W = _sel.Width, H = _sel.Height };
+            for (int l = 0; l < 3; l++)
+            {
+                clip.Layers[l] = new int[clip.H, clip.W];
+                for (int y = 0; y < clip.H; y++) for (int x = 0; x < clip.W; x++) clip.Layers[l][y, x] = _map.GetTile(_sel.X + x, _sel.Y + y, l);
+            }
+            _tileClip = clip;
+            if (cut) ClearSelectedTiles();
+        }
+
+        public void ClearSelectedTiles()
+        {
+            if (!HasSelection) return;
+            _ed.Snapshot();
+            for (int l = 0; l < 3; l++)
+                for (int y = _sel.Top; y < _sel.Bottom; y++) for (int x = _sel.Left; x < _sel.Right; x++) _map.SetTile(x, y, l, 0);
+            FixAutotilesAround(_sel);
+            InvalidateAll(); _ed.MarkDirty();
+        }
+
+        public void BeginPaste()
+        {
+            if (_tileClip == null) return;
+            _pasting = true; ClearSelection(); Focus(); Invalidate();
+        }
+
+        public void CancelPaste() { if (_pasting) { _pasting = false; Invalidate(); } }
+
+        void PasteAt(int px, int py)
+        {
+            var clip = _tileClip; if (clip == null) return;
+            _ed.Snapshot();
+            for (int l = 0; l < 3; l++)
+                for (int y = 0; y < clip.H; y++) for (int x = 0; x < clip.W; x++)
+                        if (_map.Valid(px + x, py + y)) _map.SetTile(px + x, py + y, l, clip.Layers[l][y, x]);
+            FixAutotilesAround(new Rectangle(px, py, clip.W, clip.H));
+            InvalidateAll(); _ed.MarkDirty();
+        }
+
+        /// <summary>Autotiles just outside a changed area reshape to join (or stop joining) it.</summary>
+        void FixAutotilesAround(Rectangle r)
+        {
+            for (int l = 0; l < 3; l++)
+                for (int y = r.Top - 1; y <= r.Bottom; y++)
+                    for (int x = r.Left - 1; x <= r.Right; x++)
+                        if (_map.Valid(x, y) && (y == r.Top - 1 || y == r.Bottom || x == r.Left - 1 || x == r.Right)) TileGraphics.FixAutotiles(_map, l, x, y);
+        }
+
+        void DrawClip(Graphics g, TileClip clip, int cx, int cy, int c)
+        {
+            for (int l = 0; l < 3; l++)
+                for (int y = 0; y < clip.H; y++) for (int x = 0; x < clip.W; x++)
+                    {
+                        int id = clip.Layers[l][y, x];
+                        if (id > 0 && _map.Valid(cx + x, cy + y)) _tiles.Draw(g, id, (cx + x) * c, (cy + y) * c, c);
+                    }
+        }
 
         MapEvent NewEvent(Point cell)
         {

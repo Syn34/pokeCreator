@@ -158,6 +158,10 @@ namespace PokeCreator.Studio.Controls
                     Fill(g, C(60, 60, 70), new PointF(8.3f, 15.2f), new PointF(9.7f, 15.2f), new PointF(9, 17));
                     g.ResetTransform();
                     break;
+                case "tool-select":
+                    using (var p = new Pen(C(60, 60, 60), 1.4f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash }) g.DrawRectangle(p, 2.5f, 3.5f, 13, 11);
+                    using (var p = new Pen(C(40, 120, 220), 1.6f)) { g.DrawLine(p, 10, 10, 15.5f, 15.5f); g.DrawLine(p, 10, 10, 10, 15); g.DrawLine(p, 10, 10, 15, 10); }
+                    break;
                 case "tool-rect":
                     Box(g, C(150, 200, 255), 2.5f, 4.5f, 13, 9, false);
                     using (var p = new Pen(C(40, 100, 200), 1.6f)) g.DrawRectangle(p, 2.5f, 4.5f, 13, 9);
