@@ -235,6 +235,8 @@ namespace PokeCreator.Studio.Editors
             var battle = group("Battles");
             cmd(battle, "Trainer Battle", AddTrainerBattle);
             cmd(battle, "Wild Battle", AddWildBattle);
+            cmd(battle, "Double Battle (one trainer, two Pokémon out)", () => AddDoubleBattle(false));
+            cmd(battle, "Double Battle (two trainers)", () => AddDoubleBattle(true));
 
             var field = group("Field Moves");
             cmd(field, "Cut Tree (asks to use Cut)", () => Insert(new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0)));
@@ -461,6 +463,33 @@ namespace PokeCreator.Studio.Editors
                    new EventCommand(108, 1, "If the player wins (e.g. turn on Self Switch A)"), new EventCommand(0, 1),
                    new EventCommand(411, 0), new EventCommand(108, 1, "If the player loses (they black out unless the battle allows losing)"), new EventCommand(0, 1),
                    new EventCommand(412, 0));
+        }
+
+        static string TrainerArgs(PokeCreator.Data.TrainerData tr) { return ":" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"" + (tr.Version > 0 ? ", " + tr.Version : ""); }
+
+        void AddDoubleBattle(bool twoTrainers)
+        {
+            var list = _p.Trainers.OrderBy(t => t.TrainerType).ThenBy(t => t.Name).ThenBy(t => t.Version).ToList();
+            if (list.Count == 0) { MessageBox.Show(FindForm(), "There are no trainers yet. Add them under Database > Trainers.", "Double Battle"); return; }
+            var labels = list.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (version " + t.Version + ")" : "") + "  -  " + t.Pokemon.Count + " Pokémon").ToArray();
+            int k1 = ChoiceDialog.Ask(FindForm(), twoTrainers ? "First trainer" : "Battle which trainer? (needs at least 2 Pokémon)", labels, true); if (k1 < 0) return;
+            string script;
+            var cmds = new List<EventCommand>();
+            if (twoTrainers)
+            {
+                int k2 = ChoiceDialog.Ask(FindForm(), "Second trainer", labels, true); if (k2 < 0) return;
+                script = "TrainerBattle.start(" + TrainerArgs(list[k1]) + ", " + TrainerArgs(list[k2]) + ")";
+            }
+            else
+            {
+                cmds.Add(new EventCommand(355, 0, "setBattleRule(\"double\")"));
+                script = "TrainerBattle.start(" + TrainerArgs(list[k1]) + ")";
+            }
+            cmds.Add(new EventCommand(111, 0, 12, script));
+            cmds.Add(new EventCommand(108, 1, "If the player wins")); cmds.Add(new EventCommand(0, 1));
+            cmds.Add(new EventCommand(411, 0)); cmds.Add(new EventCommand(108, 1, "If the player loses")); cmds.Add(new EventCommand(0, 1));
+            cmds.Add(new EventCommand(412, 0));
+            Insert(cmds.ToArray());
         }
 
         void AddWildBattle()

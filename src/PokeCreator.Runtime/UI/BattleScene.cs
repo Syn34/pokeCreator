@@ -15,6 +15,9 @@ namespace PokeCreator.Runtime.UI
         public bool Wild = true;
         public TrainerData Trainer;
         public TrainerTypeData TrainerType;
+        /// <summary>The second trainer of a two-trainer double battle (or null).</summary>
+        public TrainerData Trainer2;
+        public TrainerTypeData TrainerType2;
         public string Backdrop = "field";
         public bool CanLose;               // losing doesn't black out (e.g. a rival battle you may lose)
         public Action<BattleOutcome> OnEnd;
@@ -29,20 +32,25 @@ namespace PokeCreator.Runtime.UI
         readonly Battle _b;
         readonly BattleSetup _setup;
         readonly Queue<BattleEvent> _queue = new Queue<BattleEvent>();
-        enum Mode { Intro, Events, Command, Fight, Busy, Ending, Done }
+        enum Mode { Intro, Events, Command, Fight, Target, Busy, Ending, Done }
         Mode _mode = Mode.Intro;
-        int _cmd, _move, _anim;
+        int _cmd, _move, _anim, _target;
         BattleEvent _current;
-        readonly double[] _shownHp = new double[2];
-        readonly int[] _shownParty = { -1, -1 };     // which party member each side's databox/sprite shows
-        readonly bool[] _visible = new bool[2];
-        readonly int[] _faintDrop = new int[2];
-        readonly int[] _blink = new int[2];
-        double _shownExp;
+        // Display state per field position: index = side * 2 + slot
+        readonly double[] _shownHp = new double[4];
+        readonly int[] _shownParty = { -1, -1, -1, -1 };
+        readonly bool[] _visible = new bool[4];
+        readonly int[] _faintDrop = new int[4];
+        readonly int[] _blink = new int[4];
+        readonly double[] _shownExp = new double[2];
         bool _trainerVisible, _ballVisible, _ballCaught;
-        int _ballShakes;
+        int _ballShakes, _ballSlot;
         int _introSlide = 120;
         readonly List<Pokemon> _party;
+        // Commands chosen this turn (double battles: one per Pokémon)
+        int _cmdSlot;
+        readonly List<BattleCommand> _pending = new List<BattleCommand>();
+        List<Battler> _targets = new List<Battler>();
 
         public BattleScene(Game g, Battle battle, BattleSetup setup) : base(g)
         {
@@ -56,7 +64,10 @@ namespace PokeCreator.Runtime.UI
             g.Audio.PlayBgm(bgm);
         }
 
-        Battler Me { get { return _b.Active[0]; } }
+        static int Key(int side, int slot) { return side * 2 + Math.Max(0, Math.Min(1, slot)); }
+        /// <summary>The field slot showing this party member (or 0).</summary>
+        int SlotOf(int side, int party) { for (int s = 0; s < 2; s++) if (_shownParty[Key(side, s)] == party) return s; return 0; }
+        Battler Me { get { return _b.Field[0][_cmdSlot] ?? _b.Live(0).FirstOrDefault() ?? _b.Active[0]; } }
 
         // ------------------------------------------------------------------ update
         protected override void Update()
@@ -68,6 +79,7 @@ namespace PokeCreator.Runtime.UI
                 case Mode.Events: PlayEvents(); break;
                 case Mode.Command: CommandMenu(); break;
                 case Mode.Fight: FightMenu(); break;
+                case Mode.Target: TargetMenu(); break;
                 case Mode.Busy: break;
                 case Mode.Ending: break;
             }
@@ -86,8 +98,27 @@ namespace PokeCreator.Runtime.UI
             // All played: what next?
             if (_b.Outcome != BattleOutcome.Ongoing) { EndBattle(); return; }
             if (_b.NeedPlayerSwitch) { ChooseReplacement(); return; }
+            StartCommands();
+        }
+
+        void StartCommands()
+        {
+            _pending.Clear();
+            var live = _b.Live(0);
+            _cmdSlot = live.Count > 0 ? live[0].Slot : 0;
             _mode = Mode.Command;
             if (_cmd < 0 || _cmd > 3) _cmd = 0;
+        }
+
+        /// <summary>Records the command for the Pokémon being commanded; asks the next one, or runs the turn.</summary>
+        void Commit(BattleCommand c)
+        {
+            c.Slot = _cmdSlot;
+            _pending.RemoveAll(x => x.Slot == _cmdSlot);
+            _pending.Add(c);
+            var next = _b.Live(0).FirstOrDefault(x => x.Slot > _cmdSlot);
+            if (next != null && c.Kind != BattleCommandKind.Run) { _cmdSlot = next.Slot; _cmd = 0; _move = 0; _mode = Mode.Command; return; }
+            Run(_b.DoTurn(new List<BattleCommand>(_pending)));
         }
 
         /// <summary>Starts showing an event. Returns true if it animates over several frames.</summary>
@@ -97,27 +128,31 @@ namespace PokeCreator.Runtime.UI
             {
                 case BattleEventKind.Message: Game.Message.Show(e.Text); return false;
                 case BattleEventKind.SendOut:
-                    if (e.Side == 1) _trainerVisible = false;
-                    _shownParty[e.Side] = e.Party; _visible[e.Side] = true; _faintDrop[e.Side] = 0;
-                    _shownHp[e.Side] = _b.Parties[e.Side][e.Party].HP;
-                    if (e.Side == 0) _shownExp = ExpFraction(_party[e.Party]);
-                    Game.Audio.PlaySe("Battle recall");
-                    Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
-                    return true;
-                case BattleEventKind.Withdraw: _visible[e.Side] = false; Game.Audio.PlaySe("Battle recall"); return true;
+                    {
+                        if (e.Side == 1) _trainerVisible = false;
+                        int k = Key(e.Side, e.Slot);
+                        _shownParty[k] = e.Party; _visible[k] = true; _faintDrop[k] = 0;
+                        _shownHp[k] = _b.Parties[e.Side][e.Party].HP;
+                        if (e.Side == 0) _shownExp[Math.Min(1, e.Slot)] = ExpFraction(_party[e.Party]);
+                        Game.Audio.PlaySe("Battle recall");
+                        Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
+                        return true;
+                    }
+                case BattleEventKind.Withdraw: _visible[Key(e.Side, e.Slot)] = false; Game.Audio.PlaySe("Battle recall"); return true;
                 case BattleEventKind.Hp: return true;
                 case BattleEventKind.Hit:
                     Game.Audio.PlaySe(e.Value > 100 ? "Battle damage super" : e.Value < 100 ? "Battle damage weak" : "Battle damage normal");
-                    _blink[e.Side] = 16; return true;
+                    _blink[Key(e.Side, SlotOf(e.Side, e.Party))] = 16; return true;
                 case BattleEventKind.Faint: Game.Audio.PlaySe("Pkmn faint"); return true;
                 case BattleEventKind.StatChange: Game.Audio.PlaySe(e.Value > 0 ? "Battle stat up" : "Battle stat down"); return true;
                 case BattleEventKind.Exp:
-                    if (e.Party != _shownParty[0]) return false;
+                    if (_shownParty[Key(0, SlotOf(0, e.Party))] != e.Party) return false;
                     Game.Audio.PlaySe("Pkmn exp gain"); return true;
                 case BattleEventKind.LevelUp:
                     {
                         var pk = _party[e.Party];
-                        if (e.Party == _shownParty[0]) { _shownHp[0] = pk.HP; _shownExp = 0; }
+                        int slot = SlotOf(0, e.Party);
+                        if (_shownParty[Key(0, slot)] == e.Party) { _shownHp[Key(0, slot)] = pk.HP; _shownExp[slot] = 0; }
                         Game.Audio.PlayMe("Pkmn level up");
                         _mode = Mode.Busy;
                         Game.Message.Show(e.Text, null, -1, _ =>
@@ -125,10 +160,14 @@ namespace PokeCreator.Runtime.UI
                         return false;
                     }
                 case BattleEventKind.Catch:
-                    if (e.Value < 0) return false; // the trainer blocked it
-                    _ballVisible = true; _ballCaught = e.Flag; _ballShakes = e.Value;
-                    Game.Audio.PlaySe("Battle throw");
-                    return true;
+                    {
+                        if (e.Value < 0) return false; // the trainer blocked it, or two targets
+                        var foe = _b.Live(1).FirstOrDefault();
+                        _ballSlot = foe != null ? foe.Slot : 0;
+                        _ballVisible = true; _ballCaught = e.Flag; _ballShakes = e.Value;
+                        Game.Audio.PlaySe("Battle throw");
+                        return true;
+                    }
                 case BattleEventKind.Flee: Game.Audio.PlaySe("Battle flee"); return false;
                 default: return false;
             }
@@ -143,40 +182,46 @@ namespace PokeCreator.Runtime.UI
             {
                 case BattleEventKind.Hp:
                     {
-                        if (e.Party != _shownParty[e.Side]) return true;
+                        int k = Key(e.Side, SlotOf(e.Side, e.Party));
+                        if (e.Party != _shownParty[k]) return true;
                         double target = e.Value2;
                         int max = Math.Max(1, _b.Parties[e.Side][e.Party].TotalHP(Game.Project));
                         double step = Math.Max(1, max / 48.0);
-                        if (Math.Abs(_shownHp[e.Side] - target) <= step) { _shownHp[e.Side] = target; return true; }
-                        _shownHp[e.Side] += Math.Sign(target - _shownHp[e.Side]) * step;
+                        if (Math.Abs(_shownHp[k] - target) <= step) { _shownHp[k] = target; return true; }
+                        _shownHp[k] += Math.Sign(target - _shownHp[k]) * step;
                         return false;
                     }
                 case BattleEventKind.Hit: return _anim >= 16;
                 case BattleEventKind.Faint:
-                    _faintDrop[e.Side] = _anim * 8;
-                    if (_anim >= 20) { _visible[e.Side] = false; return true; }
-                    return false;
+                    {
+                        int k = Key(e.Side, e.Slot);
+                        _faintDrop[k] = _anim * 8;
+                        if (_anim >= 20) { _visible[k] = false; return true; }
+                        return false;
+                    }
                 case BattleEventKind.SendOut: return _anim >= 12;
                 case BattleEventKind.Withdraw: return _anim >= 10;
                 case BattleEventKind.StatChange: return _anim >= 14;
                 case BattleEventKind.Exp:
                     {
                         var pk = _party[e.Party];
+                        int slot = SlotOf(0, e.Party);
                         double target = ExpFractionAt(pk, e.Value2);
-                        if (_shownExp >= target - 0.01 || _anim > 90) { _shownExp = target; return true; }
-                        _shownExp = Math.Min(target, _shownExp + 0.02);
+                        if (_shownExp[slot] >= target - 0.01 || _anim > 90) { _shownExp[slot] = target; return true; }
+                        _shownExp[slot] = Math.Min(target, _shownExp[slot] + 0.02);
                         return false;
                     }
                 case BattleEventKind.Catch:
                     {
                         // 0-30 throw, then 30 frames per shake, then burst or click
                         int end = 30 + _ballShakes * 30 + 20;
-                        if (_anim == 30) _visible[1] = false;
+                        int k = Key(1, _ballSlot);
+                        if (_anim == 30) _visible[k] = false;
                         if (_anim > 30 && (_anim - 30) % 30 == 0 && (_anim - 30) / 30 <= _ballShakes) Game.Audio.PlaySe("Battle ball shake");
                         if (_anim >= end)
                         {
                             if (_ballCaught) { Game.Audio.PlaySe("Battle catch click"); Game.Audio.PlayMe("Battle capture success"); }
-                            else { _ballVisible = false; _visible[1] = true; Game.Audio.PlaySe("Battle recall"); }
+                            else { _ballVisible = false; _visible[k] = true; Game.Audio.PlaySe("Battle recall"); }
                             return true;
                         }
                         return false;
@@ -209,17 +254,26 @@ namespace PokeCreator.Runtime.UI
             if (Input.Repeat(Button.Left) && _cmd % 2 == 1) { _cmd--; Cursor(); }
             if (Input.Repeat(Button.Down) && _cmd < 2) { _cmd += 2; Cursor(); }
             if (Input.Repeat(Button.Up) && _cmd >= 2) { _cmd -= 2; Cursor(); }
-            if (Input.Trigger(Button.Cancel) && _cmd != 3) { _cmd = 3; Cursor(); return; }
+            if (Input.Trigger(Button.Cancel))
+            {
+                // Double battles: back to the first Pokémon's command
+                var prev = _b.Live(0).LastOrDefault(x => x.Slot < _cmdSlot);
+                if (prev != null) { Cancel(); _pending.RemoveAll(x => x.Slot == prev.Slot); _cmdSlot = prev.Slot; return; }
+                if (_cmd != 3) { _cmd = 3; Cursor(); }
+                return;
+            }
             if (!Input.Trigger(Button.Action)) return;
             Decide();
             switch (_cmd)
             {
                 case 0:
-                    if (Me.Charging != null || Me.MustRecharge || !_b.HasUsableMove(Me)) { Run(_b.DoTurn(BattleCommand.Fight(-1))); return; }
+                    if (Me.Charging != null || Me.MustRecharge || !_b.HasUsableMove(Me)) { Commit(BattleCommand.Fight(-1)); return; }
                     _mode = Mode.Fight; if (_move >= Me.Pk.Moves.Count) _move = 0; break;
                 case 1: OpenBag(); break;
                 case 2: OpenParty(); break;
-                case 3: Run(_b.DoTurn(BattleCommand.Run())); break;
+                case 3:
+                    if (_cmdSlot != (_b.Live(0).FirstOrDefault() ?? Me).Slot) { Game.Message.Show("Only the first Pokémon can choose to run."); return; }
+                    Commit(BattleCommand.Run()); break;
             }
         }
 
@@ -234,7 +288,34 @@ namespace PokeCreator.Runtime.UI
             if (!Input.Trigger(Button.Action)) return;
             if (Me.Pk.Moves[_move].PP <= 0) { Buzz(); Game.Message.Show("There's no PP left for this move!"); return; }
             Decide();
-            Run(_b.DoTurn(BattleCommand.Fight(_move)));
+            // Double battles: pick a target for single-target moves
+            var md = Game.Project.Moves.FirstOrDefault(x => x.Id == Me.Pk.Moves[_move].Id);
+            string tg = md != null ? md.Target ?? "NearOther" : "NearOther";
+            if (_b.IsDouble && (tg == "NearOther" || tg == "NearFoe" || tg == "Other" || tg == "Foe"))
+            {
+                _targets = _b.Live(1).ToList();
+                if (tg == "NearOther" || tg == "Other") { var ally = _b.Field[0][1 - _cmdSlot]; if (ally != null && !ally.Pk.Fainted) _targets.Add(ally); }
+                if (_targets.Count > 1)
+                {
+                    _target = Math.Max(0, _targets.FindIndex(t => t.Side == 1 && t.Slot == _cmdSlot));
+                    _mode = Mode.Target;
+                    return;
+                }
+            }
+            Commit(BattleCommand.Fight(_move));
+        }
+
+        void TargetMenu()
+        {
+            if (Input.Repeat(Button.Right) || Input.Repeat(Button.Down)) { _target = (_target + 1) % _targets.Count; Cursor(); }
+            if (Input.Repeat(Button.Left) || Input.Repeat(Button.Up)) { _target = (_target + _targets.Count - 1) % _targets.Count; Cursor(); }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); _mode = Mode.Fight; return; }
+            if (!Input.Trigger(Button.Action)) return;
+            Decide();
+            var t = _targets[_target];
+            var c = BattleCommand.Fight(_move);
+            c.TargetSide = t.Side; c.TargetSlot = t.Slot;
+            Commit(c);
         }
 
         /// <summary>Items usable in battle: Poké Balls and medicine.</summary>
@@ -254,9 +335,8 @@ namespace PokeCreator.Runtime.UI
                 if (item == null || !BattleItem(item)) { Game.Message.Show("That can't be used now.", null, -1, _ => _mode = Mode.Command); return; }
                 if (item.Pocket == 3)
                 {
-                    if (!_setup.Wild) { Run(_b.DoTurn(BattleCommand.Ball(id))); return; }  // blocked, but still uses the turn
-                    Game.State.AddItem(id, -1);
-                    Run(_b.DoTurn(BattleCommand.Ball(id)));
+                    if (_setup.Wild && _b.Live(1).Count == 1) Game.State.AddItem(id, -1);
+                    Commit(BattleCommand.Ball(id));
                     return;
                 }
                 var info = ItemEffects.Info(Game.Project, item);
@@ -268,10 +348,12 @@ namespace PokeCreator.Runtime.UI
                     if (!ItemEffects.Use(Game.Project, test, item, info, -1, ctx).Used) { Game.Message.Show("It won't have any effect."); return; }
                     close();
                     Game.State.AddItem(id, -1);
-                    Run(_b.DoTurn(BattleCommand.UseItem(id, i)));
+                    Commit(BattleCommand.UseItem(id, i));
                 }, () => _mode = Mode.Command));
             }, BattleItem, () => _mode = Mode.Command));
         }
+
+        bool OnField(int party) { return _b.OnField.Any(x => x.Side == 0 && x.PartyIndex == party && !x.Pk.Fainted); }
 
         void OpenParty()
         {
@@ -279,22 +361,25 @@ namespace PokeCreator.Runtime.UI
             Game.PushScene(new PartyScene(Game, "Choose a Pokémon.", null, (i, close) =>
             {
                 var pk = _party[i];
-                if (i == Me.PartyIndex) { Game.Message.Show(pk.Name(Game.Project) + " is already in battle!"); return; }
+                if (OnField(i)) { Game.Message.Show(pk.Name(Game.Project) + " is already in battle!"); return; }
+                if (_pending.Any(c => c.Kind == BattleCommandKind.Switch && c.Index == i)) { Game.Message.Show(pk.Name(Game.Project) + " is already going into battle!"); return; }
                 if (!Battle.Able(pk)) { Game.Message.Show(pk.IsEgg ? "An Egg can't battle!" : pk.Name(Game.Project) + " has no energy left to battle!"); return; }
                 close();
-                Run(_b.DoTurn(BattleCommand.Switch(i)));
+                Commit(BattleCommand.Switch(i));
             }, () => _mode = Mode.Command));
         }
 
         void ChooseReplacement()
         {
             _mode = Mode.Busy;
+            int slot = _b.PlayerSlotsToFill[0];
             Game.PushScene(new PartyScene(Game, "Choose a Pokémon to send out.", null, (i, close) =>
             {
                 var pk = _party[i];
+                if (OnField(i)) { Game.Message.Show(pk.Name(Game.Project) + " is already in battle!"); return; }
                 if (!Battle.Able(pk)) { Game.Message.Show(pk.IsEgg ? "An Egg can't battle!" : pk.Name(Game.Project) + " has no energy left to battle!"); return; }
                 close();
-                Run(_b.SwitchAfterFaint(i));
+                Run(_b.SwitchAfterFaint(slot, i));
             }, () => ChooseReplacement())); // must choose one
         }
 
@@ -311,6 +396,8 @@ namespace PokeCreator.Runtime.UI
                 _trainerVisible = true;
                 var tr = _setup.Trainer;
                 if (tr != null && !string.IsNullOrEmpty(tr.LoseText)) steps.Add(next => Game.Message.Show(tr.LoseText, null, -1, _ => next()));
+                var tr2 = _setup.Trainer2;
+                if (tr2 != null && !string.IsNullOrEmpty(tr2.LoseText)) steps.Add(next => Game.Message.Show(tr2.LoseText, null, -1, _ => next()));
                 int money = Prize();
                 if (money > 0) steps.Add(next => { Game.State.Money += money; Game.Message.Show("\\PN got $" + money + " for winning!", null, -1, _ => next()); });
             }
@@ -373,14 +460,18 @@ namespace PokeCreator.Runtime.UI
             var tr = _setup.Trainer;
             int baseMoney = _setup.TrainerType != null ? _setup.TrainerType.BaseMoney : 30;
             int level = tr != null && tr.Pokemon.Count > 0 ? tr.Pokemon.Max(p => p.Level) : 5;
-            return baseMoney * level;
+            int total = baseMoney * level;
+            var tr2 = _setup.Trainer2;
+            if (tr2 != null && tr2.Pokemon.Count > 0) total += (_setup.TrainerType2 != null ? _setup.TrainerType2.BaseMoney : 30) * tr2.Pokemon.Max(p => p.Level);
+            return total;
         }
 
         int LossMoney()
         {
-            // Gen 4+: highest level × a factor that grows with badges (no badges yet: 8)
+            // Gen 4+: highest level × a factor that grows with the number of badges
             int level = _party.Count > 0 ? _party.Max(p => p.Level) : 1;
-            return level * 8;
+            int[] factor = { 8, 16, 24, 36, 48, 64, 80, 100, 120 };
+            return level * factor[Math.Min(8, Game.State.Badges.Count)];
         }
 
         void Finish()
@@ -394,32 +485,58 @@ namespace PokeCreator.Runtime.UI
         }
 
         // ------------------------------------------------------------------ drawing
+        /// <summary>Where a Pokémon stands: centre x and the bottom of its sprite.</summary>
+        void Pos(int side, int slot, out int x, out int bottom)
+        {
+            int slide = Math.Max(0, _introSlide);
+            if (!_b.IsDouble) { if (side == 1) { x = 384 + slide * 2; bottom = 200; } else { x = 128 - slide * 2; bottom = 288; } return; }
+            if (side == 1) { x = (slot == 0 ? 330 : 440) + slide * 2; bottom = slot == 0 ? 196 : 188; }
+            else { x = (slot == 0 ? 92 : 212) - slide * 2; bottom = 288; }
+        }
+
         public override void Draw(Gfx g)
         {
             DrawBackdrop(g);
-            int slide = Math.Max(0, _introSlide);
-            // Opponent
-            int foeX = 384 + slide * 2, foeBottom = 200;
+            int tx, tb; Pos(1, 0, out tx, out tb);
+            if (_b.IsDouble) tx = 384 + Math.Max(0, _introSlide) * 2;
             if (_trainerVisible && _setup.TrainerType != null)
             {
+                bool two = _setup.TrainerType2 != null;
                 var tex = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Trainers", _setup.TrainerType.Id));
-                if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, foeX - tex.Width / 2, foeBottom - tex.Height);
+                if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, (two ? tx - 56 : tx) - tex.Width / 2, 200 - tex.Height);
+                if (two)
+                {
+                    var tex2 = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Trainers", _setup.TrainerType2.Id));
+                    if (tex2 != null) g.Draw(tex2, 0, 0, tex2.Width, tex2.Height, tx + 56 - tex2.Width / 2, 200 - tex2.Height);
+                }
             }
-            if (_visible[1] && _shownParty[1] >= 0 && !(_blink[1] > 0 && (_blink[1]-- / 2) % 2 == 0))
-                DrawPokemon(g, _b.Parties[1][_shownParty[1]], false, foeX, foeBottom + _faintDrop[1]);
-            if (_ballVisible) DrawBall(g, foeX, foeBottom);
-            // Player
-            int meX = 128 - slide * 2, meBottom = 288;
-            if (_visible[0] && _shownParty[0] >= 0 && !(_blink[0] > 0 && (_blink[0]-- / 2) % 2 == 0))
-                DrawPokemon(g, _party[_shownParty[0]], true, meX, meBottom + _faintDrop[0]);
+            // Opponents (back row first), then the player's Pokémon
+            for (int side = 1; side >= 0; side--)
+                for (int slot = _b.IsDouble ? 1 : 0; slot >= 0; slot--)
+                {
+                    int k = Key(side, slot);
+                    if (!_visible[k] || _shownParty[k] < 0) continue;
+                    int x, bottom; Pos(side, slot, out x, out bottom);
+                    if (_blink[k] > 0 && (_blink[k]-- / 2) % 2 == 0) continue;
+                    var pk = _b.Parties[side][_shownParty[k]];
+                    DrawPokemon(g, pk, side == 0, x, bottom + _faintDrop[k]);
+                    if (_mode == Mode.Target && _targets.Count > _target && _targets[_target].Side == side && _targets[_target].Slot == slot && (Frame / 8) % 2 == 0)
+                        Ellipse(g, x, bottom - 2, 30, 6, new Color(248, 232, 80));
+                }
+            if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
             // Databoxes
-            if (_visible[1] && _shownParty[1] >= 0) DrawFoeBox(g, _b.Parties[1][_shownParty[1]]);
-            if (_visible[0] && _shownParty[0] >= 0) DrawPlayerBox(g, _party[_shownParty[0]]);
+            for (int slot = 0; slot < (_b.IsDouble ? 2 : 1); slot++)
+            {
+                int kf = Key(1, slot), km = Key(0, slot);
+                if (_visible[kf] && _shownParty[kf] >= 0) DrawFoeBox(g, _b.Parties[1][_shownParty[kf]], kf, slot);
+                if (_visible[km] && _shownParty[km] >= 0) DrawPlayerBox(g, _party[_shownParty[km]], km, slot);
+            }
             // Bottom box
             if (!Game.Message.Busy)
             {
                 if (_mode == Mode.Command) DrawCommands(g);
                 else if (_mode == Mode.Fight) DrawFight(g);
+                else if (_mode == Mode.Target) DrawTarget(g);
                 else MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
             }
         }
@@ -495,34 +612,59 @@ namespace PokeCreator.Runtime.UI
             g.FillRect(x - 2, y - 2, 4, 4, new Color(248, 248, 248));
         }
 
-        void DrawFoeBox(Gfx g, Pokemon pk)
+        void DrawFoeBox(Gfx g, Pokemon pk, int k, int slot)
         {
-            int x = 16, y = 30, w = 236, h = 62;
+            bool dbl = _b.IsDouble;
+            int x = 16, y = dbl ? 8 + slot * 54 : 30, w = 236, h = dbl ? 50 : 62;
             Ui.Panel(g, x, y, w, h, new Color(248, 248, 232), new Color(64, 80, 72));
             Ui.Text(g, x + 12, y + 2, pk.Name(Game.Project));
             Ui.GenderSymbol(g, x + 12 + g.TextWidth(pk.Name(Game.Project)) + 4, y + 2, pk.Gender);
             Ui.TextRight(g, x + w - 12, y + 2, "Lv" + pk.Level);
-            if (_setup.Wild && Game.State.Caught.Contains(pk.Species)) { g.FillRect(x + w - 26, y + 38, 10, 10, new Color(232, 56, 48)); g.FillRect(x + w - 26, y + 42, 10, 2, new Color(40, 40, 48)); }
+            int row = dbl ? 24 : 30;
+            if (_setup.Wild && Game.State.Caught.Contains(pk.Species)) { g.FillRect(x + w - 26, y + row + 8, 10, 10, new Color(232, 56, 48)); g.FillRect(x + w - 26, y + row + 12, 10, 2, new Color(40, 40, 48)); }
             string st = Ui.StatusAbbrev(pk.Status);
-            if (st != "") g.DrawText(x + 12, y + 30, st, new Color(232, 64, 48), Ui.DarkShadow);
-            g.DrawText(x + 72, y + 30, "HP", new Color(248, 176, 0), Ui.DarkShadow);
-            Ui.HpBar(g, x + 104, y + 42, 100, (int)Math.Round(_shownHp[1]), pk.TotalHP(Game.Project));
+            if (st != "") g.DrawText(x + 12, y + row, st, new Color(232, 64, 48), Ui.DarkShadow);
+            g.DrawText(x + 72, y + row, "HP", new Color(248, 176, 0), Ui.DarkShadow);
+            Ui.HpBar(g, x + 104, y + row + 12, 100, (int)Math.Round(_shownHp[k]), pk.TotalHP(Game.Project));
         }
 
-        void DrawPlayerBox(Gfx g, Pokemon pk)
+        void DrawPlayerBox(Gfx g, Pokemon pk, int k, int slot)
         {
-            int x = 262, y = 192, w = 240, h = 88;
+            bool dbl = _b.IsDouble;
+            int x = 262, y = dbl ? 196 + slot * 46 : 192, w = 240, h = dbl ? 44 : 88;
             Ui.Panel(g, x, y, w, h, new Color(248, 248, 232), new Color(64, 80, 72));
             Ui.Text(g, x + 16, y + 2, pk.Name(Game.Project));
             Ui.GenderSymbol(g, x + 16 + g.TextWidth(pk.Name(Game.Project)) + 4, y + 2, pk.Gender);
             Ui.TextRight(g, x + w - 12, y + 2, "Lv" + pk.Level);
+            int max = pk.TotalHP(Game.Project);
             string st = Ui.StatusAbbrev(pk.Status);
+            if (dbl)
+            {
+                // Compact box: no HP numbers (the bar shows how much is left)
+                if (st != "") g.DrawText(x + w - 60, y + 22, st, new Color(232, 64, 48), Ui.DarkShadow);
+                Ui.HpBar(g, x + 40, y + 30, 150, (int)Math.Round(_shownHp[k]), max);
+                Ui.ExpBar(g, x + 40, y + h - 5, 150, _shownExp[Math.Min(1, slot)]);
+                return;
+            }
             if (st != "") g.DrawText(x + 16, y + 28, st, new Color(232, 64, 48), Ui.DarkShadow);
             g.DrawText(x + 76, y + 28, "HP", new Color(248, 176, 0), Ui.DarkShadow);
-            int max = pk.TotalHP(Game.Project);
-            Ui.HpBar(g, x + 108, y + 40, 112, (int)Math.Round(_shownHp[0]), max);
-            Ui.TextRight(g, x + w - 16, y + 46, (int)Math.Round(_shownHp[0]) + "/" + max);
-            Ui.ExpBar(g, x + 40, y + h - 10, w - 60, _shownExp);
+            Ui.HpBar(g, x + 108, y + 40, 112, (int)Math.Round(_shownHp[k]), max);
+            Ui.TextRight(g, x + w - 16, y + 46, (int)Math.Round(_shownHp[k]) + "/" + max);
+            Ui.ExpBar(g, x + 40, y + h - 10, w - 60, _shownExp[0]);
+        }
+
+        void DrawTarget(Gfx g)
+        {
+            int by = g.Height - 100;
+            Ui.Panel(g, 4, by, g.Width - 8, 96, new Color(248, 248, 248), new Color(96, 88, 120));
+            Ui.Text(g, 24, by + 10, "Choose a target:");
+            for (int i = 0; i < _targets.Count; i++)
+            {
+                var t = _targets[i];
+                int cx = 40 + (i % 2) * 240, cy = by + 44 + (i / 2) * 26;
+                if (i == _target) Ui.Arrow(g, cx - 18, cy + 4);
+                Ui.Text(g, cx, cy, (t.Side == 0 ? "Ally " : "") + t.Pk.Name(Game.Project));
+            }
         }
 
         void DrawCommands(Gfx g)

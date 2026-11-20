@@ -34,7 +34,7 @@ namespace PokeCreator.Battles
         {
             get
             {
-                foreach (var b in Active) if (b != null && !b.Pk.Fainted && (HasAbility(b, "CLOUDNINE") || HasAbility(b, "AIRLOCK"))) return NoWeather;
+                foreach (var b in OnField) if (!b.Pk.Fainted && (HasAbility(b, "CLOUDNINE") || HasAbility(b, "AIRLOCK"))) return NoWeather;
                 return Weather;
             }
         }
@@ -75,9 +75,9 @@ namespace PokeCreator.Battles
             if (WeatherTurns > 0 && --WeatherTurns == 0) { Say(WeatherEndText(Weather)); Weather = NoWeather; return; }
             Say(WeatherOngoingText(Weather));
             if (EffWeather != Sandstorm && EffWeather != Hail) return;
-            foreach (var b in Active.OrderByDescending(x => Speed(x)))
+            foreach (var b in OnField.Where(x => !x.Pk.Fainted).OrderByDescending(x => Speed(x)).ToList())
             {
-                if (b == null || b.Pk.Fainted || b.Invulnerable) continue;
+                if (b.Pk.Fainted || b.Invulnerable) continue;
                 var types = b.Pk.Types(P);
                 if (HasAbility(b, "MAGICGUARD") || HasAbility(b, "OVERCOAT") || b.Pk.Item == "SAFETYGOGGLES") continue;
                 if (EffWeather == Sandstorm)
@@ -113,16 +113,19 @@ namespace PokeCreator.Battles
         void SwitchInAbility(Battler b)
         {
             if (b == null || b.Pk.Fainted) return;
-            var foe = Active[1 - b.Side];
+            var foe = Live(1 - b.Side).FirstOrDefault();
             switch (AbilityOf(b))
             {
                 case "INTIMIDATE":
-                    if (foe == null || foe.Pk.Fainted) break;
+                    if (foe == null) break;
                     Splash(b);
-                    if (HasAbility(foe, "CLEARBODY") || HasAbility(foe, "WHITESMOKE") || HasAbility(foe, "HYPERCUTTER") || HasAbility(foe, "FULLMETALBODY")
-                        || HasAbility(foe, "INNERFOCUS") || HasAbility(foe, "OBLIVIOUS") || HasAbility(foe, "OWNTEMPO") || HasAbility(foe, "SCRAPPY"))
-                        Say(Name(foe) + "'s " + AbilityName(foe) + " prevents its Attack from being lowered!");
-                    else ChangeStat(foe, PokeCreator.Pkmn.Stat.Attack, -1);
+                    foreach (var f in Live(1 - b.Side))
+                    {
+                        if (HasAbility(f, "CLEARBODY") || HasAbility(f, "WHITESMOKE") || HasAbility(f, "HYPERCUTTER") || HasAbility(f, "FULLMETALBODY")
+                            || HasAbility(f, "INNERFOCUS") || HasAbility(f, "OBLIVIOUS") || HasAbility(f, "OWNTEMPO") || HasAbility(f, "SCRAPPY"))
+                            Say(Name(f) + "'s " + AbilityName(f) + " prevents its Attack from being lowered!");
+                        else ChangeStat(f, PokeCreator.Pkmn.Stat.Attack, -1, b);
+                    }
                     break;
                 case "DRIZZLE": if (Weather != Rain) { Splash(b); StartWeather(Rain, b); } break;
                 case "DROUGHT": if (Weather != Sun) { Splash(b); StartWeather(Sun, b); } break;

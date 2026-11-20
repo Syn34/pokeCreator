@@ -49,6 +49,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - RMXP-compatible event commands: text with Essentials text codes, choices, Input Number, conditional branches, loops, labels, switches, variables, self switches, money, transfers with fades, audio (with Memorize/Restore BGM), screen tone/flash/shake, **pictures** (Show/Move/Rotate/Erase Picture, so Essentials' intro with Professor Oak plays), Change Text Options (position, frameless text), Return to Title
 - Common events: Call Common Event (and `pbCommonEvent`), autorun and parallel common events while their switch is ON
 - **Battles**: wild battles from grass and events, trainer battles from the database (`TrainerBattle.start` / `pbTrainerBattle`, `WildBattle.start` / `pbWildBattle`). Essentials-style screen with battlebacks, databoxes, HP and EXP bars; Fight / Bag / Pokémon / Run; switching; Potions and Poké Balls in battle; catching with ball shakes; EXP, level ups, move learning and evolution afterwards; prize money and the trainer's defeat line; blacking out returns you to the last Pokémon Center (`pbSetPokemonCenter`). A Conditional Branch around `TrainerBattle.start` runs its commands only if the player won, as in Essentials. The Studio palette has Trainer Battle and Wild Battle commands
+- **Double battles**: one trainer sending out two Pokémon (`setBattleRule("double")`), two trainers at once (`TrainerBattle.start(:CAMPER, "Jeff", :PICNICKER, "Susie")`, `pbDoubleTrainerBattle`) and double wild battles (`WildBattle.start(:PIDGEY, 5, :RATTATA, 5)`). You choose a move and target for each Pokémon; moves like Surf and Earthquake hit several Pokémon (0.75× damage), each trainer sends out their own replacements, and prizes from both trainers add up. The Studio palette has Double Battle commands
 - **Abilities and battle weather**: about 90 common abilities (Intimidate, Levitate, Blaze/Torrent/Overgrow, Static, Sturdy, Swift Swim, Drizzle, Flash Fire, Volt Absorb, Wonder Guard, Speed Boost, Guts, Huge Power, Technician, Mold Breaker...), rain, sun, sandstorm and hail (from Rain Dance & co., abilities, or the map's weather), weather-dependent moves (Solar Beam, Thunder, Blizzard, Weather Ball, Moonlight), and common held items (Choice items, Life Orb, Focus Sash, type-boosting items, Rocky Helmet, Eviolite...)
 - **Bag items work**: Potions, status heals, Revives, Ethers/Elixirs, PP Up, Rare Candy, Exp. Candy, vitamins, feathers, mints, Repels (wild Pokémon weaker than your lead stay away), TMs/HMs, and evolution stones. Give and take held items from the Bag or the party
 - **Evolution** by level, stone, happiness, time of day, held item, known move, party member and more (Essentials' methods that don't need a battle), with the evolution screen (B cancels a level evolution) and "forget a move?" when learning a fifth move
@@ -69,7 +70,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 
 **Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
 
-**Not yet:** double battles and battle animations. See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Not yet:** battle animations, triple battles, Mega Evolution. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Quick start (Windows)
 

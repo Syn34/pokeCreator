@@ -519,14 +519,25 @@ namespace PokeCreator.Runtime.Script
                 return true;
             });
             Register("setBattleRule", (c, a) => { _battleRules[Str(a, 0)] = a.Count > 1 ? a[1] : true; return true; });
-            Register("TrainerBattle.start", (c, a) => TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 2 && !(a[2] is string) ? ToInt(a[2]) : 0, c));
+            Register("TrainerBattle.start", (c, a) => TrainerBattleArgs(a, c));
             Register("pbTrainerBattle", (c, a) =>
             {
                 if (a.Count > 5 && Truthy(a[5])) _battleRules["canLose"] = true;
                 return TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 4 ? ToInt(a[4]) : 0, c);
             });
-            Register("pbDoubleTrainerBattle", (c, a) => TrainerBattle(Str(a, 0), Str(a, 1), a.Count > 2 && !(a[2] is string) ? ToInt(a[2]) : 0, c));
-            Register("WildBattle.start", (c, a) => WildBattle(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false, c));
+            // pbDoubleTrainerBattle(type1, name1, version1, speech1, type2, name2, version2, speech2)
+            Register("pbDoubleTrainerBattle", (c, a) =>
+            {
+                if (a.Count > 8 && Truthy(a[8])) _battleRules["canLose"] = true;
+                return TrainerBattleList(new List<object[]> { new object[] { Str(a, 0), Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0 }, new object[] { Str(a, 4), Str(a, 5), a.Count > 6 ? ToInt(a[6]) : 0 } }, c);
+            });
+            Register("WildBattle.start", (c, a) =>
+            {
+                // WildBattle.start(:SPECIES, level) or two pairs for a double battle
+                if (a.Count >= 4 && a[2] is string) return DoubleWildBattle(Str(a, 0), ToInt(a[1]), Str(a, 2), ToInt(a[3]), false, c);
+                return WildBattle(Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 5, false, c);
+            });
+            Register("pbDoubleWildBattle", (c, a) => DoubleWildBattle(Str(a, 0), ToInt(Arg(a, 1)), Str(a, 2), ToInt(Arg(a, 3)), true, c));
             Register("pbWildBattle", (c, a) =>
             {
                 if (a.Count > 4 && Truthy(a[4])) _battleRules["canLose"] = true;
@@ -632,6 +643,65 @@ namespace PokeCreator.Runtime.Script
         readonly Dictionary<string, object> _battleRules = new Dictionary<string, object>();
 
         bool TakeRule(string name) { object v; bool on = _battleRules.TryGetValue(name, out v) && Truthy(v); return on; }
+
+        /// <summary>TrainerBattle.start(:TYPE, "Name"[, version][, :TYPE2, "Name2"[, version2]]).</summary>
+        object TrainerBattleArgs(List<object> a, Interpreter ctx)
+        {
+            var list = new List<object[]>();
+            int i = 0;
+            while (i + 1 < a.Count && list.Count < 2)
+            {
+                string type = Str(a, i), name = Str(a, i + 1); i += 2;
+                int version = 0;
+                if (i < a.Count && !(a[i] is string) && a[i] != null) { version = ToInt(a[i]); i++; }
+                list.Add(new object[] { type, name, version });
+            }
+            if (list.Count == 0) return true;
+            return TrainerBattleList(list, ctx);
+        }
+
+        /// <summary>One trainer (a double battle if setBattleRule("double") was used), or two trainers in a double battle.</summary>
+        object TrainerBattleList(List<object[]> trainers, Interpreter ctx)
+        {
+            bool dbl = trainers.Count > 1 || IsDoubleRule();
+            if (!dbl) return TrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], ctx);
+            if (_game.ResumeOutcome.HasValue && ctx != null && _game.ResumeOwner == ctx)
+            {
+                var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
+                return o == PokeCreator.Battles.BattleOutcome.Win;
+            }
+            bool canLose = TakeRule("canLose");
+            int outcomeVar = OutcomeVar();
+            _battleRules.Clear();
+            var t2 = trainers.Count > 1 ? trainers[1] : null;
+            if (!_game.StartDoubleTrainerBattle((string)trainers[0][0], (string)trainers[0][1], (int)trainers[0][2], t2 != null ? (string)t2[0] : null, t2 != null ? (string)t2[1] : null, t2 != null ? (int)t2[2] : 0, canLose, o => _game.State.SetVar(outcomeVar, (int)o)))
+            {
+                WarnOnce("Double trainer battle skipped (trainer not found in the database, or no Pokémon that can battle)");
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>setBattleRule("double") / ("2v2") / ("size", "2v2").</summary>
+        bool IsDoubleRule()
+        {
+            object v;
+            if (TakeRule("double") || TakeRule("2v2")) return true;
+            return _battleRules.TryGetValue("size", out v) && Convert.ToString(v).StartsWith("2v");
+        }
+
+        object DoubleWildBattle(string s1, int l1, string s2, int l2, bool asBool, Interpreter ctx)
+        {
+            if (_game.ResumeOutcome.HasValue && ctx != null && _game.ResumeOwner == ctx)
+            {
+                var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
+                return asBool ? (object)(o != PokeCreator.Battles.BattleOutcome.Loss) : (int)o;
+            }
+            int outcomeVar = OutcomeVar();
+            _battleRules.Clear();
+            _game.StartDoubleWildBattle(s1, l1, s2, l2, o => _game.State.SetVar(outcomeVar, (int)o));
+            return asBool ? (object)true : 1;
+        }
 
         /// <summary>Starts a trainer battle, or (when the event re-checks after it) returns whether the player won.</summary>
         object TrainerBattle(string type, string name, int version, Interpreter ctx)

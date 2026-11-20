@@ -391,6 +391,52 @@ namespace PokeCreator.Runtime
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
+        /// <summary>Double wild battle against two Pokémon (falls back to a single battle if the player has one Pokémon that can fight).</summary>
+        public void StartDoubleWildBattle(string species1, int level1, string species2, int level2, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var w1 = PokeCreator.Pkmn.Pokemon.Create(Project, species1, level1, Rng);
+            var w2 = PokeCreator.Pkmn.Pokemon.Create(Project, species2, level2, Rng);
+            if (w1.Data(Project) == null || w2.Data(Project) == null || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { w1, w2 }, true, Rng, true) { PlayerName = State.PlayerName };
+            b.AlreadyCaught = sp => State.Caught.Contains(sp);
+            StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
+        }
+
+        /// <summary>Double battle against two trainers (each sends out one Pokémon), or one trainer if the second is null.</summary>
+        public bool StartDoubleTrainerBattle(string type1, string name1, int version1, string type2, string name2, int version2, bool canLose, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            Func<string, string, int, PokeCreator.Data.TrainerData> find = (t, n, v) => Project.Trainers.FirstOrDefault(x => x.TrainerType == t && x.Name == n && x.Version == v) ?? Project.Trainers.FirstOrDefault(x => x.TrainerType == t && x.Name == n);
+            var tr1 = find(type1, name1, version1);
+            var tr2 = type2 != null ? find(type2, name2, version2) : null;
+            if (tr1 == null || tr1.Pokemon.Count == 0) { Console.WriteLine("Trainer not found: " + type1 + " " + name1); return false; }
+            if (type2 != null && (tr2 == null || tr2.Pokemon.Count == 0)) { Console.WriteLine("Trainer not found: " + type2 + " " + name2); return false; }
+            if (!PartyCanBattle) return false;
+            var tt1 = Project.TrainerTypes.FirstOrDefault(t => t.Id == type1);
+            var tt2 = tr2 != null ? Project.TrainerTypes.FirstOrDefault(t => t.Id == type2) : null;
+            var foes = tr1.Pokemon.Select(tp => PokeCreator.Pkmn.Pokemon.FromTrainer(Project, tp, Rng)).ToList();
+            int[] owner = null;
+            if (tr2 != null)
+            {
+                var more = tr2.Pokemon.Select(tp => PokeCreator.Pkmn.Pokemon.FromTrainer(Project, tp, Rng)).ToList();
+                owner = Enumerable.Repeat(0, foes.Count).Concat(Enumerable.Repeat(1, more.Count)).ToArray();
+                foes.AddRange(more);
+            }
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, true)
+            {
+                PlayerName = State.PlayerName, TrainerName = tr1.Name,
+                TrainerTypeName = tt1 != null && !string.IsNullOrEmpty(tt1.Name) ? tt1.Name : type1,
+                TrainerSkill = Math.Max(tt1 != null ? tt1.SkillLevel : 0, tt2 != null ? tt2.SkillLevel : 0),
+            };
+            if (tr2 != null)
+            {
+                b.Trainer2Name = tr2.Name;
+                b.Trainer2TypeName = tt2 != null && !string.IsNullOrEmpty(tt2.Name) ? tt2.Name : type2;
+                b.FoeOwner = owner;
+            }
+            StartBattle(b, new BattleSetup { Wild = false, Trainer = tr1, TrainerType = tt1, Trainer2 = tr2, TrainerType2 = tt2, Backdrop = Backdrop(), CanLose = canLose, OnEnd = onEnd });
+            return true;
+        }
+
         /// <summary>Trainer battle from trainers.json. Returns false if there's no such trainer.</summary>
         public bool StartTrainerBattle(string type, string name, int version, bool canLose, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {

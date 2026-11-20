@@ -33,7 +33,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Battle weather, ~90 common abilities, common held items
 - [ ] Remaining abilities and items, terrain, entry hazards (incremental)
 - [ ] Battle animations for moves
-- [ ] Double battles
+- [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
 
 ## v0.4: World features
 - [x] Field moves: Surf, Cut, Strength, Rock Smash, Headbutt; berry plants (picking)

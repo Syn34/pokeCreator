@@ -111,6 +111,7 @@ namespace PokeCreator.Studio.Editors
                         if (wb.Success) return "◆ Wild Battle: " + wb.Groups[1].Value + " Lv. " + wb.Groups[2].Value;
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
                         if (gm.Success) return "◆ Give Item: " + gm.Groups[1].Value + (gm.Groups[2].Success ? " ×" + gm.Groups[2].Value : "");
+                        if (sc.Replace(" ", "") == "setBattleRule(\"double\")") return "◆ Next Battle Is a Double Battle";
                         if (sc == "pbSmashThisEvent") return "◆ Remove This Event (until the map is re-entered)";
                         if (sc == "pbRockSmashRandomEncounter") return "◆ Maybe a Wild Pokémon (Rock Smash encounters)";
                         if (sc == "pbHeadbutt") return "◆ Headbutt Tree (Headbutt encounters)";
@@ -157,6 +158,8 @@ namespace PokeCreator.Studio.Editors
                 case 12:
                     {
                         string sc = c.StrParam(1).Trim();
+                        var tb2 = System.Text.RegularExpressions.Regex.Match(sc, @"^TrainerBattle\.start\(\s*:(\w+)\s*,\s*""([^""]*)""(?:\s*,\s*\d+)?\s*,\s*:(\w+)\s*,\s*""([^""]*)""");
+                        if (tb2.Success) return "won Double Battle against " + tb2.Groups[1].Value + " " + tb2.Groups[2].Value + " and " + tb2.Groups[3].Value + " " + tb2.Groups[4].Value;
                         var tb = System.Text.RegularExpressions.Regex.Match(sc, @"^(?:TrainerBattle\.start|pbTrainerBattle)\(\s*:(\w+)\s*,\s*""([^""]*)""(?:\s*,\s*(\d+))?");
                         if (tb.Success) return "won Trainer Battle against " + tb.Groups[1].Value + " " + tb.Groups[2].Value + (tb.Groups[3].Success && tb.Groups[3].Value != "0" ? " (version " + tb.Groups[3].Value + ")" : "");
                         if (sc == "pbCut") return "the player uses Cut";

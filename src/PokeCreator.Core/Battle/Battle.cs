@@ -16,6 +16,7 @@ namespace PokeCreator.Battles
         public BattleEventKind Kind;
         public int Side;            // 0 player, 1 opponent
         public int Party;           // party index on that side
+        public int Slot;            // position on the field (0, or 0/1 in double battles) for SendOut / Faint
         public string Text;
         public int Value, Value2;   // HP from/to, EXP amount, shakes...
         public bool Flag;           // caught, critical...
@@ -30,7 +31,10 @@ namespace PokeCreator.Battles
         public BattleCommandKind Kind;
         public int Index;       // move slot, party index to switch to / use the item on
         public string Item;
+        public int Slot;        // which of the player's Pokémon this is for (double battles)
+        public int TargetSide = -1, TargetSlot; // chosen target (-1 = automatic)
         public static BattleCommand Fight(int slot) { return new BattleCommand { Kind = BattleCommandKind.Fight, Index = slot }; }
+        public static BattleCommand Fight(int slot, int fieldSlot, int targetSide, int targetSlot) { return new BattleCommand { Kind = BattleCommandKind.Fight, Index = slot, Slot = fieldSlot, TargetSide = targetSide, TargetSlot = targetSlot }; }
         public static BattleCommand Switch(int party) { return new BattleCommand { Kind = BattleCommandKind.Switch, Index = party }; }
         public static BattleCommand UseItem(string item, int party) { return new BattleCommand { Kind = BattleCommandKind.Item, Item = item, Index = party }; }
         public static BattleCommand Ball(string item) { return new BattleCommand { Kind = BattleCommandKind.Ball, Item = item }; }
@@ -54,6 +58,8 @@ namespace PokeCreator.Battles
         public bool FlashFire;          // Flash Fire boost active
         public bool AbilitySuppressed;  // Gastro Acid etc.
         public bool MovedLast;          // moved after the other Pokémon this turn (Analytic)
+        public int Slot;                // position on the field
+        public bool FaintShown;         // "X fainted!" already shown
         public Battler(Pokemon pk, int side, int idx) { Pk = pk; Side = side; PartyIndex = idx; }
         public void Reset() { Stages = new int[8]; Confusion = 0; ToxicCount = 0; BindTurns = 0; CritStage = 0; Flinched = false; MustRecharge = false; Protected = false; ProtectChain = 0; Charging = null; Invulnerable = false; TurnsOut = 0; }
     }
@@ -61,30 +67,78 @@ namespace PokeCreator.Battles
     public enum BattleOutcome { Ongoing = 0, Win = 1, Loss = 2, Escaped = 3, Caught = 4 }
 
     /// <summary>
-    /// Single battles (wild or trainer). The screen asks for a command each turn, calls DoTurn, and plays the
-    /// returned events. State changes (HP, PP, status, EXP) are applied to the Pokémon as the turn runs.
+    /// Single and double battles (wild or trainer). The screen asks for a command for each of the player's Pokémon,
+    /// calls DoTurn, and plays the returned events. State changes (HP, PP, status, EXP) are applied as the turn runs.
     /// </summary>
     public partial class Battle
     {
         public readonly Project P;
         public readonly Random Rng;
         public readonly List<Pokemon>[] Parties = new List<Pokemon>[2];
-        public readonly Battler[] Active = new Battler[2];
+        /// <summary>Pokémon on the field: Field[side][slot]; slot 1 is only used in double battles. Empty = null.</summary>
+        public readonly Battler[][] Field = { new Battler[2], new Battler[2] };
+        /// <summary>1 for single battles, 2 for double battles.</summary>
+        public int SlotsPerSide { get; private set; }
+        public bool IsDouble { get { return SlotsPerSide == 2; } }
+        /// <summary>Slot 0 of each side (what single-battle code means by "the" Pokémon).</summary>
+        public Battler[] Active { get { return new[] { Field[0][0], Field[1][0] }; } }
         public readonly bool IsWild;
         public string TrainerName, TrainerTypeName, PlayerName = "Red";
+        /// <summary>Two-trainer double battles: the second trainer, and which trainer (0/1) owns each foe party member.</summary>
+        public string Trainer2Name, Trainer2TypeName;
+        public int[] FoeOwner;
+        bool TwoTrainers { get { return FoeOwner != null && !string.IsNullOrEmpty(Trainer2Name); } }
+        /// <summary>"Camper Jeff" for the trainer owning this foe party member.</summary>
+        string TrainerLabel(int party) { return TwoTrainers && party < FoeOwner.Length && FoeOwner[party] == 1 ? Trainer2TypeName + " " + Trainer2Name : TrainerTypeName + " " + TrainerName; }
+        string AllTrainers { get { return TwoTrainers ? TrainerTypeName + " " + TrainerName + " and " + Trainer2TypeName + " " + Trainer2Name : TrainerTypeName + " " + TrainerName; } }
         public int TrainerSkill;
         public BattleOutcome Outcome;
         public int Turn, RunAttempts;
-        public bool NeedPlayerSwitch;      // the player's Pokémon fainted and another must come out
+        /// <summary>Player slots whose Pokémon fainted and must be replaced before the next turn.</summary>
+        public readonly List<int> PlayerSlotsToFill = new List<int>();
+        public bool NeedPlayerSwitch { get { return PlayerSlotsToFill.Count > 0; } }
         public readonly HashSet<int> LeveledUp = new HashSet<int>();  // party indexes to check for evolution afterwards
         public Pokemon CaughtPokemon;
         readonly Dictionary<int, HashSet<int>> _participants = new Dictionary<int, HashSet<int>>(); // foe party index -> player party indexes
         List<BattleEvent> _ev;
 
-        public Battle(Project p, List<Pokemon> playerParty, List<Pokemon> foeParty, bool wild, Random rng)
+        public Battle(Project p, List<Pokemon> playerParty, List<Pokemon> foeParty, bool wild, Random rng, bool doubleBattle = false)
         {
             P = p; Rng = rng ?? new Random(); Parties[0] = playerParty; Parties[1] = foeParty; IsWild = wild;
+            // A double battle needs two Pokémon that can fight on each side
+            SlotsPerSide = doubleBattle && playerParty.Count(Able) >= 2 && foeParty.Count(Able) >= 2 ? 2 : 1;
         }
+
+        /// <summary>Every Pokémon on the field (fainted ones included until they're replaced).</summary>
+        public IEnumerable<Battler> OnField
+        {
+            get { for (int s = 0; s < 2; s++) for (int i = 0; i < SlotsPerSide; i++) if (Field[s][i] != null) yield return Field[s][i]; }
+        }
+        /// <summary>Pokémon of a side that can still fight.</summary>
+        public List<Battler> Live(int side) { return Field[side].Take(SlotsPerSide).Where(b => b != null && !b.Pk.Fainted).ToList(); }
+        bool OnFieldParty(int side, int party) { return Field[side].Take(SlotsPerSide).Any(b => b != null && b.PartyIndex == party); }
+        Battler Ally(Battler b) { if (!IsDouble) return null; var a = Field[b.Side][1 - b.Slot]; return a != null && !a.Pk.Fainted ? a : null; }
+        /// <summary>An opposing Pokémon that can be hit: the chosen one, or another if it fainted.</summary>
+        Battler OpponentFor(Battler user, Battler preferred)
+        {
+            if (preferred != null && !preferred.Pk.Fainted && preferred.Side != user.Side) return preferred;
+            var foes = Live(1 - user.Side);
+            return foes.Count == 0 ? null : foes.FirstOrDefault(f => f.Slot == user.Slot) ?? foes[0];
+        }
+
+        string Names(List<Battler> list) { return list.Count == 2 ? list[0].Pk.Name(P) + " and " + list[1].Pk.Name(P) : list.Count == 1 ? list[0].Pk.Name(P) : ""; }
+
+        Battler Place(int side, int slot, int party)
+        {
+            var b = new Battler(Parties[side][party], side, party) { Slot = slot };
+            Field[side][slot] = b;
+            return b;
+        }
+
+        /// <summary>The next able party members not already on the field.</summary>
+        List<int> Bench(int side) { return Enumerable.Range(0, Parties[side].Count).Where(i => Able(Parties[side][i]) && !OnFieldParty(side, i)).ToList(); }
+        /// <summary>The bench for one foe slot: with two trainers, slot 0 is the first trainer's and slot 1 the second's.</summary>
+        List<int> FoeBench(int slot) { var b = Bench(1); return TwoTrainers ? b.Where(i => i < FoeOwner.Length && FoeOwner[i] == slot).ToList() : b; }
 
         // ------------------------------------------------------------------ helpers
         public static bool Able(Pokemon pk) { return pk != null && !pk.IsEgg && !pk.Fainted; }
@@ -96,40 +150,56 @@ namespace PokeCreator.Battles
         string NameL(Battler b) { string n = Name(b); return n.StartsWith("The ") ? "the " + n.Substring(4) : n; }
         MoveData Move(string id) { return P.Moves.FirstOrDefault(m => m.Id == id); }
         void Say(string text) { _ev.Add(new BattleEvent { Kind = BattleEventKind.Message, Text = text }); }
-        void Hp(Battler b, int from) { _ev.Add(new BattleEvent { Kind = BattleEventKind.Hp, Side = b.Side, Party = b.PartyIndex, Value = from, Value2 = b.Pk.HP }); }
+        void Hp(Battler b, int from) { _ev.Add(new BattleEvent { Kind = BattleEventKind.Hp, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Value = from, Value2 = b.Pk.HP }); }
+        void SendOutEvent(Battler b) { _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot }); }
 
         /// <summary>Starts the battle: send-out messages. Call once.</summary>
         public List<BattleEvent> Start()
         {
             _ev = new List<BattleEvent>();
-            int f = FirstAble(1);
-            Active[1] = new Battler(Parties[1][f], 1, f);
+            var foes = new List<Battler>();
+            if (TwoTrainers)
+                for (int i = 0; i < SlotsPerSide; i++) { var fb = FoeBench(i); if (fb.Count > 0) foes.Add(Place(1, i, fb[0])); }
+            else
+            {
+                var foeBench = Bench(1);
+                for (int i = 0; i < SlotsPerSide && i < foeBench.Count; i++) foes.Add(Place(1, i, foeBench[i]));
+            }
             if (IsWild)
             {
-                _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = f });
-                Say("A wild " + Active[1].Pk.Name(P) + " appeared!");
+                foreach (var b in foes) SendOutEvent(b);
+                Say(foes.Count == 2 ? "Oh! A wild " + foes[0].Pk.Name(P) + " and " + foes[1].Pk.Name(P) + " appeared!" : "A wild " + foes[0].Pk.Name(P) + " appeared!");
+            }
+            else if (TwoTrainers)
+            {
+                Say("You are challenged by " + AllTrainers + "!");
+                foreach (var b in foes) { Say(TrainerLabel(b.PartyIndex) + " sent out " + b.Pk.Name(P) + "!"); SendOutEvent(b); }
             }
             else
             {
                 Say(TrainerTypeName + " " + TrainerName + " would like to battle!");
-                Say(TrainerTypeName + " " + TrainerName + " sent out " + Active[1].Pk.Name(P) + "!");
-                _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = f });
+                Say(TrainerTypeName + " " + TrainerName + " sent out " + Names(foes) + "!");
+                foreach (var b in foes) SendOutEvent(b);
             }
-            int pi = FirstAble(0);
-            Active[0] = new Battler(Parties[0][pi], 0, pi);
-            Say("Go! " + Active[0].Pk.Name(P) + "!");
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 0, Party = pi });
+            var mine = new List<Battler>();
+            var myBench = Bench(0);
+            for (int i = 0; i < SlotsPerSide && i < myBench.Count; i++) mine.Add(Place(0, i, myBench[i]));
+            Say("Go! " + Names(mine) + "!");
+            foreach (var b in mine) SendOutEvent(b);
             MarkParticipant();
             if (Weather != NoWeather) Say(WeatherFieldText(Weather));
-            foreach (var b in Active.OrderByDescending(x => Speed(x)).ToList()) SwitchInAbility(b);
+            foreach (var b in OnField.OrderByDescending(x => Speed(x)).ToList()) SwitchInAbility(b);
             return _ev;
         }
 
         void MarkParticipant()
         {
-            HashSet<int> set;
-            if (!_participants.TryGetValue(Active[1].PartyIndex, out set)) _participants[Active[1].PartyIndex] = set = new HashSet<int>();
-            set.Add(Active[0].PartyIndex);
+            foreach (var foe in Live(1))
+            {
+                HashSet<int> set;
+                if (!_participants.TryGetValue(foe.PartyIndex, out set)) _participants[foe.PartyIndex] = set = new HashSet<int>();
+                foreach (var me in Live(0)) set.Add(me.PartyIndex);
+            }
         }
 
         /// <summary>Moves the player's Pokémon can use (with PP); Struggle if none.</summary>
@@ -138,44 +208,68 @@ namespace PokeCreator.Battles
         // ------------------------------------------------------------------ turns
         public List<BattleEvent> DoTurn(BattleCommand player)
         {
+            if (player != null) player.Slot = 0;
+            return DoTurn(new List<BattleCommand> { player });
+        }
+
+        /// <summary>One turn. commands: one per player Pokémon on the field (BattleCommand.Slot says which).</summary>
+        public List<BattleEvent> DoTurn(List<BattleCommand> commands)
+        {
             _ev = new List<BattleEvent>();
             Turn++;
-            var me = Active[0]; var foe = Active[1];
-            me.SwitchedIn = foe.SwitchedIn = false;
-            // A charging or recharging Pokémon has its command decided for it
-            if (me.Charging != null || me.MustRecharge) player = BattleCommand.Fight(me.ChargingSlot);
-            var foeCmd = foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe, me);
-
-            // Non-move actions go first: run, items, balls, switching
-            if (player.Kind == BattleCommandKind.Run)
+            foreach (var b in OnField) { b.SwitchedIn = false; b.MovedLast = false; }
+            var orders = new List<KeyValuePair<Battler, BattleCommand>>();
+            foreach (var me in Live(0))
             {
-                if (TryRun()) return _ev;
-                player = null;
+                var cmd = commands.FirstOrDefault(c => c != null && c.Slot == me.Slot) ?? BattleCommand.Fight(-1);
+                // A charging or recharging Pokémon has its command decided for it
+                if (me.Charging != null || me.MustRecharge) cmd = new BattleCommand { Kind = BattleCommandKind.Fight, Index = me.ChargingSlot, Slot = me.Slot, TargetSide = cmd.TargetSide, TargetSlot = cmd.TargetSlot };
+                orders.Add(new KeyValuePair<Battler, BattleCommand>(me, cmd));
             }
-            else if (player.Kind == BattleCommandKind.Ball) { ThrowBall(player.Item); if (Outcome != BattleOutcome.Ongoing) return _ev; player = null; }
-            else if (player.Kind == BattleCommandKind.Item) { UseItem(player.Item, player.Index); player = null; }
-            else if (player.Kind == BattleCommandKind.Switch) { SwitchPlayer(player.Index); player = null; me = Active[0]; }
+            foreach (var foe in Live(1))
+                orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe)));
 
-            if (player != null && foeCmd.Kind == BattleCommandKind.Fight)
+            // Non-move actions go first: run, balls, items, switching
+            foreach (var o in orders.Where(x => x.Key.Side == 0).ToList())
             {
-                // Both attack: priority, then speed (ties at random)
-                var myMove = MoveFor(me, player.Index); var foeMove = MoveFor(foe, foeCmd.Index);
-                int pa = myMove != null ? myMove.Priority : 0, pb = foeMove != null ? foeMove.Priority : 0;
-                bool meFirst = pa != pb ? pa > pb : Speed(me) != Speed(foe) ? Speed(me) > Speed(foe) : Rng.Next(2) == 0;
-                me.MovedLast = !meFirst; foe.MovedLast = meFirst;
-                if (meFirst) { Act(me, foe, player.Index); if (!Ended()) Act(foe, me, foeCmd.Index); }
-                else { Act(foe, me, foeCmd.Index); if (!Ended()) Act(me, foe, player.Index); }
+                var cmd = o.Value;
+                if (cmd.Kind == BattleCommandKind.Run) { if (TryRun()) return _ev; orders.Remove(o); break; }
+                if (cmd.Kind == BattleCommandKind.Ball) { ThrowBall(cmd.Item); if (Outcome != BattleOutcome.Ongoing) return _ev; orders.Remove(o); }
+                else if (cmd.Kind == BattleCommandKind.Item) { UseItem(cmd.Item, cmd.Index); orders.Remove(o); }
+                else if (cmd.Kind == BattleCommandKind.Switch) { SwitchPlayer(o.Key.Slot, cmd.Index); orders.Remove(o); }
             }
-            else if (player != null) { me.MovedLast = true; Act(me, foe, player.Index); }
-            else if (foeCmd.Kind == BattleCommandKind.Fight) { foe.MovedLast = true; Act(foe, Active[0], foeCmd.Index); }
+            orders.RemoveAll(o => o.Value.Kind != BattleCommandKind.Fight);
 
-            if (!Ended()) EndOfTurn();
+            // Moves: priority, then speed (ties at random)
+            var tie = orders.ToDictionary(o => o.Key, o => Rng.Next(1000));
+            orders = orders.OrderByDescending(o => { var md = MoveFor(o.Key, o.Value.Index); return md != null ? md.Priority : 0; })
+                           .ThenByDescending(o => Speed(o.Key)).ThenBy(o => tie[o.Key]).ToList();
+            for (int i = 0; i < orders.Count; i++)
+            {
+                var user = orders[i].Key; var cmd = orders[i].Value;
+                if (Outcome != BattleOutcome.Ongoing) break;
+                if (user.Pk.Fainted || Field[user.Side][user.Slot] != user) continue;
+                if (Live(1 - user.Side).Count == 0 && Live(user.Side).Count > 0 && !SelfTargeting(user, cmd.Index)) continue;
+                user.MovedLast = i == orders.Count - 1;
+                Battler target = cmd.TargetSide >= 0 && cmd.TargetSlot >= 0 && cmd.TargetSlot < SlotsPerSide ? Field[cmd.TargetSide][cmd.TargetSlot] : null;
+                if (target != null && target.Side == user.Side && target != user && target.Pk.Fainted) target = null;
+                if (target == null || target.Side != user.Side) target = OpponentFor(user, target);
+                Act(user, target ?? user, cmd.Index);
+            }
+
+            if (Outcome == BattleOutcome.Ongoing && Live(0).Count > 0 && Live(1).Count > 0) EndOfTurn();
             AfterFaints();
-            foreach (var b in Active) if (b != null) { b.ProtectedLast = b.Protected; b.Protected = false; b.Flinched = false; b.TurnsOut++; }
+            foreach (var b in OnField) { b.ProtectedLast = b.Protected; b.Protected = false; b.Flinched = false; b.TurnsOut++; }
             return _ev;
         }
 
-        bool Ended() { return Outcome != BattleOutcome.Ongoing || Active[0].Pk.Fainted || Active[1].Pk.Fainted; }
+        bool SelfTargeting(Battler b, int slot)
+        {
+            var md = MoveFor(b, slot);
+            return md != null && (md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies");
+        }
+
+        bool Ended() { return Outcome != BattleOutcome.Ongoing || Live(0).Count == 0 || Live(1).Count == 0; }
 
         MoveData MoveFor(Battler b, int slot)
         {
@@ -203,6 +297,31 @@ namespace PokeCreator.Battles
         }
 
         // ------------------------------------------------------------------ AI
+        /// <summary>The AI's command for one of its Pokémon: a move and, in doubles, which of the player's Pokémon to hit.</summary>
+        BattleCommand ChooseAI(Battler me)
+        {
+            var targets = Live(1 - me.Side);
+            if (targets.Count == 0) return BattleCommand.Fight(-1);
+            var t = targets[Rng.Next(targets.Count)];
+            if (!IsWild && TrainerSkill > 0 && targets.Count > 1) t = targets.OrderByDescending(x => BestScore(me, x)).First();
+            var cmd = ChooseAI(me, t);
+            cmd.TargetSide = t.Side; cmd.TargetSlot = t.Slot;
+            return cmd;
+        }
+
+        double BestScore(Battler me, Battler foe)
+        {
+            double best = 0;
+            foreach (var m in me.Pk.Moves.Where(x => x.PP > 0))
+            {
+                var md = Move(m.Id);
+                if (md == null || md.Category == "Status") continue;
+                double eff = Effectiveness(md.Type, foe.Pk);
+                best = Math.Max(best, Math.Max(1, md.Power <= 1 ? 60 : md.Power) * eff * (me.Pk.Types(P).Contains(md.Type) ? 1.5 : 1));
+            }
+            return best;
+        }
+
         BattleCommand ChooseAI(Battler me, Battler foe)
         {
             var usable = Enumerable.Range(0, me.Pk.Moves.Count).Where(i => me.Pk.Moves[i].PP > 0).ToList();
@@ -333,17 +452,38 @@ namespace PokeCreator.Battles
                 Say(n + " protected itself!");
                 return;
             }
-            if (!selfTarget)
+            if (selfTarget)
             {
-                if (target.Pk.Fainted) { Say("But there was no target..."); return; }
-                if (target.Protected && md.Flags.Contains("CanProtect")) { Say(Name(target) + " protected itself!"); return; }
-                if (target.Invulnerable && md.Accuracy > 0) { Say(Name(user) + "'s attack missed!"); return; }
-                if (AbilityAbsorbs(user, target, md, MoveType(user, md, code))) return;
-                if (!Hits(user, target, md, code)) { Say(Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = target.Side, Party = target.PartyIndex }); return; }
+                if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
+                return;
             }
-            if (md.Category == "Status") { StatusMove(user, target, md, code); return; }
-            DamagingMove(user, target, md, code);
+            // Who the move hits: one target, or every foe / every other Pokémon (double battles)
+            var targets = new List<Battler>();
+            string tg = md.Target ?? "NearOther";
+            if (tg == "AllNearFoes" || tg == "AllFoes") targets.AddRange(Live(1 - user.Side));
+            else if (tg == "AllNearOthers" || tg == "AllBattlers") { targets.AddRange(Live(1 - user.Side)); var al = Ally(user); if (al != null) targets.Add(al); }
+            else if (tg == "RandomNearFoe") { var f = Live(1 - user.Side); if (f.Count > 0) targets.Add(f[Rng.Next(f.Count)]); }
+            else if (tg == "NearAlly" || tg == "AllAllies") { var al = Ally(user); if (al == null) { Say("But it failed!"); return; } targets.Add(al); }
+            else targets.Add(target);
+            targets.RemoveAll(t => t == null || t.Pk.Fainted);
+            if (targets.Count == 0) { Say("But there was no target..."); return; }
+            _spread = targets.Count > 1 ? 0.75 : 1;
+            foreach (var t in targets)
+            {
+                if (user.Pk.Fainted || Outcome != BattleOutcome.Ongoing) break;
+                if (t.Pk.Fainted) continue;
+                if (t.Protected && md.Flags.Contains("CanProtect")) { Say(Name(t) + " protected itself!"); continue; }
+                if (t.Invulnerable && md.Accuracy > 0) { Say(Name(user) + "'s attack missed!"); continue; }
+                if (AbilityAbsorbs(user, t, md, MoveType(user, md, code))) continue;
+                if (!Hits(user, t, md, code)) { Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
+                if (md.Category == "Status") StatusMove(user, t, md, code);
+                else DamagingMove(user, t, md, code);
+            }
+            _spread = 1;
         }
+
+        /// <summary>Damage multiplier for moves hitting more than one Pokémon (0.75).</summary>
+        double _spread = 1;
 
         static string ChargeText(string move)
         {
@@ -398,7 +538,7 @@ namespace PokeCreator.Battles
             if (stab) dmg = Math.Floor(dmg * (HasAbility(user, "ADAPTABILITY") ? 2 : 1.5));
             dmg = Math.Floor(dmg * typeMod);
             if (physical && (user.Pk.Status ?? "").ToUpperInvariant() == "BURN" && !HasAbility(user, "GUTS")) dmg = Math.Floor(dmg / 2);
-            if (md != null) dmg = Math.Floor(dmg * FinalMod(user, target, type, typeMod, crit));
+            if (md != null) dmg = Math.Floor(dmg * FinalMod(user, target, type, typeMod, crit) * _spread);
             return Math.Max(typeMod > 0 ? 1 : 0, (int)dmg);
         }
 
@@ -700,7 +840,7 @@ namespace PokeCreator.Battles
                 return;
             }
             if (code == "RaiseUserCriticalHitRate2" || code == "RaiseUserCriticalHitRate") { user.CritStage = Math.Min(3, user.CritStage + 2); Say(Name(user) + " is getting pumped!"); return; }
-            if (code == "ResetAllBattlersStatStages") { foreach (var b in Active) if (b != null) b.Stages = new int[8]; Say("All stat changes were eliminated!"); return; }
+            if (code == "ResetAllBattlersStatStages") { foreach (var b in OnField) b.Stages = new int[8]; Say("All stat changes were eliminated!"); return; }
             if ((code == "SwitchOutTargetStatusMove" || code == "FleeFromBattle" || code == "SwitchOutUserStatusMove") && IsWild)
             {
                 Outcome = BattleOutcome.Escaped;
@@ -716,7 +856,7 @@ namespace PokeCreator.Battles
         void EndOfTurn()
         {
             WeatherEndOfTurn();
-            foreach (var b in Active.OrderByDescending(x => Speed(x)))
+            foreach (var b in OnField.Where(x => !x.Pk.Fainted).OrderByDescending(x => Speed(x)).ToList())
             {
                 if (b.Pk.Fainted) continue;
                 EndOfTurnAbilities(b);
@@ -764,47 +904,85 @@ namespace PokeCreator.Battles
         // ------------------------------------------------------------------ fainting, EXP, next Pokémon
         void AfterFaints()
         {
-            var foe = Active[1]; var me = Active[0];
-            if (foe.Pk.Fainted && Outcome == BattleOutcome.Ongoing)
+            // Opponents that fainted: EXP, then the trainer sends out another (or the slot stays empty)
+            for (int slot = 0; slot < SlotsPerSide; slot++)
             {
+                var foe = Field[1][slot];
+                if (foe == null || !foe.Pk.Fainted || foe.FaintShown || Outcome != BattleOutcome.Ongoing) continue;
+                foe.FaintShown = true;
                 Say(Name(foe) + " fainted!");
-                _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 1, Party = foe.PartyIndex });
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 1, Party = foe.PartyIndex, Slot = slot });
                 GiveExp(foe);
+            }
+            if (Outcome == BattleOutcome.Ongoing)
+            {
                 if (!AnyAble(1))
                 {
-                    Outcome = BattleOutcome.Win;
-                    if (!IsWild) Say("You defeated " + TrainerTypeName + " " + TrainerName + "!");
+                    if (Field[1].Take(SlotsPerSide).Any(b => b != null && b.Pk.Fainted))
+                    {
+                        Outcome = BattleOutcome.Win;
+                        if (!IsWild) Say("You defeated " + AllTrainers + "!");
+                    }
                 }
-                else if (!IsWild)
-                {
-                    int next = AINextPokemon();
-                    Active[1] = new Battler(Parties[1][next], 1, next);
-                    Say(TrainerTypeName + " " + TrainerName + " sent out " + Active[1].Pk.Name(P) + "!");
-                    _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 1, Party = next });
-                    if (!me.Pk.Fainted) MarkParticipant();
-                    SwitchInAbility(Active[1]);
-                }
+                else
+                    for (int slot = 0; slot < SlotsPerSide; slot++)
+                    {
+                        var foe = Field[1][slot];
+                        if (foe == null || !foe.Pk.Fainted) continue;
+                        if (!IsWild && FoeBench(slot).Count > 0)
+                        {
+                            int next = AINextPokemon(slot);
+                            var nb = Place(1, slot, next);
+                            Say(TrainerLabel(next) + " sent out " + nb.Pk.Name(P) + "!");
+                            SendOutEvent(nb);
+                            MarkParticipant();
+                            SwitchInAbility(nb);
+                        }
+                        else Field[1][slot] = null;
+                    }
             }
-            if (me.Pk.Fainted && Outcome != BattleOutcome.Escaped && Outcome != BattleOutcome.Caught)
+            // The player's Pokémon that fainted: the player picks replacements (PlayerSlotsToFill)
+            if (Outcome != BattleOutcome.Escaped && Outcome != BattleOutcome.Caught)
             {
-                Say(me.Pk.Name(P) + " fainted!");
-                _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 0, Party = me.PartyIndex });
+                bool anyFainted = false;
+                for (int slot = 0; slot < SlotsPerSide; slot++)
+                {
+                    var me = Field[0][slot];
+                    if (me == null || !me.Pk.Fainted || me.FaintShown) continue;
+                    me.FaintShown = true; anyFainted = true;
+                    Say(me.Pk.Name(P) + " fainted!");
+                    _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 0, Party = me.PartyIndex, Slot = slot });
+                }
                 if (!AnyAble(0))
                 {
-                    if (Outcome != BattleOutcome.Win) Outcome = BattleOutcome.Loss;
-                    Say(PlayerName + " is out of usable Pokémon!");
+                    if (anyFainted)
+                    {
+                        if (Outcome != BattleOutcome.Win) Outcome = BattleOutcome.Loss;
+                        Say(PlayerName + " is out of usable Pokémon!");
+                    }
                 }
-                else if (Outcome == BattleOutcome.Ongoing) NeedPlayerSwitch = true;
+                else if (Outcome == BattleOutcome.Ongoing)
+                {
+                    int bench = Bench(0).Count;
+                    for (int slot = 0; slot < SlotsPerSide; slot++)
+                    {
+                        var me = Field[0][slot];
+                        if (me == null || !me.Pk.Fainted || PlayerSlotsToFill.Contains(slot)) continue;
+                        if (bench > 0) { PlayerSlotsToFill.Add(slot); bench--; }
+                        else Field[0][slot] = null;
+                    }
+                }
             }
         }
 
-        int AINextPokemon()
+        int AINextPokemon(int slot = 0)
         {
-            var me = Active[0];
+            var allowed = FoeBench(slot);
+            var me = Live(0).FirstOrDefault() ?? Field[0][0];
             int best = -1; double bestScore = -1;
             for (int i = 0; i < Parties[1].Count; i++)
             {
-                if (!Able(Parties[1][i])) continue;
+                if (!allowed.Contains(i)) continue;
                 double score = 1;
                 if (TrainerSkill > 0) foreach (var t in Parties[1][i].Types(P)) score *= 1 / Math.Max(0.25, Effectiveness(t, me.Pk) == 0 ? 0.25 : Effectiveness(t, me.Pk));
                 if (best < 0 || score > bestScore + 0.01) { best = i; bestScore = score; }
@@ -862,37 +1040,43 @@ namespace PokeCreator.Battles
         }
 
         // ------------------------------------------------------------------ player actions
-        /// <summary>Sends out a different Pokémon (after a faint, or as the turn's action).</summary>
-        public List<BattleEvent> SwitchAfterFaint(int party)
+        /// <summary>Sends out a Pokémon in place of one that fainted (the first slot waiting, or the given slot).</summary>
+        public List<BattleEvent> SwitchAfterFaint(int party) { return SwitchAfterFaint(PlayerSlotsToFill.Count > 0 ? PlayerSlotsToFill[0] : 0, party); }
+
+        public List<BattleEvent> SwitchAfterFaint(int slot, int party)
         {
             _ev = new List<BattleEvent>();
-            NeedPlayerSwitch = false;
-            Active[0] = new Battler(Parties[0][party], 0, party);
-            Say("Go! " + Active[0].Pk.Name(P) + "!");
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 0, Party = party });
+            PlayerSlotsToFill.Remove(slot);
+            var b = Place(0, slot, party);
+            Say("Go! " + b.Pk.Name(P) + "!");
+            SendOutEvent(b);
             MarkParticipant();
-            SwitchInAbility(Active[0]);
+            SwitchInAbility(b);
             return _ev;
         }
 
-        void SwitchPlayer(int party)
+        void SwitchPlayer(int slot, int party)
         {
-            var old = Active[0];
-            SwitchOutAbility(old);
-            Say(old.Pk.Name(P) + ", come back!");
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 0, Party = old.PartyIndex });
-            Active[0] = new Battler(Parties[0][party], 0, party) { SwitchedIn = true };
-            Say("Go! " + Active[0].Pk.Name(P) + "!");
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = 0, Party = party });
+            var old = Field[0][slot];
+            if (old != null)
+            {
+                SwitchOutAbility(old);
+                Say(old.Pk.Name(P) + ", come back!");
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 0, Party = old.PartyIndex, Slot = slot });
+            }
+            var b = Place(0, slot, party);
+            b.SwitchedIn = true;
+            Say("Go! " + b.Pk.Name(P) + "!");
+            SendOutEvent(b);
             MarkParticipant();
-            SwitchInAbility(Active[0]);
+            SwitchInAbility(b);
         }
 
         bool TryRun()
         {
             if (!IsWild) { Say("No! There's no running from a Trainer battle!"); return false; }
             RunAttempts++;
-            var me = Active[0]; var foe = Active[1];
+            var me = Live(0).FirstOrDefault() ?? Field[0][0]; var foe = Live(1).FirstOrDefault() ?? Field[1][0];
             bool ghost = me.Pk.Types(P).Contains("GHOST");
             if (HasAbility(me, "RUNAWAY") || me.Pk.Item == "SMOKEBALL" || ghost)
             {
@@ -907,7 +1091,7 @@ namespace PokeCreator.Battles
                 Say("You can't escape!");
                 return false;
             }
-            int a = Speed(Active[0]), b = Math.Max(1, Speed(Active[1]));
+            int a = Live(0).Select(x => Speed(x)).DefaultIfEmpty(1).Max(), b = Math.Max(1, Live(1).Select(x => Speed(x)).DefaultIfEmpty(1).Max());
             int f = a * 128 / b + 30 * RunAttempts;
             if (a >= b || f > 255 || Rng.Next(256) < f)
             {
@@ -929,15 +1113,17 @@ namespace PokeCreator.Battles
             int from = pk.HP;
             var o = ItemEffects.Use(P, pk, item, info, -1, new EvolutionContext());
             Say(PlayerName + " used the " + (item.Name ?? item.Id) + ".");
-            if (Active[0].PartyIndex == party && pk.HP != from) Hp(Active[0], from);
-            if (Active[0].PartyIndex == party) StatusEvent(Active[0]);
+            var onField = Field[0].Take(SlotsPerSide).FirstOrDefault(x => x != null && x.PartyIndex == party);
+            if (onField != null && pk.HP != from) Hp(onField, from);
+            if (onField != null) StatusEvent(onField);
             Say(o.Message);
         }
 
         // ------------------------------------------------------------------ catching
         static double BallModifier(string ball, Battle b)
         {
-            var foe = b.Active[1].Pk; var types = foe.Types(b.P);
+            var target = b.Live(1).FirstOrDefault() ?? b.Field[1][0];
+            var foe = target.Pk; var types = foe.Types(b.P);
             switch (ball)
             {
                 case "GREATBALL": case "SAFARIBALL": case "SPORTBALL": return 1.5;
@@ -952,7 +1138,7 @@ namespace PokeCreator.Battles
                 case "DUSKBALL": return DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20 ? 3 : 1;
                 case "LEVELBALL":
                     {
-                        int me = b.Active[0].Pk.Level, them = foe.Level;
+                        int me = (b.Live(0).FirstOrDefault() ?? b.Field[0][0]).Pk.Level, them = foe.Level;
                         return me >= them * 4 ? 8 : me >= them * 2 ? 4 : me > them ? 2 : 1;
                     }
                 default: return 1;
@@ -973,7 +1159,10 @@ namespace PokeCreator.Battles
                 Say("The Trainer blocked your Poké Ball! Don't be a thief!");
                 return;
             }
-            var foe = Active[1].Pk;
+            if (Live(1).Count > 1) { Say("It's no good! It's impossible to aim when there's more than one Pokémon!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Catch, Value = -1 }); return; }
+            var foeB = Live(1).FirstOrDefault();
+            if (foeB == null) return;
+            var foe = foeB.Pk;
             var fd = foe.Data(P);
             int rate = fd != null && fd.CatchRate > 0 ? fd.CatchRate : 45;
             double mod = BallModifier(ball, this);
@@ -997,7 +1186,7 @@ namespace PokeCreator.Battles
             {
                 Say("Gotcha! " + foe.Name(P) + " was caught!");
                 foe.Ball = ball;
-                Active[1].Reset();
+                foeB.Reset();
                 CaughtPokemon = foe;
                 Outcome = BattleOutcome.Caught;
             }
