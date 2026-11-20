@@ -330,6 +330,12 @@ namespace PokeCreator.Data
         [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
         [Field("Safari steps", Group = "Safari Zone", Help = "Steps allowed in a Safari game (0 = no limit).")] public int SafariSteps { get; set; }
         [Field("Safari Balls", Group = "Safari Zone", Help = "Safari Balls given at the start of a Safari game.")] public int SafariBalls { get; set; }
+        [Field("Contest length (minutes)", Group = "Bug-Catching Contest")] public int BugContestMinutes { get; set; }
+        [Field("Sport Balls", Group = "Bug-Catching Contest")] public int BugContestBalls { get; set; }
+        [Field("1st prize", Ref = "items", Group = "Bug-Catching Contest")] public string BugContestPrize1 { get; set; }
+        [Field("2nd prize", Ref = "items", Group = "Bug-Catching Contest")] public string BugContestPrize2 { get; set; }
+        [Field("3rd prize", Ref = "items", Group = "Bug-Catching Contest")] public string BugContestPrize3 { get; set; }
+        [Field("Other places' prize", Ref = "items", Group = "Bug-Catching Contest")] public string BugContestPrizeOther { get; set; }
         [Field("Roaming Pokémon", Group = "Roaming", Help = "Pokémon that move to another map each time the player changes map; a wild encounter on their map has a 1 in 4 chance of being them. Their HP carries over between meetings; once caught or defeated they're gone.")] public List<RoamerDef> Roamers { get; set; }
         [Field("Credits", Multiline = true, Group = "Ending", Help = "Text that scrolls after the Hall of Fame ($scene = Scene_Credits.new). One line per row; an empty line makes a gap.")] public string Credits { get; set; }
 
@@ -337,6 +343,7 @@ namespace PokeCreator.Data
         {
             Title = "My Pokémon Game"; StartMap = 1; StartDirection = 2; DefaultPlayerName = "Red"; StartMoney = 3000;
             StartItemStorage = new List<string>(); Home = new List<int>(); Roamers = new List<RoamerDef>(); SafariSteps = 600; SafariBalls = 30;
+            BugContestMinutes = 20; BugContestBalls = 20; BugContestPrize1 = "SUNSTONE"; BugContestPrize2 = "EVERSTONE"; BugContestPrize3 = "SITRUSBERRY"; BugContestPrizeOther = "ORANBERRY";
             ScreenWidth = 512; ScreenHeight = 384; WindowScale = 1; Font = "power green.ttf"; FontSize = 26; Windowskin = "";
             SpeechFrame = "speech hgss 1"; MenuFrame = "choice 1";
         }

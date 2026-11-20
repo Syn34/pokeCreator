@@ -25,6 +25,8 @@ namespace PokeCreator.Runtime.UI
         public string Bgm;
         /// <summary>A Safari Zone battle (Ball / Bait / Rock / Run).</summary>
         public bool Safari;
+        /// <summary>A Bug-Catching Contest battle: the Bag throws a Sport Ball; the catch is kept by the contest.</summary>
+        public bool BugContest;
     }
 
     /// <summary>
@@ -494,6 +496,15 @@ namespace PokeCreator.Runtime.UI
 
         void OpenBag()
         {
+            if (_setup.BugContest)
+            {
+                var cs = World.BugContest.State(Game);
+                if (cs.Balls <= 0) { Game.Message.Show("You have no Sport Balls left!"); return; }
+                if (_b.Live(1).Count != 1) { Game.Message.Show("It's no good! It's impossible to aim when there's more than one Pokémon!"); return; }
+                cs.Balls--;
+                Commit(BattleCommand.Ball("SPORTBALL"));
+                return;
+            }
             _mode = Mode.Busy;
             Game.PushScene(new BagScene(Game, id =>
             {
@@ -607,7 +618,8 @@ namespace PokeCreator.Runtime.UI
                     if (c == 0) { Game.AskName(pk.Name(Game.Project) + "'s nickname?", "", 12, n => pk.Nickname = n, null); }
                     next();
                 }));
-                steps.Add(next =>
+                if (_setup.BugContest) steps.Add(next => World.BugContest.OnCaught(Game, pk, next));
+                else steps.Add(next =>
                 {
                     if (Game.State.Party.Count < GameState.MaxParty) { Game.State.Party.Add(pk); next(); }
                     else { Game.State.Storage.Add(pk); Game.Message.Show(pk.Name(Game.Project) + " was sent to the PC.", null, -1, _ => next()); }
@@ -980,7 +992,7 @@ namespace PokeCreator.Runtime.UI
             {
                 int cx = 296 + (i % 2) * 110, cy = by + 14 + (i / 2) * 36;
                 if (i == _cmd) Ui.Arrow(g, cx - 18, cy + 6);
-                Ui.Text(g, cx, cy, _b.Safari ? SafariCommands[i] : Commands[i]);
+                Ui.Text(g, cx, cy, _b.Safari ? SafariCommands[i] : _setup.BugContest && i == 1 ? "BALL x" + World.BugContest.State(Game).Balls : Commands[i]);
             }
             if (_b.Safari)
             {

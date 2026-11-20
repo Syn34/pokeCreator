@@ -562,9 +562,16 @@ namespace PokeCreator.Runtime
                 var endSafari = end;
                 end = o => { World.Safari.AfterBattle(this, o); if (endSafari != null) endSafari(o); };
             }
+            // Bug-Catching Contest: Sport Balls only, one catch kept
+            if (setup.Wild && World.BugContest.InField(this) && b.Parties[1].Count == 1)
+            {
+                setup.BugContest = true;
+                var endContest = end;
+                end = o => { World.BugContest.AfterBattle(this); if (endContest != null) endContest(o); };
+            }
             // A registered partner fights alongside the player (the battle becomes a double battle)
             var partner = State.Extras.Partner;
-            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari)
+            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari && !setup.BugContest)
             {
                 var ptt = Project.TrainerTypes.FirstOrDefault(t => t.Id == partner.TrainerType);
                 b.AddPartner(partner.Party, partner.Name, ptt != null && !string.IsNullOrEmpty(ptt.Name) ? ptt.Name : partner.TrainerType, ptt != null ? Math.Max(32, ptt.SkillLevel) : 32);
@@ -722,6 +729,7 @@ namespace PokeCreator.Runtime
             if (_hasScriptSwitches && ++_scriptSwitchTimer >= 120 && !Interpreter.Running) { _scriptSwitchTimer = 0; Map.RefreshEvents(); }
             // Berry plants grow in real time: update their sprites now and then
             if (++_berryTimer >= 300 && State.BerryPlants.Count > 0) { _berryTimer = 0; Berries.Refresh(this); }
+            World.BugContest.Update(this);
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();

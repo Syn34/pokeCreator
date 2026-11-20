@@ -145,6 +145,27 @@ namespace PokeCreator.Runtime.Script
             Register("pbSafariState.captures", (c, a) => Safari.State(_game).Captures);
             Register("pbSafariState.pbReceptionMap", (c, a) => Safari.State(_game).StartMap);
 
+            // Bug-Catching Contest
+            Register("pbInBugContest?", (c, a) => BugContest.InProgress(_game));
+            Register("pbBugContestState.inProgress?", (c, a) => BugContest.InProgress(_game));
+            Register("pbBugContestUndecided?", (c, a) => _game.State.Extras.BugContest != null && _game.State.Extras.BugContest.Undecided);
+            Register("pbBugContestDecided?", (c, a) => _game.State.Extras.BugContest != null && !_game.State.Extras.BugContest.Undecided && !_game.State.Extras.BugContest.InProgress && _game.State.Extras.BugContest.Place >= -1 && _game.State.Extras.BugContest.EndsAt > 0);
+            Register("pbBugContestState.pbSetPokemon", (c, a) => { BugContest.SetPokemon(_game, ToInt(Arg(a, 0))); return true; });
+            Register("pbBugContestState.pbStart", (c, a) =>
+            {
+                // Without pbSetPokemon first, the first able Pokémon goes in
+                if (BugContest.State(_game).LeftBehind.Count == 0 && _game.Party.Count > 1)
+                    BugContest.SetPokemon(_game, Math.Max(0, _game.Party.FindIndex(PokeCreator.Battles.Battle.Able)));
+                BugContest.Start(_game, a.Count > 0 ? ToInt(a[0]) : 0); return true;
+            });
+            Register("pbBugContestState.pbEnd", (c, a) => { BugContest.End(_game, false); return true; });
+            Register("pbBugContestState.pbStartJudging", (c, a) => { BugContest.End(_game, false); return true; });
+            Register("pbBugContestState.pbJudge", (c, a) => { BugContest.Judge(_game, null); return true; });
+            Register("pbBugContestState.place", (c, a) => BugContest.State(_game).Place);
+            Register("pbBugContestState.ballcount", (c, a) => BugContest.State(_game).Balls);
+            Register("pbBugContestState.lastPokemon", (c, a) => BugContest.State(_game).Caught);
+            Register("pbBugContestStartOver", (c, a) => { BugContest.End(_game, true); return true; });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

@@ -74,7 +74,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Partner trainer (pbRegisterPartner / pbDeregisterPartner): every battle becomes a double battle with the partner's Pokémon in the second slot, AI-controlled, healed after each battle
 - [x] Roaming Pokémon (Game Settings → Roaming: species, level, switch, encounter kind, music, maps; HP carries over, flees each turn, gone once caught or defeated; pbResetAllRoamers)
 - [x] Safari Zone (pbSafariState: steps and Safari Balls from Game Settings, "Safari Zone" maps, Ball / Bait / Rock / Run battles, back to the reception when time is up)
-- [ ] Bug-Catching Contest
+- [x] Bug-Catching Contest (pbBugContestState: one Pokémon, Sport Balls, timer, BugContest encounters, keep one catch, judging with Essentials' score formula and prizes from Game Settings)
 - [ ] Pokérus
 - [ ] Poké Radar
 - [ ] Battle Tower / challenges (pbBattleChallenge)
