@@ -302,7 +302,7 @@ namespace PokeCreator.Runtime.UI
     public class SummaryScene : Scene
     {
         int _index, _page;
-        static readonly string[] Pages = { "INFO", "STATS", "MOVES" };
+        static readonly string[] Pages = { "INFO", "MEMO", "STATS", "MOVES", "RIBBONS" };
         readonly List<Pokemon> _list;
         public SummaryScene(Game g, int index) : base(g) { Opaque = true; _index = index; }
         /// <summary>Summary of Pokémon from another list (e.g. a PC box).</summary>
@@ -327,12 +327,11 @@ namespace PokeCreator.Runtime.UI
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 248, 240), new Color(216, 224, 232));
             // Header with page tabs
             g.FillRect(0, 0, g.Width, 40, new Color(232, 88, 64));
-            for (int i = 0; i < Pages.Length; i++)
-            {
-                int tx = 200 + i * 104;
-                if (i == _page) Ui.Panel(g, tx, 6, 96, 30, new Color(248, 248, 248), new Color(160, 48, 32));
-                g.DrawText(tx + 48 - g.TextWidth(Pages[i]) / 2, 5, Pages[i], i == _page ? Ui.Dark : Ui.Light, i == _page ? Ui.DarkShadow : new Color(160, 48, 32));
-            }
+            Ui.Panel(g, 236, 6, 160, 30, new Color(248, 248, 248), new Color(160, 48, 32));
+            g.DrawText(316 - g.TextWidth(Pages[_page]) / 2, 5, Pages[_page], Ui.Dark, Ui.DarkShadow);
+            g.DrawText(212, 5, "◀", Ui.Light, new Color(160, 48, 32));
+            g.DrawText(404, 5, "▶", Ui.Light, new Color(160, 48, 32));
+            for (int i = 0; i < Pages.Length; i++) g.FillRect(436 + i * 14, 16, 10, 10, i == _page ? new Color(248, 248, 248) : new Color(176, 64, 48));
             Ui.LightText(g, 12, 5, "SUMMARY");
 
             // Left column: sprite and name
@@ -364,8 +363,10 @@ namespace PokeCreator.Runtime.UI
             switch (_page)
             {
                 case 0: DrawInfo(g, pk, d, rx, rw); break;
-                case 1: DrawStats(g, pk, rx, rw); break;
-                case 2: DrawMoves(g, pk, rx, rw); break;
+                case 1: DrawMemo(g, pk, rx, rw); break;
+                case 2: DrawStats(g, pk, rx, rw); break;
+                case 3: DrawMoves(g, pk, rx, rw); break;
+                case 4: DrawRibbons(g, pk, rx, rw); break;
             }
         }
 
@@ -395,6 +396,63 @@ namespace PokeCreator.Runtime.UI
             Ui.Text(g, rx + 14, 326, "Exp. to next Lv.");
             Ui.TextRight(g, rx + rw - 14, 326, Math.Max(0, need).ToString());
             Ui.ExpBar(g, rx + 14, 360, rw - 28, to > from ? (double)(pk.Exp - from) / (to - from) : 1);
+        }
+
+        static readonly string[][] Characteristics =
+        {
+            new[] { "Loves to eat.", "Takes plenty of siestas.", "Nods off a lot.", "Scatters things often.", "Likes to relax." },
+            new[] { "Proud of its power.", "Likes to thrash about.", "A little quick tempered.", "Likes to fight.", "Quick tempered." },
+            new[] { "Sturdy body.", "Capable of taking hits.", "Highly persistent.", "Good endurance.", "Good perseverance." },
+            new[] { "Highly curious.", "Mischievous.", "Thoroughly cunning.", "Often lost in thought.", "Very finicky." },
+            new[] { "Strong willed.", "Somewhat vain.", "Strongly defiant.", "Hates to lose.", "Somewhat stubborn." },
+            new[] { "Likes to run.", "Alert to sounds.", "Impetuous and silly.", "Somewhat of a clown.", "Quick to flee." },
+        };
+
+        /// <summary>The characteristic from the highest IV (as the games).</summary>
+        public static string Characteristic(Pokemon pk)
+        {
+            if (pk.IV == null || pk.IV.Count < 6) return "";
+            int best = 0;
+            int[] order = { Stat.HP, Stat.Attack, Stat.Defense, Stat.Speed, Stat.SpAtk, Stat.SpDef };
+            foreach (int s in order) if (pk.IV[s] > pk.IV[best]) best = s;
+            int row = best == Stat.HP ? 0 : best == Stat.Attack ? 1 : best == Stat.Defense ? 2 : best == Stat.SpAtk ? 3 : best == Stat.SpDef ? 4 : 5;
+            return Characteristics[row][pk.IV[best] % 5];
+        }
+
+        void DrawMemo(Gfx g, Pokemon pk, int rx, int rw)
+        {
+            var p = Game.Project;
+            if (pk.IsEgg) { Ui.Text(g, rx + 14, 60, "An odd Pokémon Egg."); return; }
+            var lines = new List<string>();
+            lines.Add(Natures.Display(pk.Nature) + " nature.");
+            var info = pk.MetMap > 0 ? p.GetMapInfo(pk.MetMap) : null;
+            string where = info != null ? Game.Message.Expand(info.Name) : null;
+            bool foreign = !string.IsNullOrEmpty(pk.OTName) && (pk.OTName != Game.State.PlayerName || pk.OTId != Game.State.TrainerId);
+            if (foreign) lines.Add("Obtained in a trade" + (where != null ? " (met at " + where + ")." : "."));
+            else if (pk.MetLevel <= 1 && where != null) lines.Add("Hatched at " + where + ".");
+            else lines.Add("Met at Lv. " + Math.Max(1, pk.MetLevel) + (where != null ? " at " + where + "." : "."));
+            lines.Add(Characteristic(pk));
+            if (pk.Pokerus > 0) lines.Add(pk.PokerusStage == 1 ? "Infected with Pokérus." : "Cured of Pokérus.");
+            int y = 60;
+            foreach (var l in lines) foreach (var w in Wrap(g, l, rw - 28)) { Ui.Text(g, rx + 14, y, w); y += 30; }
+            y += 10;
+            g.DrawText(rx + 14, y, "Happiness", new Color(232, 88, 64), new Color(248, 192, 176));
+            for (int i = 0; i < 5; i++) g.FillRect(rx + 150 + i * 22, y + 8, 18, 14, pk.Happiness >= (i + 1) * 51 ? new Color(232, 88, 120) : new Color(216, 216, 224));
+        }
+
+        void DrawRibbons(Gfx g, Pokemon pk, int rx, int rw)
+        {
+            if (pk.Ribbons == null || pk.Ribbons.Count == 0) { Ui.Text(g, rx + 14, 60, "No ribbons."); return; }
+            int y = 60;
+            foreach (var r in pk.Ribbons.Take(10))
+            {
+                var icon = g.Load(Game.Project.FindAsset("Graphics/UI/Summary", "ribbon_" + r.ToLowerInvariant()));
+                if (icon != null) g.Draw(icon, 0, 0, Math.Min(28, icon.Width), Math.Min(28, icon.Height), rx + 12, y);
+                else g.FillRect(rx + 16, y + 6, 18, 18, new Color(232, 184, 40));
+                Ui.Text(g, rx + 46, y, new Script.RibbonInfo(r).Name);
+                y += 30;
+            }
+            if (pk.Ribbons.Count > 10) Ui.Text(g, rx + 14, y, "+" + (pk.Ribbons.Count - 10) + " more");
         }
 
         void DrawStats(Gfx g, Pokemon pk, int rx, int rw)
