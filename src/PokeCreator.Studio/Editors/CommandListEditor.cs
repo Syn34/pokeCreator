@@ -259,6 +259,35 @@ namespace PokeCreator.Studio.Editors
             var screen = group("Screen");
             cmd(screen, "Change Screen Tone", AddTone);
             cmd(screen, "Screen Flash", () => { int f = NumberDialog.Ask(FindForm(), "Flash length (1/20 second units)", 10); if (f > 0) Insert(new EventCommand(224, 0, ColorObj(255, 255, 255, 255), f)); });
+            cmd(screen, "Screen Shake", () =>
+            {
+                int power = NumberDialog.Ask(FindForm(), "Power (1-9)", 5); if (power < 1) return;
+                int speed = NumberDialog.Ask(FindForm(), "Speed (1-9)", 5); if (speed < 1) return;
+                int len = NumberDialog.Ask(FindForm(), "Length (1/20 second units)", 20); if (len < 1) return;
+                Insert(new EventCommand(225, 0, Math.Min(9, power), Math.Min(9, speed), len * 2));
+            });
+            cmd(screen, "Show Picture", () =>
+            {
+                string n = AssetPick("Graphics/Pictures", "Picture"); if (n == null) return;
+                int num = NumberDialog.Ask(FindForm(), "Picture number (1-50; higher numbers draw on top)", 1); if (num < 1) return;
+                int where = ChoiceDialog.Ask(FindForm(), "Position", new[] { "Top-left corner of the screen", "Centred on the screen" }); if (where < 0) return;
+                Insert(new EventCommand(231, 0, num, n, where, 0, where == 1 ? 256 : 0, where == 1 ? 192 : 0, 100, 100, 255, 0));
+            });
+            cmd(screen, "Fade Picture In / Out", () =>
+            {
+                int num = NumberDialog.Ask(FindForm(), "Picture number", 1); if (num < 1) return;
+                int k = ChoiceDialog.Ask(FindForm(), "Fade", new[] { "Fade in (to fully visible)", "Fade out (to invisible)" }); if (k < 0) return;
+                int where = ChoiceDialog.Ask(FindForm(), "The picture was shown at", new[] { "Top-left corner of the screen", "Centred on the screen" }); if (where < 0) return;
+                int len = NumberDialog.Ask(FindForm(), "Over (1/20 second units)", 10); if (len < 0) return;
+                Insert(new EventCommand(232, 0, num, len * 2, where, 0, where == 1 ? 256 : 0, where == 1 ? 192 : 0, 100, 100, k == 0 ? 255 : 0, 0));
+            });
+            cmd(screen, "Erase Picture", () => { int num = NumberDialog.Ask(FindForm(), "Picture number", 1); if (num >= 1) Insert(new EventCommand(235, 0, num)); });
+            cmd(screen, "Message Position", () =>
+            {
+                int k = ChoiceDialog.Ask(FindForm(), "Messages appear at the", new[] { "Top", "Middle", "Bottom (normal)" }); if (k < 0) return;
+                int f = ChoiceDialog.Ask(FindForm(), "Window", new[] { "Show the window", "Text only, no window" }); if (f < 0) return;
+                Insert(new EventCommand(104, 0, k, f));
+            });
 
             cmd(screen, "Set Weather", () =>
             {

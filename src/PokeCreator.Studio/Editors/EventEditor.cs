@@ -67,7 +67,15 @@ namespace PokeCreator.Studio.Editors
                 case 210: return "◆ Wait for Move's Completion";
                 case 223: return "◆ Change Screen Color Tone";
                 case 224: return "◆ Screen Flash";
-                case 225: return "◆ Screen Shake";
+                case 225: return "◆ Screen Shake: power " + c.IntParam(0) + ", speed " + c.IntParam(1) + ", @" + c.IntParam(2);
+                case 231: return "◆ Show Picture " + c.IntParam(0) + ": " + c.StrParam(1) + (c.IntParam(2) == 1 ? " (centred at " : " (at ") + c.IntParam(4) + "," + c.IntParam(5) + ")" + (c.IntParam(8) < 255 ? ", opacity " + c.IntParam(8) : "");
+                case 232: return "◆ Move Picture " + c.IntParam(0) + ": @" + c.IntParam(1) + " to " + c.IntParam(4) + "," + c.IntParam(5) + ", zoom " + c.IntParam(6) + "%, opacity " + c.IntParam(8);
+                case 233: return "◆ Rotate Picture " + c.IntParam(0) + ": speed " + c.IntParam(1);
+                case 235: return "◆ Erase Picture " + c.IntParam(0);
+                case 104: return "◆ Message Position: " + (c.IntParam(0) == 0 ? "top" : c.IntParam(0) == 1 ? "middle" : "bottom") + (c.IntParam(1) == 1 ? ", text only" : "");
+                case 354: return "◆ Return to Title Screen";
+                case 247: return "◆ Memorize BGM";
+                case 248: return "◆ Restore BGM";
                 case 236:
                     {
                         string[] names = { "None", "Rain", "Storm", "Snow", "Blizzard", "Sandstorm", "Heavy Rain", "Sun", "Fog" };
