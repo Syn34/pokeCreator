@@ -39,7 +39,14 @@ namespace PokeCreator.Runtime.Platform
     {
         const string Lib = "SDL2", Img = "SDL2_image", Ttf = "SDL2_ttf", Mix = "SDL2_mixer";
 
-        public const uint INIT_VIDEO = 0x20, INIT_AUDIO = 0x10, INIT_EVENTS = 0x4000;
+        public const uint INIT_VIDEO = 0x20, INIT_AUDIO = 0x10, INIT_EVENTS = 0x4000, INIT_GAMECONTROLLER = 0x2000, INIT_JOYSTICK = 0x200;
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_NumJoysticks();
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_IsGameController(int index);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_GameControllerOpen(int index);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern byte SDL_GameControllerGetButton(IntPtr gc, int button);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern short SDL_GameControllerGetAxis(IntPtr gc, int axis);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern byte SDL_GameControllerGetAttached(IntPtr gc);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_GameControllerUpdate();
         public const uint QUIT = 0x100, KEYDOWN = 0x300, WINDOWEVENT = 0x200;
         public const int WINDOWPOS_CENTERED = 0x2FFF0000;
         public const uint WINDOW_SHOWN = 0x4, WINDOW_RESIZABLE = 0x20;

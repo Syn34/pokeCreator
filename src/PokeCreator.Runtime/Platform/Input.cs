@@ -26,13 +26,54 @@ namespace PokeCreator.Runtime.Platform
         static readonly int[] _held = new int[(int)Button.Count];
         static readonly bool[] _simulated = new bool[(int)Button.Count];
 
+        // Game controllers (Xbox / PlayStation / Switch layouts through SDL): D-pad or left stick, A = Action, B = Cancel, X/Y/Start = Menu, shoulder = Run
+        static IntPtr _pad;
+        static int _padScan;
+        static bool _padsReady;
+        public static void InitControllers()
+        {
+            try { _padsReady = SDL.SDL_InitSubSystem(SDL.INIT_GAMECONTROLLER | SDL.INIT_JOYSTICK) == 0; } catch { _padsReady = false; }
+        }
+
+        static bool PadDown(int b)
+        {
+            if (_pad == IntPtr.Zero) return false;
+            const int A = 0, B = 1, X = 2, Y = 3, Back = 4, Start = 6, LS = 9, RS = 10, Up = 11, Down = 12, Left = 13, Right = 14;
+            short ax = SDL.SDL_GameControllerGetAxis(_pad, 0), ay = SDL.SDL_GameControllerGetAxis(_pad, 1);
+            short lt = SDL.SDL_GameControllerGetAxis(_pad, 4), rt = SDL.SDL_GameControllerGetAxis(_pad, 5);
+            Func<int, bool> btn = i => SDL.SDL_GameControllerGetButton(_pad, i) != 0;
+            switch ((Button)b)
+            {
+                case Button.Down: return btn(Down) || ay > 16000;
+                case Button.Up: return btn(Up) || ay < -16000;
+                case Button.Left: return btn(Left) || ax < -16000;
+                case Button.Right: return btn(Right) || ax > 16000;
+                case Button.Action: return btn(A);
+                case Button.Cancel: return btn(B) || btn(Back);
+                case Button.Menu: return btn(X) || btn(Y) || btn(Start);
+                case Button.Run: return btn(LS) || btn(RS) || lt > 16000 || rt > 16000;
+            }
+            return false;
+        }
+
+        static void FindController()
+        {
+            if (!_padsReady) return;
+            if (_pad != IntPtr.Zero && SDL.SDL_GameControllerGetAttached(_pad) != 0) return;
+            _pad = IntPtr.Zero;
+            if (++_padScan % 60 != 1) return; // look for a newly plugged one about once a second
+            int n = SDL.SDL_NumJoysticks();
+            for (int i = 0; i < n; i++) if (SDL.SDL_IsGameController(i) != 0) { _pad = SDL.SDL_GameControllerOpen(i); if (_pad != IntPtr.Zero) break; }
+        }
+
         public static void Update()
         {
             int n;
             IntPtr state = SDL.SDL_GetKeyboardState(out n);
+            try { FindController(); } catch { _padsReady = false; }
             for (int b = 0; b < (int)Button.Count; b++)
             {
-                bool down = _simulated[b];
+                bool down = _simulated[b] || (_pad != IntPtr.Zero && PadDown(b));
                 foreach (int sc in Keys[b]) if (sc < n && Marshal.ReadByte(state, sc) != 0) { down = true; break; }
                 _held[b] = down ? _held[b] + 1 : 0;
             }

@@ -97,6 +97,7 @@ namespace PokeCreator.Runtime
             int pluginRecords = PokeCreator.Projects.Plugins.MergeData(Project);
             if (pluginRecords > 0) Console.WriteLine("[plugins] Added " + pluginRecords + " database record(s)");
             if (SDL.SDL_Init(SDL.INIT_VIDEO | SDL.INIT_EVENTS) != 0) throw new Exception("SDL_Init failed: " + SDL.GetError());
+            Input.InitControllers();
             SDL.SDL_InitSubSystem(SDL.INIT_AUDIO);
             SDL.IMG_Init(0x2 | 0x1); // PNG | JPG
             SDL.TTF_Init();
