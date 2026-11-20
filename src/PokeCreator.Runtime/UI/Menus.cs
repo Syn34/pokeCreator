@@ -39,6 +39,7 @@ namespace PokeCreator.Runtime.UI
                     var items = new List<string>();
                     if (_save != null) items.Add("Continue");
                     items.Add("New Game");
+                    if (Game.Project.MysteryGifts.Any(m => !string.IsNullOrEmpty(m.Code))) items.Add("Mystery Gift");
                     items.Add("Quit");
                     _menu = new CommandList(items);
                 }
@@ -50,6 +51,16 @@ namespace PokeCreator.Runtime.UI
             string cmd = _menu.Items[r];
             Decide();
             if (cmd == "Quit") { Game.Quit(); return; }
+            if (cmd == "Mystery Gift")
+            {
+                Game.PushScene(new NameEntryScene(Game, "Enter the Mystery Gift code.", "", 16, code =>
+                {
+                    if (string.IsNullOrEmpty(code)) return;
+                    var gift = MysteryGift.Redeem(Game.Project, code);
+                    Game.Message.Show(gift == null ? "That code isn't valid." : "You unlocked a Mystery Gift: " + (string.IsNullOrEmpty(gift.Name) ? gift.Id : gift.Name) + "! Pick it up from the delivery person.");
+                }));
+                return;
+            }
             _choice = cmd == "Continue" ? 0 : 1;
             _fading = true;
             Game.Audio.FadeOutBgm(1);

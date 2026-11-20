@@ -409,6 +409,28 @@ namespace PokeCreator.Data
         public override string DisplayName { get { return Id + ": " + Name; } }
     }
 
+    /// <summary>A Mystery Gift: a Pokémon or an item players receive from the delivery person after redeeming it.</summary>
+    public class MysteryGiftData : GameRecord
+    {
+        [Field("Title", Help = "Shown when the gift is received, e.g. \"Shiny Pikachu event\".")] public string Name { get; set; }
+        [Field("Code", Help = "Players type this on the title screen's Mystery Gift option. Empty = every player can receive it.")] public string Code { get; set; }
+        [Field("Kind", Choices = new[] { "Pokemon", "Item" })] public string Kind { get; set; }
+        [Field("Species", Ref = "species", Group = "Pokémon")] public string Species { get; set; }
+        [Field("Level", Group = "Pokémon")] public int Level { get; set; }
+        [Field("Form", Group = "Pokémon")] public int Form { get; set; }
+        [Field("Shiny", Group = "Pokémon")] public bool Shiny { get; set; }
+        [Field("Nature", Group = "Pokémon", Help = "Empty = random")] public string Nature { get; set; }
+        [Field("Ability", Ref = "abilities", Group = "Pokémon", Help = "Empty = normal")] public string Ability { get; set; }
+        [Field("Held item", Ref = "items", Group = "Pokémon")] public string HeldItem { get; set; }
+        [Field("Moves", Ref = "moves", Group = "Pokémon", Help = "Empty = the usual moves for its level")] public List<string> Moves { get; set; }
+        [Field("Original trainer", Group = "Pokémon", Help = "Empty = the player")] public string OTName { get; set; }
+        [Field("Poké Ball", Ref = "items", Group = "Pokémon")] public string Ball { get; set; }
+        [Field("Item", Ref = "items", Group = "Item")] public string Item { get; set; }
+        [Field("Quantity", Group = "Item")] public int Quantity { get; set; }
+        public MysteryGiftData() { Kind = "Pokemon"; Level = 5; Quantity = 1; Moves = new List<string>(); Ball = "CHERISHBALL"; }
+        public override string DisplayName { get { return Id + ": " + (string.IsNullOrEmpty(Name) ? (Kind == "Item" ? Item : Species) : Name); } }
+    }
+
     public class RegionalDex : GameRecord
     {
         [Field("Name")] public string Name { get; set; }

@@ -70,6 +70,7 @@ namespace PokeCreator.Projects
         public List<TownMapRegion> TownMaps = new List<TownMapRegion>();
         public List<RegionalDex> RegionalDexes = new List<RegionalDex>();
         public List<BattleAnimation> Animations = new List<BattleAnimation>();
+        public List<MysteryGiftData> MysteryGifts = new List<MysteryGiftData>();
 
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
@@ -92,6 +93,7 @@ namespace PokeCreator.Projects
             AddTable("town_maps", "Town Maps", typeof(TownMapRegion), "town_maps.json", () => TownMaps);
             AddTable("regional_dexes", "Regional Dexes", typeof(RegionalDex), "regional_dexes.json", () => RegionalDexes);
             AddTable("animations", "Battle Animations", typeof(BattleAnimation), "animations.json", () => Animations);
+            AddTable("mystery_gifts", "Mystery Gifts", typeof(MysteryGiftData), "mystery_gifts.json", () => MysteryGifts);
         }
 
         void AddTable(string key, string label, Type t, string file, Func<IList> get)
@@ -224,6 +226,7 @@ namespace PokeCreator.Projects
             p.TownMaps = LoadOr(p.DataFile("town_maps.json"), p.TownMaps);
             p.RegionalDexes = LoadOr(p.DataFile("regional_dexes.json"), p.RegionalDexes);
             p.Animations = LoadOr(p.DataFile("animations.json"), p.Animations);
+            p.MysteryGifts = LoadOr(p.DataFile("mystery_gifts.json"), p.MysteryGifts);
             p.MapInfos = LoadOr(p.DataFile("mapinfos.json"), p.MapInfos);
             p.Tilesets = LoadOr(p.DataFile("tilesets.json"), p.Tilesets);
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);

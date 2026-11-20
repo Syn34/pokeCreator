@@ -389,7 +389,9 @@ namespace PokeCreator.Runtime.Script
             Register("$Trainer.male?", (c, a) => PlayerGender() != "Female");
             Register("$Trainer.female?", (c, a) => PlayerGender() == "Female");
             Register("pbInChallenge?", (c, a) => World.BattleTower.InProgress(_game));
-            Register("pbNextMysteryGiftID", (c, a) => 0);
+            Register("pbNextMysteryGiftID", (c, a) => { var w = World.MysteryGift.Waiting(_game); return w.Count > 0 ? (object)w[0].Id : 0; });
+            Register("pbReceiveMysteryGift", (c, a) => World.MysteryGift.Receive(_game, a.Count > 0 && a[0] != null && !(a[0] is int) ? Str(a, 0) : null));
+            Register("pbMysteryGiftWaiting?", (c, a) => World.MysteryGift.Waiting(_game).Count > 0);
             Register("$game_player.has_follower?", (c, a) => false);
             Register("get_event", (c, a) => _game.Map == null ? null : _game.Map.Events.FirstOrDefault(e => e.Id == ToInt(Arg(a, 0))));
             Register("pbSetSelfSwitch", (c, a) =>
