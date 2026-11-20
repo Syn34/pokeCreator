@@ -341,6 +341,12 @@ namespace PokeCreator.Runtime.UI
             Ui.GenderSymbol(g, 160, 54, pk.Gender);
             Ui.Text(g, 20, 86, "Lv. " + pk.Level);
             if (pk.Shiny) g.DrawText(120, 86, "Shiny", new Color(248, 64, 48), Ui.DarkShadow);
+            if (pk.ShadowPokemon)
+            {
+                g.DrawText(20, 146, "Shadow", new Color(136, 64, 200), Ui.DarkShadow);
+                int stage = PokeCreator.Pkmn.Shadow.Stage(pk);
+                for (int s = 0; s < 5; s++) g.FillRect(110 + s * 14, 152, 12, 14, s < stage ? new Color(136, 64, 200) : new Color(208, 208, 216));
+            }
             if (pk.PokerusStage == 1) { g.FillRect(18, 116, 66, 28, new Color(168, 64, 200)); g.DrawText(24, 116, "PKRS", new Color(248, 248, 248), new Color(96, 32, 120)); }
             else if (pk.PokerusStage == 2) g.DrawText(20, 115, "PKRS (cured)", new Color(168, 64, 200), Ui.DarkShadow);
             Ui.PokemonFront(g, Game, pk, 100, 290, 168);

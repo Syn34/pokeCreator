@@ -99,6 +99,18 @@ namespace PokeCreator.Runtime.UI
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
                 case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
                 case "POKERADAR": g.CloseAllScenes(); PokeRadar.Use(g); return;
+                case "JOYSCENT": case "EXCITESCENT": case "VIVIDSCENT":
+                    g.PushScene(new PartyScene(g, "Use on which Pokémon?", null, (i, close) =>
+                    {
+                        var pk = g.State.Party[i];
+                        int amount = itemId == "JOYSCENT" ? 500 : itemId == "EXCITESCENT" ? 1000 : 2000;
+                        if (!pk.ShadowPokemon || pk.HeartGauge <= 0) { g.Message.Show("It won't have any effect."); return; }
+                        close();
+                        g.State.AddItem(itemId, -1);
+                        PokeCreator.Pkmn.Shadow.AdjustHeart(pk, -amount);
+                        g.Message.Show(pk.Name(g.Project) + "'s heart opened a little!" + (PokeCreator.Pkmn.Shadow.Purifiable(pk) ? "\n" + pk.Name(g.Project) + " can now be purified!" : ""), null, -1, _ => { if (refresh != null) refresh(); });
+                    }, null));
+                    return;
                 case "ITEMFINDER": case "DOWSINGMACHINE": case "DOWSINGMCHN":
                     g.CloseAllScenes(); FieldMoves.Itemfinder(g, item.Name); return;
             }

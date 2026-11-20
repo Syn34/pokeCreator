@@ -605,9 +605,16 @@ namespace PokeCreator.Runtime
             }
             // Rain, snow, sandstorm and sun on the map carry into the battle (as Essentials)
             b.SwitchStyle = Options == null || !Options.BattleStyleSet;
+            b.CanSnag = State.Flags.Contains("has_snag_machine");
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
-            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (!setup.Facility) World.Pokerus.AfterBattle(this); if (end != null) end(o); };
+            setup.OnEnd = o =>
+            {
+                LastOutcome = o; ResumeOutcome = o;
+                if (!setup.Facility) World.Pokerus.AfterBattle(this);
+                foreach (var pk in State.Party.Where(p => p.ShadowPokemon && b.SentOut.Contains(p) && !p.Fainted)) PokeCreator.Pkmn.Shadow.AdjustHeart(pk, -100);
+                if (end != null) end(o);
+            };
             BattleJustStarted = true;
             Audio.PlaySe("Encounter");
             Flash(20);

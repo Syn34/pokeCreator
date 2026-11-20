@@ -225,7 +225,7 @@ namespace PokeCreator.Battles
         MoveData Move(string id) { return P.Moves.FirstOrDefault(m => m.Id == id); }
         void Say(string text) { _ev.Add(new BattleEvent { Kind = BattleEventKind.Message, Text = text }); }
         void Hp(Battler b, int from) { _ev.Add(new BattleEvent { Kind = BattleEventKind.Hp, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Value = from, Value2 = b.Pk.HP }); }
-        void SendOutEvent(Battler b) { _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot }); }
+        void SendOutEvent(Battler b) { SentOut.Add(b.Pk); _ev.Add(new BattleEvent { Kind = BattleEventKind.SendOut, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot }); }
 
         /// <summary>Starts the battle: send-out messages. Call once.</summary>
         public List<BattleEvent> Start()
@@ -873,7 +873,7 @@ namespace PokeCreator.Battles
             string mtype = MoveType(user, md, code);
             if (PowderExplodes(user, mtype)) { user.LastMoveFailed = true; return; }
             if (PrimalStopsMove(mtype)) { user.LastMoveFailed = true; return; }
-            double typeMod = md.Id == "STRUGGLE" ? 1 : EffectivenessOn(mtype, target);
+            double typeMod = md.Id == "STRUGGLE" ? 1 : mtype == "SHADOW" ? (target.Pk.ShadowPokemon ? 0.5 : 2) : EffectivenessOn(mtype, target);
             if (code == "EffectivenessIncludesFlyingType" && typeMod > 0) typeMod *= EffectivenessOn("FLYING", target);
             if (typeMod == 0 && mtype == "GROUND" && TypesOf(target).Contains("FLYING") && (IsGrounded(target) || code == "HitsTargetInSkyGroundsTarget"))
                 typeMod = TypesOf(target).Where(t => t != "FLYING").Aggregate(1.0, (acc, t) => acc * TypeVs(mtype, t));
@@ -1563,6 +1563,7 @@ namespace PokeCreator.Battles
                         int add = Math.Min(gain, Math.Min(ItemEffects.MaxEV - pk.EV[s], ItemEffects.MaxTotalEV - pk.EV.Sum()));
                         if (add > 0) pk.EV[s] += add;
                     }
+                if (pk.ShadowPokemon) { pk.SavedExp += amount; continue; } // Shadow Pokémon store their EXP until purified
                 Say(pk.Name(P) + " gained " + amount + " Exp. Points!");
                 int expBefore = pk.Exp;
                 var data = pk.Data(P);
@@ -1701,7 +1702,7 @@ namespace PokeCreator.Battles
             var item = P.Items.FirstOrDefault(i => i.Id == ball);
             string bname = item != null ? item.Name : ball;
             Say(PlayerName + " threw " + (StartsWithVowel(bname) ? "an " : "a ") + bname + "!");
-            if (!IsWild)
+            if (!IsWild && !(CanSnag && Live(1).Count == 1 && Live(1)[0].Pk.ShadowPokemon))
             {
                 _ev.Add(new BattleEvent { Kind = BattleEventKind.Catch, Value = -1 });
                 Say("The Trainer blocked your Poké Ball! Don't be a thief!");
@@ -1730,6 +1731,20 @@ namespace PokeCreator.Battles
                 caught = shakes == 4;
             }
             _ev.Add(new BattleEvent { Kind = BattleEventKind.Catch, Value = Math.Min(3, shakes), Flag = caught, Text = ball });
+            if (caught && !IsWild)
+            {
+                // Snagging a trainer's Shadow Pokémon: it's the player's now, and the trainer sends out the next one
+                Say("Gotcha! " + foe.Name(P) + " was snagged!");
+                foe.Ball = ball;
+                foeB.Reset();
+                Snagged.Add(foe);
+                var gone = Json.Json.Deserialize<Pokemon>(Json.Json.Write(foe)); gone.HP = 0;
+                Parties[1][foeB.PartyIndex] = gone;
+                var stub = new Battler(gone, 1, foeB.PartyIndex) { Slot = foeB.Slot, FaintShown = true };
+                Field[1][foeB.Slot] = stub;
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 1, Party = foeB.PartyIndex, Slot = foeB.Slot });
+                return;
+            }
             if (caught)
             {
                 Say("Gotcha! " + foe.Name(P) + " was caught!");

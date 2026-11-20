@@ -79,7 +79,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Poké Radar (shaking grass patches, PokeRadar encounter slots, chains of the same species raising the shiny chance, 50-step recharge)
 - [x] Battle Tower (pbBattleTower(rounds, double, level): pick 3 or 4 Pokémon, copies at level 50, generated trainers that get stronger with the streak, healing between rounds, Battle Points, records; pbInChallenge?, pbBattleChallenge.wins / decision / record / streak)
 - [x] Mystery Gift (Database → Mystery Gifts: Pokémon or items, open to everyone or unlocked by a code on the title screen; pbReceiveMysteryGift / pbNextMysteryGiftID for the delivery person)
-- [ ] Shadow Pokémon and purification
+- [x] Shadow Pokémon (trainer Pokémon with the Shadow flag, Shadow type and moves, Snag Machine catching from trainers, heart gauge opened by walking, battling and scents, EXP saved until purified at a Relic Stone)
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## Later

@@ -1059,6 +1059,12 @@ namespace PokeCreator.Runtime.Script
                     case "nature": return pk.Nature;
                     case "happiness": return pk.Happiness;
                     case "pokerus": return pk.Pokerus;
+                    case "shadowPokemon?": case "shadow?": return pk.ShadowPokemon;
+                    case "makeShadow": PokeCreator.Pkmn.Shadow.Make(_game.Project, pk); return true;
+                    case "heart_gauge": case "heartgauge": return pk.HeartGauge;
+                    case "heartStage": return PokeCreator.Pkmn.Shadow.Stage(pk);
+                    case "purifiable?": return PokeCreator.Pkmn.Shadow.Purifiable(pk);
+                    case "adjustHeart": PokeCreator.Pkmn.Shadow.AdjustHeart(pk, args.Count > 0 ? ToInt(args[0]) : 0); return true;
                     case "pokerusStage": return pk.PokerusStage;
                     case "givePokerus": pk.GivePokerus(_game.Rng, args.Count > 0 ? ToInt(args[0]) : 0); return true;
                     case "resetPokerusTime": if (pk.PokerusStage == 1) pk.Pokerus = (pk.Pokerus & 0xF0) | ((pk.Pokerus >> 4) % 4 + 1); return true;
@@ -1078,7 +1084,6 @@ namespace PokeCreator.Runtime.Script
                         }
                     case "heal": pk.Heal(P); return true;
                     case "numMoves": return pk.Moves.Count;
-                    case "shadowPokemon?": return false;
                     case "foreign?": return pk.OTName != _game.State.PlayerName || pk.OTId != _game.State.TrainerId;
                     case "can_relearn_move?": return RelearnableMoves(pk).Count > 0;
                     case "forget_move_at_index": { int i = ToInt(args.Count > 0 ? args[0] : null); if (i >= 0 && i < pk.Moves.Count && pk.Moves.Count > 1) pk.Moves.RemoveAt(i); return true; }

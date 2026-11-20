@@ -628,7 +628,19 @@ namespace PokeCreator.Runtime.UI
                     else { Game.State.Storage.Add(pk); Game.Message.Show(pk.Name(Game.Project) + " was sent to the PC.", null, -1, _ => next()); }
                 });
             }
-            else if (o == BattleOutcome.Loss && !_setup.CanLose)
+            foreach (var sn in _b.Snagged)
+            {
+                var pk = sn;
+                pk.OTName = Game.State.PlayerName; pk.OTId = Game.State.TrainerId; pk.MetMap = Game.Map != null ? Game.Map.Id : 0; pk.MetLevel = pk.Level;
+                pk.Heal(Game.Project);
+                Game.State.Register(pk);
+                steps.Add(next =>
+                {
+                    if (Game.State.Party.Count < GameState.MaxParty) { Game.State.Party.Add(pk); Game.Message.Show(pk.Name(Game.Project) + " joined your team!", null, -1, _ => next()); }
+                    else { Game.State.Storage.Add(pk); Game.Message.Show(pk.Name(Game.Project) + " was sent to the PC.", null, -1, _ => next()); }
+                });
+            }
+            if (o == BattleOutcome.Loss && !_setup.CanLose)
             {
                 int lost = Math.Min(Game.State.Money, LossMoney());
                 steps.Add(next =>
@@ -876,6 +888,7 @@ namespace PokeCreator.Runtime.UI
             // Clip what falls below the battle area (fainting slides down out of view)
             int h = Math.Min(tex.Height, Math.Max(0, 288 - (bottom - tex.Height)));
             if (h <= 0) return;
+            if (pk.ShadowPokemon) { g.DrawEx(tex, 0, 0, fw, h, cx, bottom - tex.Height + h / 2.0, 1, 1, 0, false, 255, 0, new Color(112, 40, 160, 120)); return; }
             g.Draw(tex, 0, 0, fw, h, cx - fw / 2, bottom - tex.Height);
         }
 

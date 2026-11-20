@@ -107,6 +107,10 @@ namespace PokeCreator.Pkmn
         /// <summary>"" or BURN, POISON, TOXIC, PARALYSIS, SLEEP, FROZEN.</summary>
         public string Status { get; set; }
         public int Happiness { get; set; }
+        /// <summary>Shadow Pokémon (see Shadow): heart gauge 0-4000, EXP saved until purified.</summary>
+        public bool ShadowPokemon { get; set; }
+        public int HeartGauge { get; set; }
+        public int SavedExp { get; set; }
         /// <summary>Pokérus as in the games: strain in the high 4 bits, days left in the low 4 (0 = never had it).</summary>
         public int Pokerus { get; set; }
         /// <summary>0 = never infected, 1 = infected (days left), 2 = cured (EV boost stays).</summary>
@@ -283,6 +287,7 @@ namespace PokeCreator.Pkmn
                     pk.Moves.Add(new PokemonMove(id, md != null ? md.TotalPP : 10));
                 }
             }
+            if (tp.Shadow) Shadow.Make(p, pk);
             pk.HP = pk.TotalHP(p);
             return pk;
         }

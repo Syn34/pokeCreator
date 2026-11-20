@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PokeCreator.Pkmn;
 
 namespace PokeCreator.Battles
 {
@@ -13,6 +14,12 @@ namespace PokeCreator.Battles
         public bool Safari;
         /// <summary>No EXP or EVs (battle facilities, where the team are copies).</summary>
         public bool NoExp;
+        /// <summary>The player has a Snag Machine: Poké Balls can catch a trainer's Shadow Pokémon.</summary>
+        public bool CanSnag;
+        /// <summary>Shadow Pokémon snagged from trainers this battle (they join the player afterwards).</summary>
+        public readonly List<PokeCreator.Pkmn.Pokemon> Snagged = new List<PokeCreator.Pkmn.Pokemon>();
+        /// <summary>Every Pokémon sent out this battle (Shadow Pokémon's hearts open a little after battling).</summary>
+        public readonly HashSet<PokeCreator.Pkmn.Pokemon> SentOut = new HashSet<PokeCreator.Pkmn.Pokemon>();
         int _catchFactor, _escapeFactor, _bait, _rock;
         int? _catchRateOverride;
 

@@ -317,6 +317,7 @@ namespace PokeCreator.Runtime.World
             DayCare.OnStep(Game);
             World.Phone.OnStep(Game);
             Safari.OnStep(Game);
+            foreach (var spk in Game.State.Party) if (spk.ShadowPokemon) PokeCreator.Pkmn.Shadow.AdjustHeart(spk, -1);
             if ((Game.State.Steps & 63) == 0) World.Pokerus.DailyCheck(Game);
             if (Game.Map.TerrainTag(X, Y) == GameMap.TagIce && !Surfing && !RouteForced) _sliding = true;
             // Player touch / event touch on the tile we stepped onto

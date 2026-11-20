@@ -174,6 +174,29 @@ namespace PokeCreator.Runtime.Script
             Register("pbBattleChallenge.record", (c, a) => { int r; BattleTower.State(_game).Records.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
             Register("pbBattleChallenge.streak", (c, a) => { int r; BattleTower.State(_game).Streaks.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
 
+            // Shadow Pokémon: the Relic Stone purifies a Pokémon whose heart is fully open
+            Register("pbRelicStone", (c, a) =>
+            {
+                if (!_game.State.Party.Any(p => p.ShadowPokemon)) { _game.Message.Show("There's no Pokémon to purify here."); return false; }
+                _game.PushScene(new UI.PartyScene(_game, "Purify which Pokémon?", null, (i, close) =>
+                {
+                    var pk = _game.State.Party[i];
+                    if (!pk.ShadowPokemon) { _game.Message.Show("That isn't a Shadow Pokémon."); return; }
+                    close();
+                    if (!PokeCreator.Pkmn.Shadow.Purifiable(pk)) { _game.Message.Show(pk.Name(_game.Project) + "'s heart is still closed..."); return; }
+                    PokeCreator.Pkmn.Shadow.Purify(_game.Project, pk);
+                    _game.Audio.PlayMe("Pkmn get");
+                    _game.Message.Show(pk.Name(_game.Project) + " opened the door to its heart! " + pk.Name(_game.Project) + " was purified!");
+                }, null));
+                return true;
+            });
+            Register("pbPurify", (c, a) =>
+            {
+                var pk = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
+                if (pk == null || !PokeCreator.Pkmn.Shadow.Purifiable(pk)) return false;
+                PokeCreator.Pkmn.Shadow.Purify(_game.Project, pk); return true;
+            });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);
