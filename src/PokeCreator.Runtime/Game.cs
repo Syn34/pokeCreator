@@ -555,9 +555,16 @@ namespace PokeCreator.Runtime
         void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
         {
             var end = setup.OnEnd;
+            // Safari Zone: wild battles are Safari battles
+            if (setup.Wild && World.Safari.InZone(this) && b.Parties[1].Count == 1 && !b.IsDouble)
+            {
+                b.Safari = true; setup.Safari = true;
+                var endSafari = end;
+                end = o => { World.Safari.AfterBattle(this, o); if (endSafari != null) endSafari(o); };
+            }
             // A registered partner fights alongside the player (the battle becomes a double battle)
             var partner = State.Extras.Partner;
-            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple)
+            if (partner != null && partner.Party.Any(PokeCreator.Battles.Battle.Able) && !b.IsTriple && !b.Safari)
             {
                 var ptt = Project.TrainerTypes.FirstOrDefault(t => t.Id == partner.TrainerType);
                 b.AddPartner(partner.Party, partner.Name, ptt != null && !string.IsNullOrEmpty(ptt.Name) ? ptt.Name : partner.TrainerType, ptt != null ? Math.Max(32, ptt.SkillLevel) : 32);

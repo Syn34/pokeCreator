@@ -256,6 +256,14 @@ namespace PokeCreator.Battles
                 foreach (var b in foes) SendOutEvent(b);
             }
             var mine = new List<Battler>();
+            if (Safari)
+            {
+                // Safari Zone: the player's Pokémon stays in its Ball
+                var own = Bench(0);
+                if (own.Count > 0) Place(0, 0, own[0]);
+                SafariSetup();
+                return _ev;
+            }
             if (HasPartner) mine = PlacePlayerSideWithPartner();
             else
             {
@@ -1703,7 +1711,7 @@ namespace PokeCreator.Battles
             if (foeB == null) return;
             var foe = foeB.Pk;
             var fd = foe.Data(P);
-            int rate = fd != null && fd.CatchRate > 0 ? fd.CatchRate : 45;
+            int rate = _catchRateOverride.HasValue ? _catchRateOverride.Value : fd != null && fd.CatchRate > 0 ? fd.CatchRate : 45;
             double mod = BallModifier(ball, this);
             if (ball == "REPEATBALL" && AlreadyCaught(foe.Species)) mod = 3.5;
             int max = foe.TotalHP(P);

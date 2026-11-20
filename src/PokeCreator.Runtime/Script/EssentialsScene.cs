@@ -132,6 +132,19 @@ namespace PokeCreator.Runtime.Script
             Register("pbResetAllRoamers", (c, a) => { Roaming.ResetAll(_game); return true; });
             Register("pbRoamPokemon", (c, a) => { Roaming.OnMapChanged(_game); return true; });
 
+            // Safari Zone
+            Register("pbInSafari?", (c, a) => Safari.InSafari(_game));
+            foreach (var n in new[] { "pbSafariState.pbStart", "pbSafariState.start" })
+                Register(n, (c, a) => { Safari.Start(_game, a.Count > 0 ? ToInt(a[0]) : 0); return true; });
+            foreach (var n in new[] { "pbSafariState.pbEnd", "pbSafariState.end" }) Register(n, (c, a) => { Safari.End(_game); return true; });
+            Register("pbSafariState.inProgress?", (c, a) => Safari.InProgress(_game));
+            Register("pbSafariState.pbGoToStart", (c, a) => { Safari.GoToStart(_game); return true; });
+            Register("pbSafariState.ballcount", (c, a) => Safari.State(_game).Balls);
+            Register("pbSafariState.steps", (c, a) => Safari.State(_game).Steps);
+            Register("pbSafariState.decision", (c, a) => Safari.State(_game).Decision);
+            Register("pbSafariState.captures", (c, a) => Safari.State(_game).Captures);
+            Register("pbSafariState.pbReceptionMap", (c, a) => Safari.State(_game).StartMap);
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

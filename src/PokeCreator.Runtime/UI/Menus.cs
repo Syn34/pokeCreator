@@ -156,6 +156,16 @@ namespace PokeCreator.Runtime.UI
         {
             int w = _list.Width(g) + 20;
             _list.Draw(g, g.Width - w - 6, 6);
+            if (Safari.InSafari(Game))
+            {
+                var s = Safari.State(Game);
+                string steps = Game.Project.Settings.SafariSteps > 0 ? "Steps: " + s.Steps + "/" + Game.Project.Settings.SafariSteps : "Steps: -";
+                string balls = "Balls: " + s.Balls;
+                int bw = Math.Max(g.TextWidth(steps), g.TextWidth(balls)) + 28;
+                MessageWindow.DrawBox(g, 6, 6, bw, 76);
+                Ui.Text(g, 20, 18, steps);
+                Ui.Text(g, 20, 46, balls);
+            }
         }
     }
 

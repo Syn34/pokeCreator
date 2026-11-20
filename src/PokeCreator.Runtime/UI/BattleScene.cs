@@ -23,6 +23,8 @@ namespace PokeCreator.Runtime.UI
         public Action<BattleOutcome> OnEnd;
         /// <summary>Battle music instead of the usual wild / trainer music (roaming Pokémon).</summary>
         public string Bgm;
+        /// <summary>A Safari Zone battle (Ball / Bait / Rock / Run).</summary>
+        public bool Safari;
     }
 
     /// <summary>
@@ -384,9 +386,31 @@ namespace PokeCreator.Runtime.UI
 
         // ------------------------------------------------------------------ menus
         static readonly string[] Commands = { "FIGHT", "BAG", "POKéMON", "RUN" };
+        static readonly string[] SafariCommands = { "BALL", "BAIT", "ROCK", "RUN" };
+
+        void SafariMenu()
+        {
+            if (Input.Repeat(Button.Right) && _cmd % 2 == 0) { _cmd++; Cursor(); }
+            if (Input.Repeat(Button.Left) && _cmd % 2 == 1) { _cmd--; Cursor(); }
+            if (Input.Repeat(Button.Down) && _cmd < 2) { _cmd += 2; Cursor(); }
+            if (Input.Repeat(Button.Up) && _cmd >= 2) { _cmd -= 2; Cursor(); }
+            if (Input.Trigger(Button.Cancel) && _cmd != 3) { _cmd = 3; Cursor(); return; }
+            if (!Input.Trigger(Button.Action)) return;
+            Decide();
+            var s = World.Safari.State(Game);
+            if (_cmd == 0)
+            {
+                if (s.Balls <= 0) { Game.Message.Show("You have no Safari Balls left!"); return; }
+                s.Balls--;
+                Run(_b.SafariTurn(Battle.SafariAction.Ball, s.Balls));
+                return;
+            }
+            Run(_b.SafariTurn(_cmd == 1 ? Battle.SafariAction.Bait : _cmd == 2 ? Battle.SafariAction.Rock : Battle.SafariAction.Run, s.Balls));
+        }
 
         void CommandMenu()
         {
+            if (_b.Safari) { SafariMenu(); return; }
             if (Input.Repeat(Button.Right) && _cmd % 2 == 0) { _cmd++; Cursor(); }
             if (Input.Repeat(Button.Left) && _cmd % 2 == 1) { _cmd--; Cursor(); }
             if (Input.Repeat(Button.Down) && _cmd < 2) { _cmd += 2; Cursor(); }
@@ -950,13 +974,20 @@ namespace PokeCreator.Runtime.UI
             int by = g.Height - 100;
             MessageWindow.DrawBox(g, 4, by, 260, 96);
             Ui.Text(g, 24, by + 14, "What will");
-            Ui.Text(g, 24, by + 46, Me.Pk.Name(Game.Project) + " do?");
+            Ui.Text(g, 24, by + 46, (_b.Safari ? Game.State.PlayerName : Me.Pk.Name(Game.Project)) + " do?");
             Ui.Panel(g, 268, by, g.Width - 272, 96, new Color(248, 248, 248), new Color(96, 88, 120));
             for (int i = 0; i < 4; i++)
             {
                 int cx = 296 + (i % 2) * 110, cy = by + 14 + (i / 2) * 36;
                 if (i == _cmd) Ui.Arrow(g, cx - 18, cy + 6);
-                Ui.Text(g, cx, cy, Commands[i]);
+                Ui.Text(g, cx, cy, _b.Safari ? SafariCommands[i] : Commands[i]);
+            }
+            if (_b.Safari)
+            {
+                string balls = "Safari Balls: " + World.Safari.State(Game).Balls;
+                int bw = g.TextWidth(balls) + 20;
+                Ui.Panel(g, g.Width - bw - 4, by - 34, bw, 30, new Color(248, 248, 248), new Color(96, 88, 120));
+                g.DrawText(g.Width - bw + 6, by - 32, balls, Ui.Dark, Ui.DarkShadow);
             }
         }
 

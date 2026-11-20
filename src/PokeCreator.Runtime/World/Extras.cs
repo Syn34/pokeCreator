@@ -20,6 +20,7 @@ namespace PokeCreator.Runtime.World
     {
         public PartnerInfo Partner { get; set; }
         public List<RoamerState> Roamers { get; set; }
+        public SafariState Safari { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>
         public bool RoamedAlready { get; set; }
     }

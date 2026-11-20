@@ -316,6 +316,7 @@ namespace PokeCreator.Runtime.World
             Game.State.Steps++;
             DayCare.OnStep(Game);
             World.Phone.OnStep(Game);
+            Safari.OnStep(Game);
             if (Game.Map.TerrainTag(X, Y) == GameMap.TagIce && !Surfing && !RouteForced) _sliding = true;
             // Player touch / event touch on the tile we stepped onto
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
