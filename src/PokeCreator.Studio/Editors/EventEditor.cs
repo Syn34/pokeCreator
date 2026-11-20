@@ -132,6 +132,17 @@ namespace PokeCreator.Studio.Editors
                         if (sc.StartsWith("pbShowMap") || sc == "pbTownMap") return "◆ Show Town Map";
                         if (sc == "pbMountBike") return "◆ Get On the Bicycle";
                         if (sc == "pbHallOfFameEntry") return "◆ Enter Hall of Fame";
+                        if (sc.StartsWith("pbBattleTower")) return "◆ Battle Tower Challenge " + sc.Substring("pbBattleTower".Length);
+                        if (sc.StartsWith("pbLinkBattle")) return "◆ Link Battle" + (sc.Contains("true") ? " (double)" : "");
+                        if (sc == "pbLinkTrade") return "◆ Link Trade";
+                        if (sc == "pbReceiveMysteryGift") return "◆ Give Waiting Mystery Gift";
+                        if (sc.StartsWith("pbRegisterPartner")) return "◆ Register Partner " + sc.Substring("pbRegisterPartner".Length);
+                        if (sc == "pbDeregisterPartner") return "◆ Remove Partner Trainer";
+                        if (sc.StartsWith("pbSafariState.pbStart")) return "◆ Start Safari Game " + sc.Substring("pbSafariState.pbStart".Length);
+                        if (sc == "pbSafariState.pbEnd") return "◆ End Safari Game";
+                        if (sc.StartsWith("pbBugContestState.pbStart")) return "◆ Start Bug-Catching Contest " + sc.Substring("pbBugContestState.pbStart".Length);
+                        if (sc == "pbBugContestState.pbJudge") return "◆ Judge Bug-Catching Contest";
+                        if (sc == "pbRelicStone") return "◆ Relic Stone";
                         if (sc.Replace(" ", "") == "$scene=Scene_Credits.new") return "◆ Play Credits";
                         if (sc == "pbDismountBike") return "◆ Get Off the Bicycle";
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbPickBerry\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");

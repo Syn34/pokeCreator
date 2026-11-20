@@ -251,6 +251,35 @@ namespace PokeCreator.Studio.Editors
                 Insert(new EventCommand(355, 0, "WildBattle.start(" + string.Join(", ", parts) + ")"));
             });
 
+            cmd(battle, "Battle Tower Challenge", () =>
+            {
+                int rounds = NumberDialog.Ask(FindForm(), "Rounds (trainers in a row)", 7); if (rounds < 1) return;
+                int k = ChoiceDialog.Ask(FindForm(), "Battle style", new[] { "Single battles", "Double battles" }, false); if (k < 0) return;
+                int lv = NumberDialog.Ask(FindForm(), "Level the team fights at", 50); if (lv < 1) return;
+                Insert(new EventCommand(355, 0, "pbBattleTower(" + rounds + ", " + (k == 1 ? "true" : "false") + ", " + Math.Min(100, lv) + ")"));
+            });
+            cmd(battle, "Link Battle with Another Player", () =>
+            {
+                int k = ChoiceDialog.Ask(FindForm(), "Battle style", new[] { "Single battle", "Double battle" }, false); if (k < 0) return;
+                Insert(new EventCommand(355, 0, "pbLinkBattle(" + (k == 1 ? "true" : "false") + ")"));
+            });
+
+            var extras = group("Extras");
+            cmd(extras, "Link Trade with Another Player", () => Insert(new EventCommand(355, 0, "pbLinkTrade")));
+            cmd(extras, "Give Waiting Mystery Gift (delivery person)", () => Insert(new EventCommand(355, 0, "pbReceiveMysteryGift")));
+            cmd(extras, "Register Partner Trainer", () =>
+            {
+                var trs = _p.Trainers.ToList();
+                int k = ChoiceDialog.Ask(FindForm(), "Partner (from the trainers database)", trs.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (" + t.Version + ")" : "")).ToArray(), true); if (k < 0) return;
+                Insert(new EventCommand(355, 0, "pbRegisterPartner(:" + trs[k].TrainerType + ", \"" + trs[k].Name + "\", " + trs[k].Version + ")"));
+            });
+            cmd(extras, "Remove Partner Trainer", () => Insert(new EventCommand(355, 0, "pbDeregisterPartner")));
+            cmd(extras, "Start Safari Game", () => { int b = NumberDialog.Ask(FindForm(), "Safari Balls", 30); if (b > 0) Insert(new EventCommand(355, 0, "pbSafariState.pbStart(" + b + ")")); });
+            cmd(extras, "End Safari Game", () => Insert(new EventCommand(355, 0, "pbSafariState.pbEnd")));
+            cmd(extras, "Start Bug-Catching Contest", () => { int b = NumberDialog.Ask(FindForm(), "Sport Balls", 20); if (b > 0) Insert(new EventCommand(355, 0, "pbBugContestState.pbStart(" + b + ")")); });
+            cmd(extras, "Judge Bug-Catching Contest", () => Insert(new EventCommand(355, 0, "pbBugContestState.pbJudge")));
+            cmd(extras, "Relic Stone (purify a Shadow Pokémon)", () => Insert(new EventCommand(355, 0, "pbRelicStone")));
+
             var field = group("Field Moves");
             cmd(field, "Cut Tree (asks to use Cut)", () => Insert(new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0)));
             cmd(field, "Rock Smash Rock (asks to use Rock Smash)", () => Insert(new EventCommand(111, 0, 12, "pbRockSmash"), new EventCommand(355, 1, "pbSmashThisEvent"),

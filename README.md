@@ -72,6 +72,8 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - Poké Marts (`pbPokemonMart`), the Pokémon Center PC (Pokémon storage boxes and item storage) and trainers who spot the player and walk up
 - Essentials compatibility layer for common script calls (`pbReceiveItem`, `pbItemBall`, `setTempSwitchOn`, `$game_switches[..]`, `TrainerBattle.start`, ...)
 - C# project scripts compiled at startup: `[ScriptCommand("name")]` methods become event commands, `[ScriptInit]` methods run at startup and can hook `GameEvents` (steps, map changes, battle ends, frames)
+- Link battles and trades between two players over a LAN or the internet (pbLinkBattle, pbLinkTrade)
+- Partner trainers, roaming Pokémon, Safari Zone, Bug-Catching Contest, Pokérus, Poké Radar, Battle Tower, Mystery Gift and Shadow Pokémon
 - Plugins (Game → Plugins…): share scripts, graphics, sounds and database records between projects as folders or .zip files
 - Translations (Game → Translations…): every message and database name in a per-language file with a grid editor; players pick the language in Options
 - Location signs, day/night tint on outdoor maps, BGM/SE/ME through SDL_mixer

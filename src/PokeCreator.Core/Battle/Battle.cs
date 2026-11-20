@@ -118,7 +118,7 @@ namespace PokeCreator.Battles
         public int[] FoeOwner;
         bool TwoTrainers { get { return FoeOwner != null && !string.IsNullOrEmpty(Trainer2Name); } }
         /// <summary>"Camper Jeff" for the trainer owning this foe party member.</summary>
-        string TrainerLabel(int party) { return TwoTrainers && party < FoeOwner.Length && FoeOwner[party] == 1 ? Trainer2TypeName + " " + Trainer2Name : TrainerTypeName + " " + TrainerName; }
+        string TrainerLabel(int party) { return (TwoTrainers && party < FoeOwner.Length && FoeOwner[party] == 1 ? Trainer2TypeName + " " + Trainer2Name : TrainerTypeName + " " + TrainerName).Trim(); }
         string AllTrainers { get { return TwoTrainers ? TrainerTypeName + " " + TrainerName + " and " + Trainer2TypeName + " " + Trainer2Name : TrainerTypeName + " " + TrainerName; } }
         public int TrainerSkill;
         public BattleOutcome Outcome;
@@ -218,7 +218,7 @@ namespace PokeCreator.Battles
         public static bool Able(Pokemon pk) { return pk != null && !pk.IsEgg && !pk.Fainted; }
         public int FirstAble(int side) { return Parties[side].FindIndex(Able); }
         public bool AnyAble(int side) { return Parties[side].Any(Able); }
-        string Name(Battler b) { return b.Side == 1 ? (IsWild ? "The wild " : "The opposing ") + b.Pk.Name(P) : b.Pk.Name(P); }
+        string Name(Battler b) { return b.Side == (FlipNames ? 0 : 1) ? (IsWild ? "The wild " : "The opposing ") + b.Pk.Name(P) : b.Pk.Name(P); }
         string NameCap(Battler b) { return Name(b); }
         /// <summary>Name in the middle of a sentence: "the wild Pidgey", "the opposing Onix".</summary>
         string NameL(Battler b) { string n = Name(b); return n.StartsWith("The ") ? "the " + n.Substring(4) : n; }
@@ -230,6 +230,7 @@ namespace PokeCreator.Battles
         /// <summary>Starts the battle: send-out messages. Call once.</summary>
         public List<BattleEvent> Start()
         {
+            if (StartOverride != null) return StartOverride();
             _ev = new List<BattleEvent>();
             var foes = new List<Battler>();
             if (TwoTrainers)
@@ -249,12 +250,13 @@ namespace PokeCreator.Battles
                 Say("You are challenged by " + AllTrainers + "!");
                 foreach (var b in foes) { Say(TrainerLabel(b.PartyIndex) + " sent out " + b.Pk.Name(P) + "!"); SendOutEvent(b); }
             }
-            else
+            else if (!FlipNames)
             {
-                Say(TrainerTypeName + " " + TrainerName + " would like to battle!");
-                Say(TrainerTypeName + " " + TrainerName + " sent out " + Names(foes) + "!");
+                Say((TrainerTypeName + " " + TrainerName).Trim() + " would like to battle!");
+                Say((TrainerTypeName + " " + TrainerName).Trim() + " sent out " + Names(foes) + "!");
                 foreach (var b in foes) SendOutEvent(b);
             }
+            else Say((TrainerTypeName + " " + TrainerName).Trim() + " would like to battle!");
             var mine = new List<Battler>();
             if (Safari)
             {
@@ -269,7 +271,14 @@ namespace PokeCreator.Battles
             {
                 var myBench = Bench(0);
                 for (int i = 0; i < SlotsPerSide && i < myBench.Count; i++) mine.Add(Place(0, i, myBench[i]));
-                Say("Go! " + Names(mine) + "!");
+                if (FlipNames)
+                {
+                    // Worded for the player on side 1: side 0 is the other player
+                    Say((TrainerTypeName + " " + TrainerName).Trim() + " sent out " + Names(mine) + "!");
+                    Say("Go! " + string.Join(" and ", foes.Select(f => f.Pk.Name(P))) + "!");
+                    foreach (var b in foes) SendOutEvent(b);
+                }
+                else Say("Go! " + Names(mine) + "!");
             }
             foreach (var b in mine) SendOutEvent(b);
             MarkParticipant();
@@ -302,6 +311,7 @@ namespace PokeCreator.Battles
         /// <summary>One turn. commands: one per player Pokémon on the field (BattleCommand.Slot says which).</summary>
         public List<BattleEvent> DoTurn(List<BattleCommand> commands)
         {
+            if (TurnOverride != null) return TurnOverride(commands);
             _ev = new List<BattleEvent>();
             Turn++;
             foreach (var b in OnField) { b.SwitchedIn = false; b.MovedLast = false; }
@@ -320,6 +330,13 @@ namespace PokeCreator.Battles
             }
             foreach (var foe in Live(1))
             {
+                if (ExternalCommand != null)
+                {
+                    var ec = foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ExternalCommand(foe);
+                    ec.Slot = foe.Slot;
+                    orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, ec));
+                    continue;
+                }
                 var item = foe.Charging == null && !foe.MustRecharge ? FoeItemChoice(foe) : null;
                 if (item != null) { FoeUseItem(foe, item); continue; }
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe)));
@@ -353,6 +370,13 @@ namespace PokeCreator.Battles
                     orders.Remove(o);
                 }
             }
+            // Side 1 switching by command (link battles)
+            foreach (var o in orders.Where(x => x.Key.Side == 1 && x.Value.Kind == BattleCommandKind.Switch).ToList())
+            {
+                if (!IsTrapped(o.Key) && o.Value.Index >= 0 && o.Value.Index < Parties[1].Count && Able(Parties[1][o.Value.Index]) && !OnFieldParty(1, o.Value.Index))
+                    SwitchFoe(o.Key.Slot, o.Value.Index);
+                else if (IsTrapped(o.Key)) Say(Name(o.Key) + " can't be switched out!");
+            }
             orders.RemoveAll(o => o.Value.Kind != BattleCommandKind.Fight);
             foreach (var o in orders)
             {
@@ -364,7 +388,7 @@ namespace PokeCreator.Battles
             StartOfTurnBookkeeping();
             // Mega Evolution happens before any move, fastest first
             foreach (var o in orders.OrderByDescending(x => Speed(x.Key)).ToList())
-                if ((o.Key.Side == 0 && o.Value.Mega) || (o.Key.Side == 1 && AIWantsMega(o.Key))) MegaEvolve(o.Key);
+                if ((o.Key.Side == 0 && o.Value.Mega) || (o.Key.Side == 1 && (ExternalCommand != null ? o.Value.Mega && MegaForm(o.Key.Pk) != null && !_megaUsed[1] : AIWantsMega(o.Key)))) MegaEvolve(o.Key);
 
             // Moves: priority, then speed (ties at random)
             var tie = orders.ToDictionary(o => o.Key, o => Rng.Next(1000));
@@ -1454,7 +1478,8 @@ namespace PokeCreator.Battles
                     if (Field[1].Take(SlotsPerSide).Any(b => b != null && b.Pk.Fainted))
                     {
                         Outcome = BattleOutcome.Win;
-                        if (!IsWild) Say("You defeated " + AllTrainers + "!");
+                        if (FlipNames) Say(PlayerName + " is out of usable Pokémon!");
+                        else if (!IsWild) Say("You defeated " + AllTrainers.Trim() + "!");
                     }
                 }
                 else
@@ -1472,7 +1497,7 @@ namespace PokeCreator.Battles
                                 continue;
                             }
                             var nb = Place(1, slot, next);
-                            Say(TrainerLabel(next) + " sent out " + nb.Pk.Name(P) + "!");
+                            Say(FlipNames ? "Go! " + nb.Pk.Name(P) + "!" : TrainerLabel(next) + " sent out " + nb.Pk.Name(P) + "!");
                             SendOutEvent(nb);
                             MarkParticipant();
                             SwitchInAbility(nb);
@@ -1489,7 +1514,7 @@ namespace PokeCreator.Battles
                     var me = Field[0][slot];
                     if (me == null || !me.Pk.Fainted || me.FaintShown) continue;
                     me.FaintShown = true; anyFainted = true;
-                    Say(me.Pk.Name(P) + " fainted!");
+                    Say(Name(me) + " fainted!");
                     _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 0, Party = me.PartyIndex, Slot = slot });
                 }
                 if (!AnyAble(0))
@@ -1497,7 +1522,7 @@ namespace PokeCreator.Battles
                     if (anyFainted)
                     {
                         if (Outcome != BattleOutcome.Win) Outcome = BattleOutcome.Loss;
-                        Say(PlayerName + " is out of usable Pokémon!");
+                        Say(FlipNames ? "You defeated " + TrainerName + "!" : PlayerName + " is out of usable Pokémon!");
                     }
                 }
                 else if (Outcome == BattleOutcome.Ongoing)
@@ -1587,6 +1612,7 @@ namespace PokeCreator.Battles
 
         public List<BattleEvent> SwitchAfterFaint(int slot, int party)
         {
+            if (SwitchAfterFaintOverride != null) return SwitchAfterFaintOverride(slot, party);
             _ev = new List<BattleEvent>();
             PlayerSlotsToFill.Remove(slot);
             var old = Field[0][slot];
@@ -1597,7 +1623,7 @@ namespace PokeCreator.Battles
                 _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 0, Party = old.PartyIndex, Slot = slot });
             }
             var b = Place(0, slot, party);
-            Say("Go! " + b.Pk.Name(P) + "!");
+            Say(FlipNames ? TrainerName + " sent out " + b.Pk.Name(P) + "!" : "Go! " + b.Pk.Name(P) + "!");
             SendOutEvent(b);
             MarkParticipant();
             SwitchInAbility(b);
@@ -1610,12 +1636,12 @@ namespace PokeCreator.Battles
             if (old != null)
             {
                 SwitchOutAbility(old);
-                Say(old.Pk.Name(P) + ", come back!");
+                Say(FlipNames ? TrainerName + " withdrew " + old.Pk.Name(P) + "!" : old.Pk.Name(P) + ", come back!");
                 _ev.Add(new BattleEvent { Kind = BattleEventKind.Withdraw, Side = 0, Party = old.PartyIndex, Slot = slot });
             }
             var b = Place(0, slot, party);
             b.SwitchedIn = true;
-            Say("Go! " + b.Pk.Name(P) + "!");
+            Say(FlipNames ? TrainerName + " sent out " + b.Pk.Name(P) + "!" : "Go! " + b.Pk.Name(P) + "!");
             SendOutEvent(b);
             MarkParticipant();
             SwitchInAbility(b);

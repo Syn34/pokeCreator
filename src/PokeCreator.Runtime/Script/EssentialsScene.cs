@@ -197,6 +197,12 @@ namespace PokeCreator.Runtime.Script
                 PokeCreator.Pkmn.Shadow.Purify(_game.Project, pk); return true;
             });
 
+            // Link battles and trades with another player (LAN / internet)
+            Register("pbLinkBattle", (c, a) => { LinkPlay.Begin(_game, "battle", a.Count > 0 && Truthy(a[0])); return true; });
+            Register("pbLinkTrade", (c, a) => { LinkPlay.Begin(_game, "trade", false); return true; });
+            Register("pbLinkHost", (c, a) => { LinkPlay.Host(_game, a.Count > 0 ? Str(a, 0) : "battle", false); return true; });
+            Register("pbLinkJoin", (c, a) => { LinkPlay.Join(_game, a.Count > 0 ? Str(a, 0) : "battle", a.Count > 1 ? Str(a, 1) : (_game.State.Extras.LastLinkAddress ?? "127.0.0.1")); return true; });
+
             Register("pbBridgeOn", (c, a) => { GameMap.BridgeHeight = a.Count > 0 ? Math.Max(1, ToInt(a[0])) : 2; return true; });
             Register("pbBridgeOff", (c, a) => { GameMap.BridgeHeight = 0; return true; });
             Register("$PokemonGlobal.bridge", (c, a) => GameMap.BridgeHeight);

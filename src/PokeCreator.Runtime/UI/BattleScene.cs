@@ -29,6 +29,10 @@ namespace PokeCreator.Runtime.UI
         public bool BugContest;
         /// <summary>A battle facility round (Battle Tower): no items from the Bag, no prize money.</summary>
         public bool Facility;
+        /// <summary>A link battle: no Bag, no running, no prize money; LinkUpdate runs every frame (network).</summary>
+        public bool Link;
+        public Action LinkUpdate;
+        public string LinkOpponent;
     }
 
     /// <summary>
@@ -92,8 +96,20 @@ namespace PokeCreator.Runtime.UI
         Battler Me { get { return _b.Field[0][_cmdSlot] ?? _b.Live(0).FirstOrDefault() ?? _b.Active[0]; } }
 
         // ------------------------------------------------------------------ update
+        /// <summary>Link battles: the turn's events haven't arrived yet (waiting for the other player).</summary>
+        public bool ExternalWait;
+
+        /// <summary>Link battles: events that arrived later (the turn, or the other player's switch).</summary>
+        public void Inject(List<BattleEvent> events)
+        {
+            ExternalWait = false;
+            foreach (var e in events) _queue.Enqueue(e);
+            if (_mode != Mode.Ending) _mode = Mode.Events;
+        }
+
         protected override void Update()
         {
+            if (_setup.LinkUpdate != null) _setup.LinkUpdate();
             if (_introSlide > 0) { _introSlide -= 6; return; }
             switch (_mode)
             {
@@ -118,6 +134,7 @@ namespace PokeCreator.Runtime.UI
                 if (Game.Message.Busy || _mode != Mode.Events) return;
             }
             // All played: what next?
+            if (ExternalWait) return;
             if (_b.Outcome != BattleOutcome.Ongoing) { EndBattle(); return; }
             if (_b.NeedPlayerSwitch) { ChooseReplacement(); return; }
             if (_b.PendingFoeSendOut) { AskShift(); return; }
@@ -437,6 +454,7 @@ namespace PokeCreator.Runtime.UI
                 case 1: OpenBag(); break;
                 case 2: OpenParty(); break;
                 case 3:
+                    if (_setup.Link) { Game.Message.Show("There's no running from a link battle!"); return; }
                     if (_cmdSlot != (_b.PlayerControlled().FirstOrDefault() ?? Me).Slot) { Game.Message.Show("Only the first Pokémon can choose to run."); return; }
                     Commit(BattleCommand.Run()); break;
             }
@@ -498,7 +516,7 @@ namespace PokeCreator.Runtime.UI
 
         void OpenBag()
         {
-            if (_setup.Facility) { Game.Message.Show("Items can't be used here."); return; }
+            if (_setup.Facility || _setup.Link) { Game.Message.Show("Items can't be used here."); return; }
             if (_setup.BugContest)
             {
                 var cs = World.BugContest.State(Game);
@@ -587,7 +605,7 @@ namespace PokeCreator.Runtime.UI
         {
             _b.RevertForms();
             // Pickup / Honey Gather: Pokémon holding nothing may find an item after the battle
-            if (_b.Outcome == BattleOutcome.Win || _b.Outcome == BattleOutcome.Escaped || _b.Outcome == BattleOutcome.Caught)
+            if (!_setup.Link && (_b.Outcome == BattleOutcome.Win || _b.Outcome == BattleOutcome.Escaped || _b.Outcome == BattleOutcome.Caught))
                 Battle.PostBattlePickup(Game.Project, _party, new Random());
             _mode = Mode.Ending;
             var o = _b.Outcome;
@@ -765,6 +783,11 @@ namespace PokeCreator.Runtime.UI
             if (!Game.Message.Busy)
             {
                 if (_mode == Mode.Command) DrawCommands(g);
+                if (ExternalWait && !Game.Message.Busy)
+                {
+                    MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
+                    Ui.Text(g, 24, g.Height - 86, "Waiting for " + (_setup.LinkOpponent ?? "the other player") + "...");
+                }
                 else if (_mode == Mode.Fight) DrawFight(g);
                 else if (_mode == Mode.Target) DrawTarget(g);
                 else

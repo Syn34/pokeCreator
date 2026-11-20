@@ -25,6 +25,8 @@ namespace PokeCreator.Runtime.World
         public ChallengeState Challenge { get; set; }
         /// <summary>Mystery Gift IDs already received.</summary>
         public List<string> GiftsReceived { get; set; }
+        /// <summary>The address last typed to join a link.</summary>
+        public string LastLinkAddress { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>
         public int PokerusDay { get; set; }
         /// <summary>A roamer was already met since the last map change.</summary>
