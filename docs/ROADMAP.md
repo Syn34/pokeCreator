@@ -75,7 +75,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Roaming Pokémon (Game Settings → Roaming: species, level, switch, encounter kind, music, maps; HP carries over, flees each turn, gone once caught or defeated; pbResetAllRoamers)
 - [x] Safari Zone (pbSafariState: steps and Safari Balls from Game Settings, "Safari Zone" maps, Ball / Bait / Rock / Run battles, back to the reception when time is up)
 - [x] Bug-Catching Contest (pbBugContestState: one Pokémon, Sport Balls, timer, BugContest encounters, keep one catch, judging with Essentials' score formula and prizes from Game Settings)
-- [ ] Pokérus
+- [x] Pokérus (catching it after battles, spreading in the party, wearing off by day, double EVs, PKRS on the Summary, pbPokerus? for Nurse Joy)
 - [ ] Poké Radar
 - [ ] Battle Tower / challenges (pbBattleChallenge)
 - [ ] Mystery Gift

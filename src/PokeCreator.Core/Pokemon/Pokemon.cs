@@ -107,6 +107,23 @@ namespace PokeCreator.Pkmn
         /// <summary>"" or BURN, POISON, TOXIC, PARALYSIS, SLEEP, FROZEN.</summary>
         public string Status { get; set; }
         public int Happiness { get; set; }
+        /// <summary>Pokérus as in the games: strain in the high 4 bits, days left in the low 4 (0 = never had it).</summary>
+        public int Pokerus { get; set; }
+        /// <summary>0 = never infected, 1 = infected (days left), 2 = cured (EV boost stays).</summary>
+        public int PokerusStage { get { return Pokerus == 0 ? 0 : (Pokerus & 15) > 0 ? 1 : 2; } }
+        /// <summary>Infects this Pokémon with a strain (1-15; 0 = random).</summary>
+        public void GivePokerus(Random rng, int strain = 0)
+        {
+            if (PokerusStage == 2) return;
+            if (strain <= 0 || strain > 15) strain = 1 + rng.Next(15);
+            Pokerus = strain << 4 | (strain % 4 + 1);
+        }
+        /// <summary>Days pass: the infection runs its course (the Pokémon stays "cured").</summary>
+        public void LowerPokerusCount(int days)
+        {
+            if (PokerusStage != 1 || days <= 0) return;
+            Pokerus = (Pokerus & 0xF0) | Math.Max(0, (Pokerus & 15) - days);
+        }
         public string Ball { get; set; }
         public string OTName { get; set; }
         public int OTId { get; set; }

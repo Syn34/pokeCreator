@@ -477,7 +477,7 @@ namespace PokeCreator.Runtime.Script
             Register("get_self.onEvent?", (c, a) => { var ev = c == null || _game.Map == null ? null : _game.Map.Events.FirstOrDefault(x => x.Id == c.EventId); return ev != null && ev.X == _game.Player.X && ev.Y == _game.Player.Y; });
             foreach (var f in new[] { "Followers.hide_followers", "Followers.put_followers_on_player", "Followers.follow_into_door", "Followers.add", "Followers.remove", "Followers.clear", "Followers.toggle", "Followers.update", "Followers.move_followers", "Followers.turn_followers" })
                 Register(f, (c, a) => true);
-            Register("pbPokerus?", (c, a) => false);
+            Register("pbPokerus?", (c, a) => World.Pokerus.AnyInfected(_game));
             Register("Pokemon::MAX_NAME_SIZE", (c, a) => 10);
             Register("pbChooseMove", (c, a) =>
             {
@@ -1056,6 +1056,11 @@ namespace PokeCreator.Runtime.Script
                     case "totalhp": return pk.TotalHP(P);
                     case "nature": return pk.Nature;
                     case "happiness": return pk.Happiness;
+                    case "pokerus": return pk.Pokerus;
+                    case "pokerusStage": return pk.PokerusStage;
+                    case "givePokerus": pk.GivePokerus(_game.Rng, args.Count > 0 ? ToInt(args[0]) : 0); return true;
+                    case "resetPokerusTime": if (pk.PokerusStage == 1) pk.Pokerus = (pk.Pokerus & 0xF0) | ((pk.Pokerus >> 4) % 4 + 1); return true;
+                    case "lowerPokerusCount": pk.LowerPokerusCount(1); return true;
                     case "ability": case "ability_id": return pk.AbilityId(P);
                     case "iv": return pk.IV;
                     case "ev": return pk.EV;

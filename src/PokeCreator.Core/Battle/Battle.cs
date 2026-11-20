@@ -1559,7 +1559,8 @@ namespace PokeCreator.Battles
                     {
                         int s = PokeCreator.Pkmn.Stat.IndexOf(ev.Stat);
                         if (s < 0) continue;
-                        int add = Math.Min(ev.Value, Math.Min(ItemEffects.MaxEV - pk.EV[s], ItemEffects.MaxTotalEV - pk.EV.Sum()));
+                        int gain = ev.Value * (pk.Pokerus != 0 ? 2 : 1);
+                        int add = Math.Min(gain, Math.Min(ItemEffects.MaxEV - pk.EV[s], ItemEffects.MaxTotalEV - pk.EV.Sum()));
                         if (add > 0) pk.EV[s] += add;
                     }
                 Say(pk.Name(P) + " gained " + amount + " Exp. Points!");

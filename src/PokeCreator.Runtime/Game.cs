@@ -582,7 +582,7 @@ namespace PokeCreator.Runtime
             b.SwitchStyle = Options == null || !Options.BattleStyleSet;
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
-            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (end != null) end(o); };
+            setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; World.Pokerus.AfterBattle(this); if (end != null) end(o); };
             BattleJustStarted = true;
             Audio.PlaySe("Encounter");
             Flash(20);
