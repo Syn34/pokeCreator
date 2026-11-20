@@ -98,7 +98,10 @@ namespace PokeCreator.Runtime.UI
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
                 case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
+                case "ITEMFINDER": case "DOWSINGMACHINE": case "DOWSINGMCHN":
+                    g.CloseAllScenes(); FieldMoves.Itemfinder(g, item.Name); return;
             }
+            if (Array.IndexOf(Berries.WateringCans, itemId) >= 0) { g.CloseAllScenes(); FieldMoves.WaterFacingPlant(g); return; }
             if (Array.IndexOf(FieldMoves.Rods, itemId) >= 0)
             {
                 // Rods: close the menus and fish

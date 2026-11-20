@@ -825,6 +825,8 @@ namespace PokeCreator.Studio.Editors
                 fieldMenu.DropDownItems.Add("Strength Boulder", null, (s, a) => QuickFieldObject(cell, "StrengthBoulder"));
                 fieldMenu.DropDownItems.Add("Headbutt Tree", null, (s, a) => QuickFieldObject(cell, "HeadbuttTree"));
                 fieldMenu.DropDownItems.Add("Berry Plant…", null, (s, a) => QuickFieldObject(cell, "BerryPlant"));
+                fieldMenu.DropDownItems.Add("Empty Berry Soil (plant your own)", null, (s, a) => QuickFieldObject(cell, "BerrySoil"));
+                fieldMenu.DropDownItems.Add("Hidden Item (found with the Itemfinder)…", null, (s, a) => QuickFieldObject(cell, "HiddenItem"));
                 menu.Items.Add(fieldMenu);
                 var dcMenu = new ToolStripMenuItem("New Day Care");
                 dcMenu.DropDownItems.Add("Day Care Lady (takes and returns Pokémon)", null, (s, a) => QuickDayCare(cell, true));
@@ -1109,7 +1111,13 @@ namespace PokeCreator.Studio.Editors
         /// <summary>Cut trees, smashable rocks, Strength boulders, Headbutt trees and berry plants, set up as in Essentials.</summary>
         void QuickFieldObject(Point cell, string kind)
         {
-            string berry = null; int count = 2;
+            string berry = null, hidden = null; int count = 2;
+            if (kind == "HiddenItem")
+            {
+                var ids = _p.Items.Where(it => it.Pocket != 8).Select(it => it.Id).ToArray();
+                int k = ChoiceDialog.Ask(FindForm(), "Which item is hidden here?", ids, true); if (k < 0) return;
+                hidden = ids[k];
+            }
             if (kind == "BerryPlant")
             {
                 var ids = _p.Items.Where(it => it.Pocket == 5).Select(it => it.Id).ToArray();
@@ -1118,7 +1126,7 @@ namespace PokeCreator.Studio.Editors
                 berry = ids[k];
                 count = NumberDialog.Ask(FindForm(), "How many berries?", 2); if (count < 1) return;
             }
-            var ev = NewEvent(cell); ev.Name = kind;
+            var ev = NewEvent(cell); ev.Name = kind == "BerrySoil" ? "BerryPlant" : kind;
             var pg = ev.Pages[0];
             pg.Trigger = Triggers.Action;
             switch (kind)
@@ -1150,6 +1158,17 @@ namespace PokeCreator.Studio.Editors
                     soil.Trigger = Triggers.Action;
                     soil.List = new List<EventCommand> { new EventCommand(355, 0, "pbBerryPlant"), new EventCommand(0, 0) };
                     ev.Pages.Add(soil);
+                    break;
+                case "BerrySoil":
+                    pg.List = new List<EventCommand> { new EventCommand(355, 0, "pbBerryPlant"), new EventCommand(0, 0) };
+                    break;
+                case "HiddenItem":
+                    // Invisible; picked up once (self switch A), and the Itemfinder points at it while it's there
+                    pg.List = new List<EventCommand> { new EventCommand(111, 0, 12, "pbItemBall(:" + hidden + ")"), new EventCommand(123, 1, "A", 0), new EventCommand(0, 1), new EventCommand(412, 0), new EventCommand(0, 0) };
+                    var found = new EventPage();
+                    found.Condition.SelfSwitchValid = true; found.Condition.SelfSwitchCh = "A";
+                    found.List = new List<EventCommand> { new EventCommand(0, 0) };
+                    ev.Pages.Add(found);
                     break;
             }
             _ed.EditEvent(ev);

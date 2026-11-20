@@ -584,6 +584,7 @@ namespace PokeCreator.Runtime
         public void Flash(int frames) { _flash = Math.Max(1, frames); }
 
         // ------------------------------------------------------------------ update
+        int _berryTimer;
         void Update()
         {
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
@@ -610,6 +611,8 @@ namespace PokeCreator.Runtime
             Pictures.Update();
             UpdateShake();
             if (_hasScriptSwitches && ++_scriptSwitchTimer >= 120 && !Interpreter.Running) { _scriptSwitchTimer = 0; Map.RefreshEvents(); }
+            // Berry plants grow in real time: update their sprites now and then
+            if (++_berryTimer >= 300 && State.BerryPlants.Count > 0) { _berryTimer = 0; Berries.Refresh(this); }
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
@@ -819,6 +822,11 @@ namespace PokeCreator.Runtime
                         break;
                     }
                 case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)), null); break;
+                case "berryage": // berryage HOURS: makes every planted berry older
+                    foreach (var bp in _g.State.BerryPlants.Values) { long dt = (long)(double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture) * TimeSpan.TicksPerHour); bp.PlantedAt -= dt; bp.MoistureAt -= dt; }
+                    Berries.Refresh(_g);
+                    Console.WriteLine("[autotest] berries: " + string.Join(", ", _g.State.BerryPlants.Select(kv => kv.Key + "=" + kv.Value.Berry + " stage " + Berries.Stage(kv.Value) + " yield " + Berries.Yield(kv.Value))));
+                    break;
                 case "anim": // anim MOVE|Common:Name userSide [targetSlot]: plays a battle animation in the open battle
                     {
                         var bs = _g.FindScene<PokeCreator.Runtime.UI.BattleScene>();

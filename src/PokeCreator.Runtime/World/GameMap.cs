@@ -37,6 +37,8 @@ namespace PokeCreator.Runtime.World
         public int RepelSteps;
         /// <summary>When timed events last happened (pbSetEventTime), "map,event" -> seconds since 2000.</summary>
         public readonly Dictionary<string, long> EventTimes = new Dictionary<string, long>();
+        /// <summary>Berries planted in soil, "map,event" -> plant.</summary>
+        public Dictionary<string, BerryPlantState> BerryPlants = new Dictionary<string, BerryPlantState>();
         /// <summary>Game Corner coins, Battle Points and gym badges (0-based, as $player.badges[n]).</summary>
         public int Coins, BattlePoints;
         public readonly HashSet<int> Badges = new HashSet<int>();
@@ -71,6 +73,8 @@ namespace PokeCreator.Runtime.World
             string k = map + "," + ev + "," + ch;
             if (v) SelfSwitches.Add(k); else SelfSwitches.Remove(k);
         }
+        public int ItemCount(string item) { int n; return item != null && Bag.TryGetValue(item, out n) ? n : 0; }
+        public void RemoveItem(string item, int qty) { AddItem(item, -qty); }
         public void AddItem(string item, int qty)
         {
             int n; Bag.TryGetValue(item, out n);

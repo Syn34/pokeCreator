@@ -158,7 +158,46 @@ namespace PokeCreator.Runtime.World
         // ------------------------------------------------------------------ fishing
         public static readonly string[] Rods = { "OLDROD", "GOODROD", "SUPERROD" };
         /// <summary>Key items used straight from the Bag (besides rods).</summary>
-        public static readonly string[] DirectKeyItems = { "BICYCLE", "MACHBIKE", "ACROBIKE", "TOWNMAP", "ESCAPEROPE" };
+        public static readonly string[] DirectKeyItems = { "BICYCLE", "MACHBIKE", "ACROBIKE", "TOWNMAP", "ESCAPEROPE", "ITEMFINDER", "DOWSINGMACHINE", "DOWSINGMCHN", "SPRAYDUCK", "SQUIRTBOTTLE", "WAILMERPAIL", "SPRINKLOTAD" };
+
+        /// <summary>
+        /// Itemfinder / Dowsing Machine (as in Essentials): looks for the nearest event named "HiddenItem" that still has
+        /// something to pick up, within 8 tiles across and 6 up or down, and turns the player toward it.
+        /// </summary>
+        public static void Itemfinder(Game g, string itemName)
+        {
+            var p = g.Player;
+            if (g.Map == null || p == null) return;
+            GameEvent best = null; int bestD = int.MaxValue;
+            foreach (var ev in g.Map.Events)
+            {
+                if (ev.Name != "HiddenItem" || ev.Erased || !ev.HasCommands) continue;
+                int dx = ev.X - p.X, dy = ev.Y - p.Y;
+                if (Math.Abs(dx) > 8 || Math.Abs(dy) > 6) continue;
+                int d = dx * dx + dy * dy;
+                if (d < bestD) { bestD = d; best = ev; }
+            }
+            if (best == null) { g.Message.Show("... \\| ... \\| ... \\| ...\\nThere's no response."); return; }
+            int ox = best.X - p.X, oy = best.Y - p.Y;
+            if (ox == 0 && oy == 0) { g.Message.Show("The " + itemName + "'s indicating something right underfoot!"); return; }
+            int dir = Math.Abs(ox) > Math.Abs(oy) ? (ox < 0 ? 4 : 6) : (oy < 0 ? 8 : 2);
+            p.Direction = dir;
+            g.Message.Show("Huh? The " + itemName + " is responding!\\nThere's an item buried around here!");
+        }
+
+        /// <summary>A watering can used from the Bag waters the berry plant the player faces.</summary>
+        public static void WaterFacingPlant(Game g)
+        {
+            var p = g.Player;
+            int fx = p.X + (p.Direction == 4 ? -1 : p.Direction == 6 ? 1 : 0), fy = p.Y + (p.Direction == 8 ? -1 : p.Direction == 2 ? 1 : 0);
+            var ev = g.Map != null ? g.Map.EventsAt(fx, fy).FirstOrDefault(Berries.IsBerryPlantEvent) : null;
+            var plant = ev != null ? Berries.Get(g, g.Map.Id, ev.Id) : null;
+            if (plant == null || Berries.Stage(plant) < 0 || Berries.Stage(plant) >= 4) { g.Message.Show("Can't use that here."); return; }
+            int st = Berries.Stage(plant);
+            plant.Moisture = 100; plant.MoistureAt = DateTime.UtcNow.Ticks;
+            if (plant.LastWateredStage != st) { plant.LastWateredStage = st; plant.WateredStages = Math.Min(4, plant.WateredStages + 1); }
+            g.Message.Show("\\PN watered the plant.\\nThe plant seemed to be delighted.");
+        }
 
         public static void Fish(Game g, string rod)
         {
@@ -458,9 +497,6 @@ namespace PokeCreator.Runtime.World
             });
         }
 
-        public static void BerryPlant(Game g, Interpreter ctx)
-        {
-            g.Message.Show("It's soft, loamy soil.");
-        }
+        public static void BerryPlant(Game g, Interpreter ctx) { Berries.Interact(g, ctx); }
     }
 }

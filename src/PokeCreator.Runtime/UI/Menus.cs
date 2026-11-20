@@ -435,7 +435,12 @@ namespace PokeCreator.Runtime.UI
 
         /// <summary>Choose mode showing only some items (e.g. those usable in battle).</summary>
         public BagScene(Game g, Action<string> onChosen, Func<ItemData, bool> filter, Action onCancel) : base(g)
-        { Opaque = true; _choose = onChosen; _filter = filter; _onCancel = onCancel; }
+        {
+            Opaque = true; _choose = onChosen; _filter = filter; _onCancel = onCancel;
+            // Open on the first pocket that has something to pick
+            for (int pk = 0; pk < 8; pk++) { _pocket = pk; if (Items().Count > 0) return; }
+            _pocket = 0;
+        }
 
         List<KeyValuePair<ItemData, int>> Items()
         {

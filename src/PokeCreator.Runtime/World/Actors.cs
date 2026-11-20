@@ -15,6 +15,8 @@ namespace PokeCreator.Runtime.World
         public readonly GameMap Owner;
         public EventPage Page;
         public bool Erased;
+        /// <summary>Showing a planted berry's sprite instead of the page's.</summary>
+        public bool BerryOverride;
         public int Trigger = -1;
         public List<EventCommand> List;
         public bool Starting;
@@ -69,6 +71,8 @@ namespace PokeCreator.Runtime.World
             SetCustomRoute(Page.MoveType == 3 ? Page.MoveRoute : null);
             ParallelInterpreter = Trigger == Triggers.Parallel ? new Interpreter(Game, Owner.Id, Id, List) : null;
             if (Trigger == Triggers.Autorun) Start();
+            BerryOverride = false;
+            Berries.ApplyGraphic(Game, this);
         }
 
         public bool HasCommands { get { return List != null && List.Any(c => c.Code != 0); } }
