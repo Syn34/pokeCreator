@@ -17,7 +17,12 @@ namespace PokeCreator.Runtime.UI
         public int TextSpeed { get; set; }
         public int BgmVolume { get; set; }
         public int SeVolume { get; set; }
-        public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; }
+        /// <summary>Message / menu frames chosen by the player ("" = the game's default).</summary>
+        public string SpeechFrame { get; set; }
+        public string MenuFrame { get; set; }
+        /// <summary>Running key: false = hold to run, true = press to switch running on/off.</summary>
+        public bool RunToggle { get; set; }
+        public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; SpeechFrame = ""; MenuFrame = ""; }
 
         static string FilePath(Game g) { return Path.Combine(SaveSystem.Folder(g.Project), "options.json"); }
 
@@ -38,6 +43,27 @@ namespace PokeCreator.Runtime.UI
             g.Audio.BgmVolume = Math.Max(0, Math.Min(100, BgmVolume));
             g.Audio.SeVolume = Math.Max(0, Math.Min(100, SeVolume));
             g.Audio.ApplyVolume();
+            g.LoadFrames();
+        }
+
+        /// <summary>Frame images in Graphics/Windowskins whose names start with prefix ("speech", "choice"), in natural order.</summary>
+        public static List<string> Frames(Game g, string prefix)
+        {
+            var list = new List<string>();
+            foreach (var dir in new[] { Path.Combine(g.Project.GraphicsDir, "Windowskins") })
+                if (Directory.Exists(dir))
+                    foreach (var f in Directory.GetFiles(dir, "*.png"))
+                    {
+                        string n = Path.GetFileNameWithoutExtension(f);
+                        if (n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !list.Contains(n)) list.Add(n);
+                    }
+            list.Sort((a, b) =>
+            {
+                var ma = System.Text.RegularExpressions.Regex.Match(a, @"^(.*?)(\d+)$"); var mb = System.Text.RegularExpressions.Regex.Match(b, @"^(.*?)(\d+)$");
+                if (ma.Success && mb.Success && ma.Groups[1].Value == mb.Groups[1].Value) return int.Parse(ma.Groups[2].Value).CompareTo(int.Parse(mb.Groups[2].Value));
+                return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+            });
+            return list;
         }
     }
 
@@ -433,9 +459,23 @@ namespace PokeCreator.Runtime.UI
     {
         readonly PlayerOptions _o;
         int _row;
-        static readonly string[] Labels = { "Text Speed", "Music Volume", "Sound Volume", "Close" };
+        static readonly string[] Labels = { "Text Speed", "Music Volume", "Sound Volume", "Speech Frame", "Menu Frame", "Running Key", "Close" };
+        List<string> _speech, _menu;
 
-        public OptionsScene(Game g) : base(g) { Opaque = true; _o = g.Options; }
+        public OptionsScene(Game g) : base(g)
+        {
+            Opaque = true; _o = g.Options;
+            _speech = PlayerOptions.Frames(g, "speech"); _speech.Insert(0, "");
+            _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
+        }
+
+        static string Cycle(List<string> list, string cur, int d)
+        {
+            int i = Math.Max(0, list.IndexOf(cur ?? ""));
+            return list[(i + d + list.Count) % list.Count];
+        }
+
+        static string FrameLabel(string f) { return string.IsNullOrEmpty(f) ? "Default" : f; }
 
         protected override void Update()
         {
@@ -447,10 +487,13 @@ namespace PokeCreator.Runtime.UI
                 if (_row == 0) _o.TextSpeed = (_o.TextSpeed + d + 4) % 4;
                 else if (_row == 1) _o.BgmVolume = Math.Max(0, Math.Min(100, _o.BgmVolume + d * 10));
                 else if (_row == 2) _o.SeVolume = Math.Max(0, Math.Min(100, _o.SeVolume + d * 10));
+                else if (_row == 3) _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d);
+                else if (_row == 4) _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d);
+                else if (_row == 5) _o.RunToggle = !_o.RunToggle;
                 _o.Apply(Game);
-                if (_row != 3) Cursor();
+                if (_row != Labels.Length - 1) Cursor();
             }
-            if (Input.Trigger(Button.Cancel) || (Input.Trigger(Button.Action) && _row == 3)) { _o.Save(Game); Cancel(); Close(); }
+            if (Input.Trigger(Button.Cancel) || (Input.Trigger(Button.Action) && _row == Labels.Length - 1)) { _o.Save(Game); Cancel(); Close(); }
         }
 
         public override void Draw(Gfx g)
@@ -458,11 +501,12 @@ namespace PokeCreator.Runtime.UI
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Options");
-            Ui.Panel(g, 8, 60, g.Width - 16, 220, new Color(248, 248, 248), new Color(32, 48, 96));
-            string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶", "" };
+            Ui.Panel(g, 8, 60, g.Width - 16, 230, new Color(248, 248, 248), new Color(32, 48, 96));
+            string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶",
+                                "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "" };
             for (int i = 0; i < Labels.Length; i++)
             {
-                int y = 76 + i * 48;
+                int y = 70 + i * 31;
                 if (i == _row) Ui.Arrow(g, 22, y + 8);
                 Ui.Text(g, 44, y, Labels[i]);
                 Ui.TextRight(g, g.Width - 32, y, values[i]);

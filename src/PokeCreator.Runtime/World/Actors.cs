@@ -162,6 +162,7 @@ namespace PokeCreator.Runtime.World
         public bool Diving;
         public string DiveCharset { get { return Look != null && !string.IsNullOrEmpty(Look.DiveCharset) ? Look.DiveCharset : SurfCharset; } }
         bool _sliding;
+        bool _runOn;
 
         /// <summary>Climbs (up = true) or slides down a waterfall while surfing.</summary>
         public void ClimbWaterfall(bool up)
@@ -213,7 +214,9 @@ namespace PokeCreator.Runtime.World
             if (canControl && !Moving && !Jumping)
             {
                 int d = Input.Dir4;
-                bool run = Input.Press(Button.Run) && !Cycling && (!Game.Project.Settings.RunningShoesRequired || Game.State.Flags.Contains("has_running_shoes"));
+                if (Game.Options != null && Game.Options.RunToggle && Input.Trigger(Button.Run)) _runOn = !_runOn;
+                bool runKey = Game.Options != null && Game.Options.RunToggle ? _runOn : Input.Press(Button.Run);
+                bool run = runKey && !Cycling && (!Game.Project.Settings.RunningShoesRequired || Game.State.Flags.Contains("has_running_shoes"));
                 MoveSpeed = run || Cycling ? 5 : 4;
                 SpeedScale = Cycling ? 1.5 : 1;
                 if (d != 0) Move(d);

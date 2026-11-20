@@ -239,8 +239,10 @@ namespace PokeCreator.Runtime
         public void LoadFrames()
         {
             var st = Project.Settings;
-            MessageWindow.SpeechSkin = string.IsNullOrEmpty(st.SpeechFrame) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", st.SpeechFrame));
-            MessageWindow.MenuSkin = string.IsNullOrEmpty(st.MenuFrame) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", st.MenuFrame));
+            string speech = Options != null && !string.IsNullOrEmpty(Options.SpeechFrame) ? Options.SpeechFrame : st.SpeechFrame;
+            string menu = Options != null && !string.IsNullOrEmpty(Options.MenuFrame) ? Options.MenuFrame : st.MenuFrame;
+            MessageWindow.SpeechSkin = string.IsNullOrEmpty(speech) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", speech));
+            MessageWindow.MenuSkin = string.IsNullOrEmpty(menu) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", menu));
         }
 
         /// <summary>Map music, or the Bicycle / Surf music while riding.</summary>
