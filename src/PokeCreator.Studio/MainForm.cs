@@ -886,7 +886,7 @@ namespace PokeCreator.Studio
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
             string game = Path.Combine(exeDir, "Game.exe");
             if (!File.Exists(game)) { MessageBox.Show(this, "Game.exe was not found next to the Studio:\n" + game, "Playtest"); return; }
-            var args = new List<string> { Quote(Project.Root) };
+            var args = new List<string> { Quote(Project.Root), "--debug" };
             if (extra != null) args.AddRange(extra);
             try
             {

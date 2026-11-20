@@ -19,6 +19,7 @@ namespace PokeCreator.Runtime
         public int StartMap = -1, StartX, StartY, StartDir = 2;
         public string AutotestScript;
         public bool NoEncounters;
+        public bool Debug;
         public bool SkipTitle;
         public int Scale = 0;
         /// <summary>Battle test from the Studio: party "SPECIES:LV,..." or "trainer:TYPE:Name:Version"; opponent trainer "TYPE:Name:Version" or wild "SPECIES:LV,...".</summary>
@@ -467,6 +468,15 @@ namespace PokeCreator.Runtime
 
         /// <summary>Closes every open screen (e.g. to fish after choosing a rod in the Bag).</summary>
         public void CloseAllScenes() { foreach (var sc in _scenes.ToList()) sc.Close(); }
+
+        /// <summary>Asks for a number (a prompt, then the digit entry); done gets the value.</summary>
+        public void AskNumber(string prompt, int start, int digits, Action<int> done)
+        {
+            Message.Show(prompt, null, -1, _ => PushScene(new UI.NumberInputScene(this, Math.Max(1, digits), start, done)));
+        }
+
+        /// <summary>Playtest from the Studio: F9 opens the debug menu, Ctrl walks through walls.</summary>
+        public bool DebugMode { get { return _opt != null && _opt.Debug; } }
         /// <summary>The event waiting for ResumeOutcome (only it may take the result).</summary>
         public object ResumeOwner;
         public PokeCreator.Battles.BattleOutcome LastOutcome;
@@ -1037,6 +1047,7 @@ namespace PokeCreator.Runtime
                         case "party": _g.PushScene(new PartyScene(_g)); break;
                         case "dex": PokedexScene.Open(_g); break;
                         case "storage": _g.PushScene(new StorageScene(_g, StorageScene.Mode.Organize)); break;
+                        case "debug": DebugMenu.Open(_g); break;
                         case "options": _g.PushScene(new OptionsScene(_g)); break;
                         case "name": _g.AskName("Your name?", "", 10, n => _g.State.PlayerName = n, null); break;
                     }
@@ -1094,6 +1105,7 @@ namespace PokeCreator.Runtime
                 else if (a == "--autotest" && i + 1 < args.Length) opt.AutotestScript = args[++i];
                 else if (a == "--scale" && i + 1 < args.Length) opt.Scale = int.Parse(args[++i]);
                 else if (a == "--no-encounters") opt.NoEncounters = true;
+                else if (a == "--debug") opt.Debug = true;
                 else if (a == "--skip-title") opt.SkipTitle = true;
                 else if (a == "--test-party" && i + 1 < args.Length) opt.TestParty = args[++i];
                 else if (a == "--test-trainer" && i + 1 < args.Length) opt.TestTrainer = args[++i];

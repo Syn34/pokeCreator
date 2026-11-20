@@ -152,7 +152,7 @@ namespace PokeCreator.Runtime.Platform
     {
         public const int A = 4, C = 6, D = 7, Q = 20, S = 22, W = 26, X = 27, Z = 29;
         public const int Return = 40, Escape = 41, Backspace = 42, Space = 44;
-        public const int F5 = 62, F12 = 69, Right = 79, Left = 80, Down = 81, Up = 82;
+        public const int F5 = 62, F9 = 66, F12 = 69, Right = 79, Left = 80, Down = 81, Up = 82;
         public const int KpEnter = 88, LShift = 225, RShift = 229, LCtrl = 224;
     }
 }

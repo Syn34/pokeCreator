@@ -36,7 +36,14 @@ namespace PokeCreator.Runtime.Platform
                 foreach (int sc in Keys[b]) if (sc < n && Marshal.ReadByte(state, sc) != 0) { down = true; break; }
                 _held[b] = down ? _held[b] + 1 : 0;
             }
+            foreach (int sc in WatchedKeys) { int h; _keyHeld.TryGetValue(sc, out h); _keyHeld[sc] = sc < n && Marshal.ReadByte(state, sc) != 0 ? h + 1 : 0; }
         }
+
+        static readonly Dictionary<int, int> _keyHeld = new Dictionary<int, int>();
+        /// <summary>A raw key (SDL scancode) pressed this frame.</summary>
+        public static bool KeyTrigger(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h == 1; }
+        public static bool KeyPress(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h > 0; }
+        static readonly int[] WatchedKeys = { Scancode.F9, Scancode.LCtrl, 228 /* right Ctrl */ };
 
         public static bool Press(Button b) { return _held[(int)b] > 0; }
         public static bool Trigger(Button b) { return _held[(int)b] == 1; }

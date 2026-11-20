@@ -162,6 +162,7 @@ namespace PokeCreator.Runtime.World
 
         /// <summary>On the bicycle (from the Bag, or maps that are "Always on bicycle").</summary>
         public bool Cycling;
+        bool _debugThrough;
         /// <summary>Underwater after Dive.</summary>
         public bool Diving;
         public string DiveCharset { get { return Look != null && !string.IsNullOrEmpty(Look.DiveCharset) ? Look.DiveCharset : SurfCharset; } }
@@ -238,6 +239,13 @@ namespace PokeCreator.Runtime.World
 
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Action)) CheckActionTrigger();
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Menu) && !Game.State.Flags.Contains("menu_disabled")) Game.PushScene(new PokeCreator.Runtime.UI.PauseMenu(Game));
+            if (canControl && !Moving && !Jumping && Game.DebugMode && Input.KeyTrigger(Scancode.F9)) PokeCreator.Runtime.UI.DebugMenu.Open(Game);
+            if (Game.DebugMode)
+            {
+                bool ctrl = Input.KeyPress(Scancode.LCtrl) || Input.KeyPress(228);
+                if (ctrl && !Through) { Through = true; _debugThrough = true; }
+                else if (!ctrl && _debugThrough) { Through = false; _debugThrough = false; }
+            }
         }
 
         GameMap TargetMap(int nx, int ny, out int lx, out int ly)
