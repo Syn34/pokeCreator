@@ -326,7 +326,7 @@ namespace PokeCreator.Runtime.Script
             Handler noop = (c, a) => true;
             foreach (var n in new[] { "pbCallBub", "pbFadeOutIn",
                                       "pbUpdateSceneMap", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
-                                      "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw",
+                                      "pbEraseEscapePoint",
                                       "pbUnlockWallpaper" })
                 Register(n, noop);
             RegisterSceneCalls();
@@ -778,6 +778,11 @@ namespace PokeCreator.Runtime.Script
                 _game.Message.Show(Str(a, 0), names, names.Count - 1, k => _game.State.SetVar(v, k == names.Count - 1 ? -1 : k));
                 return true;
             });
+            // Older (v19/v20) Day Care names
+            foreach (var pair in new[] { new[] { "pbDayCareDeposit", "DayCare.deposit" }, new[] { "pbDayCareWithdraw", "DayCare.withdraw" }, new[] { "pbDayCareChoose", "DayCare.choose" },
+                                         new[] { "pbDayCareGetCompat", "DayCare.get_compatibility" }, new[] { "pbEggGenerated?", "DayCare.egg_generated?" }, new[] { "pbDayCareGenerateEgg", "DayCare.collect_egg" },
+                                         new[] { "pbDayCareDeposited", "DayCare.count" }, new[] { "pbDayCareGetDeposited", "DayCare.get_details" }, new[] { "pbDayCareGetLevelGain", "DayCare.get_level_gain" } })
+                if (_commands.ContainsKey(pair[1])) _commands[pair[0]] = _commands[pair[1]];
             Register("pbEventCanReachPlayer?", (c, a) => false);
             Register("pbFacingTerrainTag", (c, a) => 0);
             Register("pbGetTimeNow", (c, a) => DateTime.Now);
