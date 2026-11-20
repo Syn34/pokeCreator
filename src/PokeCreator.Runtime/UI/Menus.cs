@@ -562,12 +562,27 @@ namespace PokeCreator.Runtime.UI
             Ui.TextRight(g, g.Width - 56, 44, "IDNo. " + s.TrainerId.ToString("00000"));
             Ui.Text(g, 56, 104, "Name");    Ui.TextRight(g, 300, 104, s.PlayerName);
             Ui.Text(g, 56, 144, "Money");   Ui.TextRight(g, 300, 144, "$" + s.Money.ToString("N0"));
-            Ui.Text(g, 56, 184, "Pokémon"); Ui.TextRight(g, 300, 184, (s.Party.Count + s.Storage.Count).ToString());
+            if (s.HasPokedex) { Ui.Text(g, 56, 184, "Pokédex"); Ui.TextRight(g, 300, 184, s.Caught.Count + " / " + s.Seen.Count); }
+            else { Ui.Text(g, 56, 184, "Pokémon"); Ui.TextRight(g, 300, 184, (s.Party.Count + s.Storage.Count).ToString()); }
             Ui.Text(g, 56, 224, "Time");    Ui.TextRight(g, 300, 224, Ui.PlayTime(s.PlayFrames));
             var look = Game.Player.Look;
             var tex = look != null ? g.Load(Game.Project.FindAsset("Graphics/Trainers", look.TrainerType)) : null;
             if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, g.Width - 48 - tex.Width - 16, 90);
-            for (int i = 0; i < Math.Min(6, s.Party.Count); i++) Ui.PokemonIcon(g, Game, s.Party[i], 48 + i * 68, 268, Frame);
+            // Badges: Graphics/UI/Trainer Card/icon_badges (32×32 each, one row per region), or drawn ones
+            var badges = g.Load(Game.Project.FindAsset("Graphics/UI/Trainer Card", "icon_badges"));
+            int bx = (g.Width - 8 * 48) / 2 + 8, by = 280;
+            for (int i = 0; i < 8; i++)
+            {
+                int x = bx + i * 48;
+                if (!s.Badges.Contains(i)) { g.FillRect(x + 6, by + 6, 20, 20, new Color(208, 200, 176)); continue; }
+                if (badges != null && badges.Width >= (i + 1) * 32) g.Draw(badges, i * 32, 0, 32, 32, x, by);
+                else
+                {
+                    var c = new[] { new Color(160, 160, 168), new Color(72, 136, 232), new Color(248, 200, 48), new Color(96, 192, 96), new Color(232, 96, 168), new Color(216, 168, 72), new Color(232, 72, 48), new Color(120, 96, 200) }[i];
+                    g.FillRect(x + 4, by + 4, 24, 24, new Color(64, 56, 48)); g.FillRect(x + 6, by + 6, 20, 20, c);
+                    g.FillRect(x + 9, by + 9, 6, 6, new Color(255, 255, 255, 160));
+                }
+            }
         }
     }
 }
