@@ -218,6 +218,11 @@ namespace PokeCreator.Runtime.Script
             Register("$PokemonStorage.pbStoreCaught", (c, a) => { var pk = Arg(a, 0) as Pokemon; return pk == null ? -1 : _game.State.Storage.TryAdd(pk); });
             Register("$PokemonStorage.pbFirstFreePos", (c, a) => { int b = ToInt(Arg(a, 0)); return b >= 0 && b < _game.State.Storage.Boxes.Count ? _game.State.Storage.Boxes[b].Slots.IndexOf(null) : -1; });
             Register("$PokemonStorage.boxName", (c, a) => { int b = ToInt(Arg(a, 0)); return b >= 0 && b < _game.State.Storage.Boxes.Count ? _game.State.Storage.Boxes[b].Name : ""; });
+            Register("$game_system.save_disabled", (c, a) => _game.State.Flags.Contains("save_disabled"));
+            Register("$game_system.menu_disabled", (c, a) => _game.State.Flags.Contains("menu_disabled"));
+            Register("$game_system.encounter_disabled", (c, a) => _game.State.Flags.Contains("encounter_disabled"));
+            Register("pbStringToAudioFile", (c, a) => new Dictionary<string, object> { { "name", Str(a, 0) }, { "volume", 100 }, { "pitch", 100 } });
+            Register("RPG::AudioFile.new", (c, a) => new Dictionary<string, object> { { "name", Str(a, 0) }, { "volume", a.Count > 1 ? ToInt(a[1]) : 100 }, { "pitch", a.Count > 2 ? ToInt(a[2]) : 100 } });
             Register("Game.save", (c, a) => { try { SaveSystem.Save(_game); return true; } catch { return false; } });
             Register("pbSaveGame", (c, a) => { try { SaveSystem.Save(_game); return true; } catch { return false; } });
             Handler showMap = (c, a) =>

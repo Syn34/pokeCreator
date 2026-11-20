@@ -55,6 +55,8 @@ namespace PokeCreator.Runtime.Script
             if (s != null) return s;
             var list = o as List<object>;
             if (list != null && list.Count > 0) return Convert.ToString(list[0]);
+            var d = o as Dictionary<string, object>; object n;
+            if (d != null && d.TryGetValue("name", out n)) return Convert.ToString(n);
             return Convert.ToString(o);
         }
 

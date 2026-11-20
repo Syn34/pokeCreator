@@ -118,7 +118,7 @@ namespace PokeCreator.Runtime.UI
             _ids.Add("bag"); labels.Add("Bag");
             if (g.State.Flags.Contains("has_pokegear")) { _ids.Add("pokegear"); labels.Add("Pokégear"); }
             _ids.Add("card"); labels.Add(g.State.PlayerName);
-            _ids.Add("save"); labels.Add("Save");
+            if (!g.State.Flags.Contains("save_disabled")) { _ids.Add("save"); labels.Add("Save"); }
             _ids.Add("options"); labels.Add("Options");
             _ids.Add("title"); labels.Add("Quit to Title");
             _ids.Add("exit"); labels.Add("Exit");

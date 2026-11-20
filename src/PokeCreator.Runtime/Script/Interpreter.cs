@@ -144,6 +144,8 @@ namespace PokeCreator.Runtime.Script
             return false;
         }
 
+        void SetFlag(string flag, bool on) { if (on) _game.State.Flags.Add(flag); else _game.State.Flags.Remove(flag); }
+
         void Warn(int code, string what)
         {
             if (_warned.Add(code)) Console.WriteLine("[events] Command " + code + " (" + what + ") is not supported yet; skipped.");
@@ -293,6 +295,20 @@ namespace PokeCreator.Runtime.Script
                         _index++;
                         return false;
                     }
+                case 105:
+                    {
+                        // Button Input Processing: waits for a press and stores its code (2/4/6/8 = directions, 13 = Action, 12 = Cancel, 14 = Menu)
+                        int code = Input.Trigger(Button.Down) ? 2 : Input.Trigger(Button.Left) ? 4 : Input.Trigger(Button.Right) ? 6 : Input.Trigger(Button.Up) ? 8 :
+                                   Input.Trigger(Button.Action) ? 13 : Input.Trigger(Button.Cancel) ? 12 : Input.Trigger(Button.Menu) ? 14 : 0;
+                        if (code == 0) return false;
+                        _game.State.SetVar(c.IntParam(0), code); return true;
+                    }
+                case 132: { var a = c.Params.Count > 0 ? c.Params[0] as JsonObject : null; _game.State.Extras.BattleBgm = a != null ? a.GetString("Name") : null; return true; }
+                case 133: { var a = c.Params.Count > 0 ? c.Params[0] as JsonObject : null; _game.State.Extras.BattleEndMe = a != null ? a.GetString("Name") : null; return true; }
+                case 134: SetFlag("save_disabled", c.IntParam(0) == 0); return true;
+                case 135: SetFlag("menu_disabled", c.IntParam(0) == 0); return true;
+                case 136: SetFlag("encounter_disabled", c.IntParam(0) == 0); return true;
+                case 303: _game.AskName("Your name?", _game.State.PlayerName, Math.Max(1, c.IntParam(1) > 0 ? c.IntParam(1) : 10), n => { if (!string.IsNullOrEmpty(n)) _game.State.PlayerName = n; }, this); return true;
                 case 104: UI.MessageWindow.DefaultPosition = Math.Max(0, Math.Min(2, c.IntParam(0))); UI.MessageWindow.FrameHidden = c.IntParam(1) == 1; return true;
 
                 case 241: { var a = c.Params[0] as JsonObject; if (a != null) _game.Audio.PlayBgm(a.GetString("Name"), a.GetInt("Volume", 100)); return true; }

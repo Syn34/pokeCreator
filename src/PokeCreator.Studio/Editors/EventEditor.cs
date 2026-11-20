@@ -93,6 +93,14 @@ namespace PokeCreator.Studio.Editors
                 case 241: return "◆ Play BGM: " + Audio(c);
                 case 242: return "◆ Fade Out BGM: " + c.IntParam(0) + " sec";
                 case 245: return "◆ Play BGS: " + Audio(c);
+                case 246: return "◆ Fade Out BGS: " + c.IntParam(0) + " sec";
+                case 132: return "◆ Change Battle BGM: " + Audio(c);
+                case 133: return "◆ Change Battle Victory Music: " + Audio(c);
+                case 134: return "◆ Saving: " + (c.IntParam(0) == 0 ? "forbidden" : "allowed");
+                case 135: return "◆ Pause Menu: " + (c.IntParam(0) == 0 ? "forbidden" : "allowed");
+                case 136: return "◆ Wild Encounters: " + (c.IntParam(0) == 0 ? "off" : "on");
+                case 105: return "◆ Button Input: [" + c.IntParam(0).ToString("0000") + "]";
+                case 303: return "◆ Name Input Processing";
                 case 249: return "◆ Play ME: " + Audio(c);
                 case 250: return "◆ Play SE: " + Audio(c);
                 case 301: return "◆ Battle Processing";

@@ -87,7 +87,14 @@ namespace PokeCreator.Runtime.UI
             foreach (var e in battle.Start()) _queue.Enqueue(e);
             // Seen in the Pokédex as soon as it appears
             foreach (var pk in battle.Parties[1]) if (setup.Wild) g.State.Seen.Add(pk.Species);
-            string bgm = !string.IsNullOrEmpty(setup.Bgm) ? setup.Bgm : setup.Wild ? g.Project.Settings.WildBattleBGM : (setup.TrainerType != null && !string.IsNullOrEmpty(setup.TrainerType.BattleBGM) ? setup.TrainerType.BattleBGM : g.Project.Settings.TrainerBattleBGM);
+            // Music: the battle's own > $PokemonGlobal.nextBattleBGM (once) > the map's > the trainer type's > Change Battle BGM > the defaults
+            var ex = g.State.Extras;
+            var mp = g.Map != null ? g.Map.Data.Properties : null;
+            string mapBgm = mp == null ? null : setup.Wild ? mp.WildBattleBGM : mp.TrainerBattleBGM;
+            string bgm = !string.IsNullOrEmpty(setup.Bgm) ? setup.Bgm : !string.IsNullOrEmpty(ex.NextBattleBgm) ? ex.NextBattleBgm : !string.IsNullOrEmpty(mapBgm) ? mapBgm
+                       : !setup.Wild && setup.TrainerType != null && !string.IsNullOrEmpty(setup.TrainerType.BattleBGM) ? setup.TrainerType.BattleBGM
+                       : !string.IsNullOrEmpty(ex.BattleBgm) ? ex.BattleBgm : setup.Wild ? g.Project.Settings.WildBattleBGM : g.Project.Settings.TrainerBattleBGM;
+            ex.NextBattleBgm = null;
             if (string.IsNullOrEmpty(bgm)) bgm = setup.Wild ? "Battle wild" : "Battle trainer";
             g.Audio.PlayBgm(bgm);
         }
@@ -642,7 +649,8 @@ namespace PokeCreator.Runtime.UI
             var steps = new List<Action<Action>>();
             if (o == BattleOutcome.Win && !_setup.Wild)
             {
-                string victory = _setup.TrainerType != null && !string.IsNullOrEmpty(_setup.TrainerType.VictoryBGM) ? _setup.TrainerType.VictoryBGM : Game.Project.Settings.TrainerVictoryBGM;
+                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : _setup.TrainerType != null && !string.IsNullOrEmpty(_setup.TrainerType.VictoryBGM) ? _setup.TrainerType.VictoryBGM : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : Game.Project.Settings.TrainerVictoryBGM;
+                Game.State.Extras.NextBattleMe = null;
                 Game.Audio.PlayBgm(string.IsNullOrEmpty(victory) ? "Battle victory trainer" : victory);
                 _trainerVisible = true;
                 var tr = _setup.Trainer;
@@ -654,7 +662,8 @@ namespace PokeCreator.Runtime.UI
             }
             else if (o == BattleOutcome.Win)
             {
-                string victory = Game.Project.Settings.WildVictoryBGM;
+                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : Game.Project.Settings.WildVictoryBGM;
+                Game.State.Extras.NextBattleMe = null;
                 Game.Audio.PlayBgm(string.IsNullOrEmpty(victory) ? "Battle victory wild" : victory);
             }
             else if (o == BattleOutcome.Caught && _b.CaughtPokemon != null)

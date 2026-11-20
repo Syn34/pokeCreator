@@ -387,6 +387,19 @@ namespace PokeCreator.Studio.Editors
             cmd(audio, "Fade Out BGM", () => { int sec = NumberDialog.Ask(FindForm(), "Fade out over (seconds)", 1); if (sec >= 0) Insert(new EventCommand(242, 0, sec)); });
             cmd(audio, "Play ME (jingle)", () => { string n = AssetPick("Audio/ME", "Music effect"); if (n != null) Insert(new EventCommand(249, 0, AudioObj(n))); });
             cmd(audio, "Play SE", AddSound);
+            cmd(audio, "Play BGS (ambient loop)", () => { string n = AssetPick("Audio/BGS", "Background sound"); if (n != null) Insert(new EventCommand(245, 0, AudioObj(n))); });
+            cmd(audio, "Fade Out BGS", () => { int sec = NumberDialog.Ask(FindForm(), "Fade out over (seconds)", 1); if (sec >= 0) Insert(new EventCommand(246, 0, sec)); });
+            cmd(audio, "Memorize BGM", () => Insert(new EventCommand(247, 0)));
+            cmd(audio, "Restore Memorized BGM", () => Insert(new EventCommand(248, 0)));
+            cmd(audio, "Change Battle BGM", () => { string n = AssetPick("Audio/BGM", "Battle music"); if (n != null) Insert(new EventCommand(132, 0, AudioObj(n))); });
+            cmd(audio, "Change Battle Victory Music", () => { string n = AssetPick("Audio/BGM", "Victory music"); if (n != null) Insert(new EventCommand(133, 0, AudioObj(n))); });
+
+            var sys = group("System");
+            cmd(sys, "Allow / Forbid Saving", () => { int k = ChoiceDialog.Ask(FindForm(), "Saving", new[] { "Forbid", "Allow" }, false); if (k >= 0) Insert(new EventCommand(134, 0, k)); });
+            cmd(sys, "Allow / Forbid the Pause Menu", () => { int k = ChoiceDialog.Ask(FindForm(), "Pause menu", new[] { "Forbid", "Allow" }, false); if (k >= 0) Insert(new EventCommand(135, 0, k)); });
+            cmd(sys, "Turn Wild Encounters Off / On", () => { int k = ChoiceDialog.Ask(FindForm(), "Wild encounters", new[] { "Off", "On" }, false); if (k >= 0) Insert(new EventCommand(136, 0, k)); });
+            cmd(sys, "Wait for a Button Press (into variable)", () => { int v = NumberDialog.Ask(FindForm(), "Variable to store the button in (2/4/6/8 directions, 13 Action, 12 Cancel, 14 Menu)", 1); if (v > 0) Insert(new EventCommand(105, 0, v)); });
+            cmd(sys, "Name Entry (player's name)", () => Insert(new EventCommand(303, 0, 1, 10)));
 
             var adv = group("Advanced");
             cmd(adv, "Script", AddScript);

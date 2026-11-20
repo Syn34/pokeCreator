@@ -532,6 +532,11 @@ namespace PokeCreator.Runtime.Script
                 }
             }
             if (lhs == "$PokemonGlobal.encounter_version") { _game.State.Extras.EncounterVersion = ToInt(val); return; }
+            if (lhs == "$PokemonGlobal.nextBattleBGM" || lhs == "$PokemonGlobal.next_battle_bgm") { _game.State.Extras.NextBattleBgm = AudioName(val); return; }
+            if (lhs == "$PokemonGlobal.nextBattleME" || lhs == "$PokemonGlobal.nextBattleVictoryME" || lhs == "$PokemonGlobal.next_battle_victory_me") { _game.State.Extras.NextBattleMe = AudioName(val); return; }
+            if (lhs == "$game_system.save_disabled") { if (Truthy(val)) _game.State.Flags.Add("save_disabled"); else _game.State.Flags.Remove("save_disabled"); return; }
+            if (lhs == "$game_system.menu_disabled") { if (Truthy(val)) _game.State.Flags.Add("menu_disabled"); else _game.State.Flags.Remove("menu_disabled"); return; }
+            if (lhs == "$game_system.encounter_disabled") { if (Truthy(val)) _game.State.Flags.Add("encounter_disabled"); else _game.State.Flags.Remove("encounter_disabled"); return; }
             if (lhs == "$PokemonGlobal.dungeon_area") { _game.State.Extras.DungeonArea = val == null ? null : Convert.ToString(val, CultureInfo.InvariantCulture); return; }
             if (lhs == "$PokemonGlobal.dungeon_version") { _game.State.Extras.DungeonVersion = ToInt(val); return; }
             WarnOnce("Can't assign to " + lhs);

@@ -49,6 +49,12 @@ namespace PokeCreator.Runtime.World
         public List<int> UnlockedDexes { get; set; }
         /// <summary>pbTimeEvent: the time (ticks) stored for a variable.</summary>
         public Dictionary<string, long> TimeEvents { get; set; }
+        /// <summary>Change Battle BGM / Battle End ME (event commands 132 / 133).</summary>
+        public string BattleBgm { get; set; }
+        public string BattleEndMe { get; set; }
+        /// <summary>$PokemonGlobal.nextBattleBGM / nextBattleME: music for the next battle only.</summary>
+        public string NextBattleBgm { get; set; }
+        public string NextBattleMe { get; set; }
         /// <summary>Play statistics ($stats).</summary>
         public Dictionary<string, int> Stats { get; set; }
         /// <summary>Day number of the last Pokérus day count.</summary>

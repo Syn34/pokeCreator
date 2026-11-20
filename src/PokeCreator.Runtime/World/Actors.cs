@@ -237,7 +237,7 @@ namespace PokeCreator.Runtime.World
             _wasMoving = Moving || Jumping;
 
             if (canControl && !Moving && !Jumping && Input.Trigger(Button.Action)) CheckActionTrigger();
-            if (canControl && !Moving && !Jumping && Input.Trigger(Button.Menu)) Game.PushScene(new PokeCreator.Runtime.UI.PauseMenu(Game));
+            if (canControl && !Moving && !Jumping && Input.Trigger(Button.Menu) && !Game.State.Flags.Contains("menu_disabled")) Game.PushScene(new PokeCreator.Runtime.UI.PauseMenu(Game));
         }
 
         GameMap TargetMap(int nx, int ny, out int lx, out int ly)
@@ -380,7 +380,7 @@ namespace PokeCreator.Runtime.World
                 _game.Message.Show("The repelling effect wore off!");
                 return;
             }
-            if (!Enabled) return;
+            if (!Enabled || _game.State.Flags.Contains("encounter_disabled")) return;
             if (_cooldown > 0) { _cooldown--; return; }
             var map = _game.Map;
             int tag = map.TerrainTag(x, y);
