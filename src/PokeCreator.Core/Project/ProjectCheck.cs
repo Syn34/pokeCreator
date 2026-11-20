@@ -92,7 +92,10 @@ namespace PokeCreator.Projects
             CheckFields(s, "Game Settings", "settings");
             string font = _p.MessageFontFile();
             if (font == null) Add(ProblemSeverity.Error, "Game Settings", "settings", "There is no font, so message text won't show. Put a .ttf in the project's Fonts folder, or the FireRed font (power green.ttf from Pokémon Essentials) in PokeCreator's BaseData/Fonts folder.");
-            else if (_p.FindAsset("Fonts", s.Font) == null) Add(ProblemSeverity.Info, "Game Settings", "settings", "Message font '" + s.Font + "' isn't in Fonts, so the game uses " + Path.GetFileName(font) + ".");
+            else if (s.UseProjectFont && _p.InProjectFonts(s.Font) == null)
+                Add(ProblemSeverity.Warning, "Game Settings", "settings", "'Use my own font' is on, but this project's Fonts folder has no font" + (string.IsNullOrEmpty(s.Font) ? "" : " called '" + s.Font + "'") + ", so the game uses " + Path.GetFileName(font) + ".");
+            else if (!s.UseProjectFont && _p.ProjectFonts.Length > 0)
+                Add(ProblemSeverity.Info, "Game Settings", "settings", "This project's Fonts folder has " + _p.ProjectFonts.Length + " font(s), but 'Use my own font' is off, so the game uses the default " + Path.GetFileName(font) + ".");
             if (_p.Players.Count == 0) Add(ProblemSeverity.Error, "Player Characters", "players", "There are no player characters.");
             for (int i = 0; i < _p.Players.Count; i++) CheckFields(_p.Players[i], "Player character " + (i + 1), "players");
         }

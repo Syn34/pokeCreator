@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.4";
+        public const string EngineVersion = "0.3.5";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
@@ -161,13 +161,21 @@ namespace PokeCreator.Projects
         /// <summary>The shared default fonts (BaseData/Fonts).</summary>
         public static string[] SharedFonts { get { return FontFiles(SharedFontsDir); } }
 
+        string InSharedFonts(string name) { string d = SharedFontsDir; return d == null || string.IsNullOrEmpty(name) ? null : FindIn(Path.GetDirectoryName(d), "Fonts", name); }
+        public string InProjectFonts(string name) { return string.IsNullOrEmpty(name) ? null : FindIn(Root, "Fonts", name); }
+
+        /// <summary>The default font: the Message font if it's one of the shared defaults, else Power Green, else any default.</summary>
+        public string DefaultFontFile() { return InSharedFonts(Settings.Font) ?? InSharedFonts("power green") ?? SharedFonts.FirstOrDefault(); }
+
         /// <summary>
-        /// The message font file to use: the one named in Game Settings (project first, then the shared defaults),
-        /// else the project's first font, else the first shared default. Null if there are none at all.
+        /// The message font file to use. With "Use my own font" off (the default), the shared default font, even if the
+        /// project has fonts; with it on, the Message font from the project's Fonts folder. Each falls back to the other
+        /// so text always shows. Null if there are no fonts at all.
         /// </summary>
         public string MessageFontFile()
         {
-            return FindAsset("Fonts", Settings.Font) ?? ProjectFonts.FirstOrDefault() ?? SharedFonts.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).ToLowerInvariant() == "power green") ?? SharedFonts.FirstOrDefault();
+            if (Settings.UseProjectFont) return InProjectFonts(Settings.Font) ?? ProjectFonts.FirstOrDefault() ?? DefaultFontFile();
+            return DefaultFontFile() ?? InProjectFonts(Settings.Font) ?? InProjectFonts("power green") ?? ProjectFonts.FirstOrDefault();
         }
 
         // ------------------------------------------------------------------ create / load / save

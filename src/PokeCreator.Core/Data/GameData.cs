@@ -312,7 +312,8 @@ namespace PokeCreator.Data
         [Field("Screen width", Group = "Display")] public int ScreenWidth { get; set; }
         [Field("Screen height", Group = "Display")] public int ScreenHeight { get; set; }
         [Field("Window scale", Group = "Display")] public int WindowScale { get; set; }
-        [Field("Message font", Asset = "Fonts", Group = "Display")] public string Font { get; set; }
+        [Field("Use my own font", Help = "Off: the game uses PokeCreator's default font (the FireRed font in BaseData/Fonts), even if this project's Fonts folder has fonts in it. On: it uses the Message font below from this project's Fonts folder.", Group = "Display")] public bool UseProjectFont { get; set; }
+        [Field("Message font", Asset = "Fonts", Help = "Used when 'Use my own font' is on. When it's off, you can still pick another default font here.", Group = "Display")] public string Font { get; set; }
         [Field("Font size", Group = "Display")] public int FontSize { get; set; }
         [Field("Windowskin", Asset = "Graphics/Windowskins", Group = "Display")] public string Windowskin { get; set; }
         [Field("Wild battle BGM", Asset = "Audio/BGM", Group = "Music")] public string WildBattleBGM { get; set; }
