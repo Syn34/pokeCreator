@@ -99,6 +99,8 @@ namespace PokeCreator.Battles
         public bool NeedPlayerSwitch { get { return PlayerSlotsToFill.Count > 0; } }
         /// <summary>"Switch" battle style: before a trainer sends in their next Pokémon, the player may change theirs.</summary>
         public bool SwitchStyle;
+        /// <summary>Items the opposing trainer(s) can use (e.g. Full Restore), each once.</summary>
+        public readonly List<string> FoeItems = new List<string>();
         int _pendingFoe = -1, _pendingFoeSlot;
         /// <summary>A trainer's next Pokémon is waiting so the player can choose to switch (FinishFoeSendOut).</summary>
         public bool PendingFoeSendOut { get { return _pendingFoe >= 0; } }
@@ -249,7 +251,11 @@ namespace PokeCreator.Battles
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(me, cmd));
             }
             foreach (var foe in Live(1))
+            {
+                var item = foe.Charging == null && !foe.MustRecharge ? FoeItemChoice(foe) : null;
+                if (item != null) { FoeUseItem(foe, item); continue; }
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe)));
+            }
 
             // Non-move actions go first: run, balls, items, switching
             foreach (var o in orders.Where(x => x.Key.Side == 0).ToList())
@@ -319,6 +325,34 @@ namespace PokeCreator.Battles
         }
 
         // ------------------------------------------------------------------ AI
+        /// <summary>A trainer's item worth using now: healing at 1/4 HP or less, or a status cure.</summary>
+        string FoeItemChoice(Battler foe)
+        {
+            if (IsWild || FoeItems.Count == 0) return null;
+            int hp = foe.Pk.HP, max = foe.Pk.TotalHP(P);
+            foreach (var id in FoeItems.Distinct().ToList())
+            {
+                var it = P.Items.FirstOrDefault(i => i.Id == id);
+                if (it == null) continue;
+                var kind = ItemEffects.Info(P, it).Kind;
+                if ((kind == ItemKind.HealHP || kind == ItemKind.FullRestore) && hp * 4 <= max && Rng.Next(100) < 80) return id;
+                if (kind == ItemKind.CureStatus && !string.IsNullOrEmpty(foe.Pk.Status) && ItemEffects.Works(P, foe.Pk, it, ItemEffects.Info(P, it), new EvolutionContext()) && Rng.Next(100) < 50) return id;
+            }
+            return null;
+        }
+
+        void FoeUseItem(Battler foe, string id)
+        {
+            FoeItems.Remove(id);
+            var it = P.Items.FirstOrDefault(i => i.Id == id);
+            string iname = it != null ? it.Name : id;
+            int from = foe.Pk.HP;
+            ItemEffects.Use(P, foe.Pk, it, ItemEffects.Info(P, it), -1, new EvolutionContext());
+            Say(TrainerLabel(foe.PartyIndex) + " used " + (StartsWithVowel(iname) ? "an " : "a ") + iname + "!");
+            if (foe.Pk.HP != from) { Hp(foe, from); Say(Name(foe) + "'s HP was restored."); }
+            StatusEvent(foe);
+        }
+
         /// <summary>The AI's command for one of its Pokémon: a move and, in doubles, which of the player's Pokémon to hit.</summary>
         BattleCommand ChooseAI(Battler me)
         {

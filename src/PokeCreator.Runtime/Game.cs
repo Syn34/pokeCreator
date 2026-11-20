@@ -427,6 +427,8 @@ namespace PokeCreator.Runtime
                 TrainerTypeName = tt1 != null && !string.IsNullOrEmpty(tt1.Name) ? tt1.Name : type1,
                 TrainerSkill = Math.Max(tt1 != null ? tt1.SkillLevel : 0, tt2 != null ? tt2.SkillLevel : 0),
             };
+            if (tr1.Items != null) b.FoeItems.AddRange(tr1.Items);
+            if (tr2 != null && tr2.Items != null) b.FoeItems.AddRange(tr2.Items);
             if (tr2 != null)
             {
                 b.Trainer2Name = tr2.Name;
@@ -452,6 +454,7 @@ namespace PokeCreator.Runtime
                 TrainerTypeName = tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name : type,
                 TrainerSkill = tt != null ? tt.SkillLevel : 0,
             };
+            if (tr.Items != null) b.FoeItems.AddRange(tr.Items);
             StartBattle(b, new BattleSetup { Wild = false, Trainer = tr, TrainerType = tt, Backdrop = Backdrop(), CanLose = canLose, OnEnd = onEnd });
             return true;
         }
