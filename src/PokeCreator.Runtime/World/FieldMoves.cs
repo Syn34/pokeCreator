@@ -208,6 +208,10 @@ namespace PokeCreator.Runtime.World
             if (!IsWater(g, fx, fy)) { g.Message.Show("Can't use that here."); return; }
             string method = rod == "OLDROD" ? "OldRod" : rod == "GOODROD" ? "GoodRod" : "SuperRod";
             int bite = rod == "OLDROD" ? 50 : rod == "GOODROD" ? 70 : 85;
+            // Suction Cups / Sticky Hold leading: more bites (as Essentials)
+            var lead = g.State.Party.FirstOrDefault(pk => !pk.IsEgg);
+            string ab = lead != null ? lead.AbilityId(g.Project) : null;
+            if (ab == "SUCTIONCUPS" || ab == "STICKYHOLD") bite = Math.Min(100, bite + 15);
             g.Message.Show(". . . . . . . . .", null, -1, _ =>
             {
                 bool hasTable = g.Project.Encounters.Any(en => en.Map == g.Map.Id && en.Methods.Any(m => m.Type == method && m.Slots.Count > 0));

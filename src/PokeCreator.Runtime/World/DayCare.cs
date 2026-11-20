@@ -140,6 +140,7 @@ namespace PokeCreator.Runtime.World
                         egg.Moves.Add(new PokemonMove { Id = m, PP = md.TotalPP });
                     }
             egg.Ball = mother.Ball ?? "POKEBALL";
+            EncounterModifiers.ShinyCharm(g, egg);
             egg.IsEgg = true;
             egg.EggSteps = data != null && data.HatchSteps > 1 ? data.HatchSteps : 5120;
             egg.OTName = g.State.PlayerName; egg.OTId = g.State.TrainerId;
@@ -189,7 +190,8 @@ namespace PokeCreator.Runtime.World
                 {
                     s.DayCareEggSteps = 0;
                     int c = Compatibility(g);
-                    if (c > 0 && g.Rng.Next(100) < EggChance[c]) s.DayCareEgg = true;
+                    int chance = g.State.ItemCount("OVALCHARM") > 0 ? new[] { 0, 40, 80, 88 }[c] : EggChance[c];
+                    if (c > 0 && g.Rng.Next(100) < chance) s.DayCareEgg = true;
                 }
             }
             // Eggs in the party hatch (twice as fast with Flame Body / Magma Armor in the party)

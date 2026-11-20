@@ -70,10 +70,18 @@ namespace PokeCreator.Runtime.World
             return lead != null && !lead.Fainted && (ab == "INTIMIDATE" || ab == "KEENEYE") && level <= lead.Level - 5 && g.Rng.Next(2) == 0;
         }
 
+        /// <summary>The Shiny Charm: two more chances for the Pokémon to be shiny.</summary>
+        public static void ShinyCharm(Game g, Pokemon pk)
+        {
+            if (pk == null || pk.Shiny || g.State.ItemCount("SHINYCHARM") <= 0) return;
+            for (int i = 0; i < 2 && !pk.Shiny; i++) if (g.Rng.Next(4096) == 0) pk.Shiny = true;
+        }
+
         /// <summary>Synchronize and Cute Charm on the wild Pokémon just made.</summary>
         public static void ApplyToWild(Game g, Pokemon wild)
         {
             var lead = Lead(g); string ab = Ability(g, lead);
+            ShinyCharm(g, wild);
             if (lead == null) return;
             if (ab == "SYNCHRONIZE" && g.Rng.Next(2) == 0) wild.Nature = lead.Nature;
             if (ab == "CUTECHARM" && (lead.Gender == "M" || lead.Gender == "F") && (wild.Gender == "M" || wild.Gender == "F") && g.Rng.Next(3) < 2)
