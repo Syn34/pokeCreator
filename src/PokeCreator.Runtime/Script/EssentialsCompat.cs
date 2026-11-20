@@ -191,6 +191,7 @@ namespace PokeCreator.Runtime.Script
             }
             if (lhs == "$player.money" || lhs == "$Trainer.money") { _game.State.Money = ToInt(val); return; }
             if (lhs == "$player.name" || lhs == "$Trainer.name") { _game.State.PlayerName = Convert.ToString(val); return; }
+            if (lhs == "$player.character_ID" || lhs == "$Trainer.character_ID") { _game.ChangePlayer(ToInt(val) - 1); return; }
             var fm = Regex.Match(lhs, @"^\$(?:player|Trainer)\.(has_\w+|pokedex)$");
             if (fm.Success)
             {
@@ -209,7 +210,7 @@ namespace PokeCreator.Runtime.Script
                                       "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
                                       "pbMoveRoute", "pbPhoneRegisterBattle", "pbPhoneRegister", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
-                                      "pbChangePlayer", "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
+                                      "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
                 Register(n, noop);
 
             Register("pbCommonEvent", (c, a) => c != null && c.CallCommonEvent(ToInt(Arg(a, 0))));
@@ -297,6 +298,8 @@ namespace PokeCreator.Runtime.Script
             Register("pbTrainerName", (c, a) => { _game.AskName("Your name?", _game.State.PlayerName, 12, n => _game.State.PlayerName = n, c); return true; });
             Register("pbEnterPlayerName", (c, a) => { _game.AskName(Arg(a, 0) != null ? Convert.ToString(Arg(a, 0)) : "Your name?", _game.State.PlayerName, Arg(a, 2) != null ? ToInt(Arg(a, 2)) : 12, n => _game.State.PlayerName = n, c); return true; });
             Register("pbChangePlayerName", (c, a) => true);
+            // Player characters are numbered from 1 in Essentials (metadata [1], [2]...)
+            Register("pbChangePlayer", (c, a) => { _game.ChangePlayer(ToInt(Arg(a, 0)) - 1); return true; });
             Register("rand", (c, a) => _game.Rng.Next(Math.Max(1, ToInt(Arg(a, 0)))));
         }
 

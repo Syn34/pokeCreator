@@ -173,6 +173,14 @@ namespace PokeCreator.Runtime
             PushScene(new NameEntryScene(this, prompt, initial, max, n => { if (!string.IsNullOrEmpty(n)) set(n); }));
         }
 
+        /// <summary>Switches the player character (index into Player Characters) and updates the sprite.</summary>
+        public void ChangePlayer(int index)
+        {
+            if (Project.Players.Count == 0) return;
+            State.PlayerCharacter = Math.Max(0, Math.Min(index, Project.Players.Count - 1));
+            if (Player != null) Player.Look = Project.Players[State.PlayerCharacter];
+        }
+
         /// <summary>Plays the current map's music again (after the evolution tune).</summary>
         public void RestoreMapBgm()
         {

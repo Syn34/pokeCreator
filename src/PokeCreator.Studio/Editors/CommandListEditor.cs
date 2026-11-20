@@ -216,6 +216,12 @@ namespace PokeCreator.Studio.Editors
             cmd(party, "Heal Party (Recover All)", () => Insert(new EventCommand(314, 0, 0)));
             cmd(party, "Enter Player Name", () => Insert(new EventCommand(355, 0, "pbTrainerName")));
             cmd(party, "Give Pokédex", () => Insert(new EventCommand(355, 0, "$player.has_pokedex = true")));
+            cmd(party, "Change Player Character", () =>
+            {
+                if (_p.Players.Count == 0) { MessageBox.Show(FindForm(), "There are no player characters. Add them under Game Settings > Player Characters.", "Change Player Character"); return; }
+                int k = ChoiceDialog.Ask(FindForm(), "Change to which player character?", _p.Players.Select((pc, i) => (i + 1) + ": " + pc).ToArray());
+                if (k >= 0) Insert(new EventCommand(355, 0, "pbChangePlayer(" + (k + 1) + ")"));
+            });
 
             var map = group("Map && Movement");
             cmd(map, "Transfer Player (Warp)", AddTransfer);

@@ -80,6 +80,8 @@ namespace PokeCreator.Studio.Editors
                         string sc = c.StrParam(0).Trim();
                         if (sc == "pbTrainerName" || sc.StartsWith("pbEnterPlayerName")) return "◆ Enter Player Name";
                         if (sc.Replace(" ", "") == "$player.has_pokedex=true" || sc.Replace(" ", "") == "$Trainer.pokedex=true") return "◆ Give Pokédex";
+                        var cp = System.Text.RegularExpressions.Regex.Match(sc, @"^pbChangePlayer\(\s*(\d+)\s*\)$");
+                        if (cp.Success) { int n = int.Parse(cp.Groups[1].Value); return "◆ Change Player Character: " + n + (n >= 1 && n <= p.Players.Count ? " (" + p.Players[n - 1] + ")" : ""); }
                         var gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbAddPokemon\(\s*:(\w+)\s*,\s*(\d+)\s*\)$");
                         if (gm.Success) return "◆ Give Pokémon: " + gm.Groups[1].Value + " Lv. " + gm.Groups[2].Value;
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbReceiveItem\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
