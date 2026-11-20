@@ -267,11 +267,15 @@ namespace PokeCreator.Runtime.UI
     {
         int _index, _page;
         static readonly string[] Pages = { "INFO", "STATS", "MOVES" };
+        readonly List<Pokemon> _list;
         public SummaryScene(Game g, int index) : base(g) { Opaque = true; _index = index; }
+        /// <summary>Summary of Pokémon from another list (e.g. a PC box).</summary>
+        public SummaryScene(Game g, int index, List<Pokemon> list) : base(g) { Opaque = true; _index = index; _list = list; }
+        List<Pokemon> Party { get { return _list ?? Game.State.Party; } }
 
         protected override void Update()
         {
-            var party = Game.State.Party;
+            var party = Party;
             if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
             if (Input.Repeat(Button.Right)) { _page = (_page + 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
             if (Input.Repeat(Button.Left)) { _page = (_page + Pages.Length - 1) % Pages.Length; Game.Audio.PlaySe("GUI summary change page"); }
@@ -282,7 +286,7 @@ namespace PokeCreator.Runtime.UI
         public override void Draw(Gfx g)
         {
             var p = Game.Project;
-            var pk = Game.State.Party[Math.Min(_index, Game.State.Party.Count - 1)];
+            var pk = Party[Math.Min(_index, Party.Count - 1)];
             var d = pk.Data(p);
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 248, 240), new Color(216, 224, 232));
             // Header with page tabs

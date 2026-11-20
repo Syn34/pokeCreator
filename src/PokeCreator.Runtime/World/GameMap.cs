@@ -26,6 +26,8 @@ namespace PokeCreator.Runtime.World
         public List<PokeCreator.Pkmn.Pokemon> Storage = new List<PokeCreator.Pkmn.Pokemon>();
         /// <summary>Player flags set by scripts: has_pokedex, has_running_shoes, has_pokegear...</summary>
         public readonly HashSet<string> Flags = new HashSet<string>();
+        /// <summary>Items stored in the player's PC.</summary>
+        public readonly Dictionary<string, int> PcItems = new Dictionary<string, int>();
         /// <summary>Pokédex: species seen and caught (owned).</summary>
         public readonly HashSet<string> Seen = new HashSet<string>();
         public readonly HashSet<string> Caught = new HashSet<string>();

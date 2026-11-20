@@ -37,6 +37,7 @@ namespace PokeCreator.Runtime.World
         public List<string> Caught { get; set; }
         public int RepelSteps { get; set; }
         public List<int> HealPoint { get; set; }
+        public Dictionary<string, int> PcItems { get; set; }
         public SaveData()
         {
             Version = 1; SwitchesOn = new List<int>(); Variables = new Dictionary<string, int>(); SelfSwitches = new List<string>();
@@ -98,6 +99,7 @@ namespace PokeCreator.Runtime.World
                 Party = s.Party, Storage = s.Storage,
                 Flags = s.Flags.OrderBy(x => x).ToList(), Seen = s.Seen.OrderBy(x => x).ToList(), Caught = s.Caught.OrderBy(x => x).ToList(),
                 RepelSteps = s.RepelSteps,
+                PcItems = s.PcItems.Count > 0 ? new Dictionary<string, int>(s.PcItems) : null,
                 HealPoint = s.HealMap > 0 ? new List<int> { s.HealMap, s.HealX, s.HealY, s.HealDir } : null
             };
             Directory.CreateDirectory(Folder(g.Project));
@@ -123,6 +125,7 @@ namespace PokeCreator.Runtime.World
             s.Caught.Clear(); if (d.Caught != null) foreach (var f in d.Caught) s.Caught.Add(f);
             foreach (var pk in s.Party.Concat(s.Storage)) s.Register(pk); // saves from before the Pokédex
             s.RepelSteps = d.RepelSteps;
+            s.PcItems.Clear(); if (d.PcItems != null) foreach (var kv in d.PcItems) s.PcItems[kv.Key] = kv.Value;
             if (d.HealPoint != null && d.HealPoint.Count >= 4) { s.HealMap = d.HealPoint[0]; s.HealX = d.HealPoint[1]; s.HealY = d.HealPoint[2]; s.HealDir = d.HealPoint[3]; }
             return d;
         }

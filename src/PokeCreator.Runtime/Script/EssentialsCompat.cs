@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using PokeCreator.Runtime.UI;
 using PokeCreator.Runtime.World;
 using PokeCreator.Pkmn;
 
@@ -52,14 +53,25 @@ namespace PokeCreator.Runtime.Script
 
         static IEnumerable<string> SplitStatements(string s)
         {
-            // Join lines that end with an open parenthesis/comma (multi-line calls), then split on newlines/semicolons.
-            var joined = Regex.Replace(s, @"([\(,])\s*\n\s*", "$1");
-            foreach (var line in joined.Split('\n'))
-                foreach (var part in SplitTopLevel(line, ';'))
-                {
-                    var t = part.Trim();
-                    if (t.Length > 0 && !t.StartsWith("#")) yield return t;
-                }
+            // Statements end at a newline or ';' outside brackets and strings, so calls and arrays can span lines
+            var parts = new List<string>();
+            int depth = 0, start = 0; bool inStr = false; char q = '\0';
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inStr) { if (c == '\\') i++; else if (c == q) inStr = false; continue; }
+                if (c == '"' || c == '\'') { inStr = true; q = c; continue; }
+                if (c == '#' && depth == 0) { while (i < s.Length && s[i] != '\n') i++; parts.Add(s.Substring(start, i - start)); start = i + 1; continue; }
+                if (c == '(' || c == '[' || c == '{') depth++;
+                else if (c == ')' || c == ']' || c == '}') depth = Math.Max(0, depth - 1);
+                else if ((c == '\n' || c == ';') && depth == 0) { parts.Add(s.Substring(start, i - start)); start = i + 1; }
+            }
+            if (start < s.Length) parts.Add(s.Substring(start));
+            foreach (var part in parts)
+            {
+                var t = Regex.Replace(part, @"\s*\n\s*", " ").Trim();
+                if (t.Length > 0 && !t.StartsWith("#")) yield return t;
+            }
         }
 
         // ------------------------------------------------------------------ tiny expression evaluator
@@ -122,6 +134,11 @@ namespace PokeCreator.Runtime.Script
             int n; if (int.TryParse(e, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) return n;
             if (e.StartsWith(":") && Regex.IsMatch(e, @"^:\w+$")) return e.Substring(1);
             if ((e.StartsWith("\"") && e.EndsWith("\"")) || (e.StartsWith("'") && e.EndsWith("'"))) return Unquote(e);
+            if (e.StartsWith("[") && MatchingBracket(e, 0) == e.Length - 1)
+            {
+                string inner = e.Substring(1, e.Length - 2).Trim();
+                return inner.Length == 0 ? new List<object>() : SplitTopLevel(inner, ',').Where(x => x.Trim().Length > 0).Select(x => Eval(x, ctx)).ToList();
+            }
             var intl = Regex.Match(e, @"^_I(?:NTL|SPRINTF)\((.*)\)$", RegexOptions.Singleline);
             if (intl.Success)
             {
@@ -252,9 +269,16 @@ namespace PokeCreator.Runtime.Script
             Register("$player.able_pokemon_count", (c, a) => _game.State.Party.Count(pk => !pk.Fainted));
             Register("$player.party_full?", (c, a) => _game.State.Party.Count >= GameState.MaxParty);
             Register("pbBoxesFull?", (c, a) => false);
-            Register("pbPokeCenterPC", (c, a) => { _game.Message.Show("The PC isn't available in this version of PokeCreator yet."); return true; });
-            Register("pbTrainerPC", (c, a) => { _game.Message.Show("The PC isn't available in this version of PokeCreator yet."); return true; });
-            Register("pbPokemonMart", (c, a) => { _game.Message.Show("Shops are coming in a future version of PokeCreator."); return true; });
+            Register("pbPokeCenterPC", (c, a) => { PcMenu.Open(_game, true); return true; });
+            Register("pbTrainerPC", (c, a) => { PcMenu.Open(_game, false); return true; });
+            // pbPokemonMart([:POTION, :ANTIDOTE, ...], speech = nil, cantsell = false)
+            Register("pbPokemonMart", (c, a) =>
+            {
+                var stock = Arg(a, 0) as List<object>;
+                var ids = stock == null ? new List<string>() : stock.Select(x => Convert.ToString(x)).ToList();
+                _game.PushScene(new MartScene(_game, ids, a.Count > 2 && Truthy(a[2])));
+                return true;
+            });
             Register("pbSellItem", (c, a) => true);
 
             // Battles. The event waits for the battle; a Conditional Branch re-checks afterwards and gets the result.
@@ -474,6 +498,20 @@ namespace PokeCreator.Runtime.Script
                     if ((op == "-" || op == "+") && "=<>!(,+-*/".IndexOf(s[i - 1]) >= 0) continue;
                     return i;
                 }
+            }
+            return -1;
+        }
+
+        static int MatchingBracket(string s, int open)
+        {
+            int depth = 0; bool inStr = false; char q = '\0';
+            for (int i = open; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inStr) { if (c == '\\') i++; else if (c == q) inStr = false; continue; }
+                if (c == '"' || c == '\'') { inStr = true; q = c; continue; }
+                if (c == '[' || c == '(' || c == '{') depth++;
+                else if (c == ']' || c == ')' || c == '}') { depth--; if (depth == 0) return i; }
             }
             return -1;
         }
