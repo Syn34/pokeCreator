@@ -87,7 +87,7 @@ namespace PokeCreator.Runtime.World
             }
             var pk = MakePokemon(g, m);
             if (pk.Data(g.Project) == null) return false;
-            if (g.State.Party.Count >= GameState.MaxParty && g.State.Storage.Count >= 30 * 40) { g.Message.Show("There's no room for the Pokémon!"); return false; }
+            if (g.State.Party.Count >= GameState.MaxParty && g.State.Storage.Full) { g.Message.Show("There's no room for the Pokémon!"); return false; }
             g.State.Register(pk);
             g.State.Extras.GiftsReceived.Add(m.Id);
             g.Audio.PlayMe("Pkmn get");

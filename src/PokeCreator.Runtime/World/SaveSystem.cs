@@ -32,7 +32,10 @@ namespace PokeCreator.Runtime.World
         public List<string> SelfSwitches { get; set; }
         public Dictionary<string, int> Bag { get; set; }
         public List<Pokemon> Party { get; set; }
+        /// <summary>Old saves: stored Pokémon as one list (new saves use Boxes).</summary>
         public List<Pokemon> Storage { get; set; }
+        public List<StorageBox> Boxes { get; set; }
+        public int CurrentBox { get; set; }
         public List<string> Flags { get; set; }
         public List<string> Seen { get; set; }
         public List<string> Caught { get; set; }
@@ -121,7 +124,7 @@ namespace PokeCreator.Runtime.World
                 StringVariables = s.StringVars.Count > 0 ? s.StringVars.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value) : null,
                 SelfSwitches = s.SelfSwitches.OrderBy(x => x).ToList(),
                 Bag = new Dictionary<string, int>(s.Bag),
-                Party = s.Party, Storage = s.Storage,
+                Party = s.Party, Storage = null, Boxes = s.Storage.Boxes, CurrentBox = s.Storage.Current,
                 Flags = s.Flags.OrderBy(x => x).ToList(), Seen = s.Seen.OrderBy(x => x).ToList(), Caught = s.Caught.OrderBy(x => x).ToList(),
                 RepelSteps = s.RepelSteps,
                 Surfing = g.Player != null && g.Player.Surfing,
@@ -162,7 +165,7 @@ namespace PokeCreator.Runtime.World
             s.SelfSwitches.Clear(); foreach (var k in d.SelfSwitches) s.SelfSwitches.Add(k);
             s.Bag.Clear(); foreach (var kv in d.Bag) s.Bag[kv.Key] = kv.Value;
             s.Party = d.Party ?? new List<Pokemon>();
-            s.Storage = d.Storage ?? new List<Pokemon>();
+            s.Storage = d.Boxes != null && d.Boxes.Count > 0 ? PokemonStorage.FromBoxes(d.Boxes, d.CurrentBox) : PokemonStorage.FromList(d.Storage);
             s.Flags.Clear(); if (d.Flags != null) foreach (var f in d.Flags) s.Flags.Add(f);
             s.Seen.Clear(); if (d.Seen != null) foreach (var f in d.Seen) s.Seen.Add(f);
             s.Caught.Clear(); if (d.Caught != null) foreach (var f in d.Caught) s.Caught.Add(f);

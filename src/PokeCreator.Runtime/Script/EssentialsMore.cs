@@ -209,6 +209,17 @@ namespace PokeCreator.Runtime.Script
             Register("pbFlyToNewLocation", (c, a) => false);
             Register("pbEncounter", (c, a) => FieldMoves.EncounterFrom(_game, new[] { Str(a, 0).TrimStart(':') }));
             Register("pbFadeOutInWithMusic", (c, a) => true);
+            // $PokemonStorage: boxes as lists ($PokemonStorage[box][slot]) plus the usual queries
+            Register("$PokemonStorage", (c, a) => _game.State.Storage.Boxes.Select(b => (object)b.Slots).ToList());
+            Register("$PokemonStorage.full?", (c, a) => _game.State.Storage.Full);
+            Register("$PokemonStorage.maxBoxes", (c, a) => _game.State.Storage.Boxes.Count);
+            Register("$PokemonStorage.maxPokemon", (c, a) => PokemonStorage.BoxSize);
+            Register("$PokemonStorage.currentBox", (c, a) => _game.State.Storage.Current);
+            Register("$PokemonStorage.pbStoreCaught", (c, a) => { var pk = Arg(a, 0) as Pokemon; return pk == null ? -1 : _game.State.Storage.TryAdd(pk); });
+            Register("$PokemonStorage.pbFirstFreePos", (c, a) => { int b = ToInt(Arg(a, 0)); return b >= 0 && b < _game.State.Storage.Boxes.Count ? _game.State.Storage.Boxes[b].Slots.IndexOf(null) : -1; });
+            Register("$PokemonStorage.boxName", (c, a) => { int b = ToInt(Arg(a, 0)); return b >= 0 && b < _game.State.Storage.Boxes.Count ? _game.State.Storage.Boxes[b].Name : ""; });
+            Register("Game.save", (c, a) => { try { SaveSystem.Save(_game); return true; } catch { return false; } });
+            Register("pbSaveGame", (c, a) => { try { SaveSystem.Save(_game); return true; } catch { return false; } });
             Handler showMap = (c, a) =>
             {
                 object answer;

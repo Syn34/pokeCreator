@@ -166,6 +166,8 @@ namespace PokeCreator.Pkmn
             Pokerus = (Pokerus & 0xF0) | Math.Max(0, (Pokerus & 15) - days);
         }
         public string Ball { get; set; }
+        /// <summary>Box markings (bits: circle, triangle, square, heart, star, diamond).</summary>
+        public int Markings { get; set; }
         public string OTName { get; set; }
         public int OTId { get; set; }
         public int MetMap { get; set; }

@@ -265,7 +265,7 @@ namespace PokeCreator.Runtime.Script
                 {
                     var lm2 = Regex.Match(e.Substring(lastDot + 1), @"^(\w+[?!]?)(?:\((.*)\))?$");
                     string recvText = e.Substring(0, lastDot);
-                    if (lm2.Success && (recvText.StartsWith("[") || recvText.StartsWith("(") || recvText.EndsWith("}")))
+                    if (lm2.Success && (recvText.StartsWith("[") || recvText.StartsWith("(") || recvText.EndsWith("}") || recvText.EndsWith("]")))
                     {
                         var margs = lm2.Groups[2].Success && lm2.Groups[2].Value.Trim().Length > 0 ? SplitTopLevel(lm2.Groups[2].Value, ',').Select(x => Eval(x, ctx)).ToList() : new List<object>();
                         return Member(Eval(recvText, ctx), lm2.Groups[1].Value, margs);
@@ -843,7 +843,7 @@ namespace PokeCreator.Runtime.Script
                 }, () => _game.SetPrompt(c, false)));
                 return false;
             });
-            Register("pbBoxesFull?", (c, a) => _game.State.Party.Count >= GameState.MaxParty && _game.State.Storage.Count >= 40 * 30);
+            Register("pbBoxesFull?", (c, a) => _game.State.Party.Count >= GameState.MaxParty && _game.State.Storage.Full);
             Register("pbGetStorageCreator", (c, a) => "someone");
             Register("$player.seen_storage_creator", (c, a) => _game.State.Flags.Contains("seen_storage_creator"));
             Register("pbSaveScreen", (c, a) =>

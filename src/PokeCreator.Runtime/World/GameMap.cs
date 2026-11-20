@@ -22,8 +22,8 @@ namespace PokeCreator.Runtime.World
         public long PlayFrames;
         public List<PokeCreator.Pkmn.Pokemon> Party = new List<PokeCreator.Pkmn.Pokemon>();
         public const int MaxParty = 6;
-        /// <summary>Pokémon sent to the PC when the party is full (boxes UI comes later).</summary>
-        public List<PokeCreator.Pkmn.Pokemon> Storage = new List<PokeCreator.Pkmn.Pokemon>();
+        /// <summary>The PC's Pokémon boxes.</summary>
+        public PokemonStorage Storage = new PokemonStorage();
         /// <summary>Player flags set by scripts: has_pokedex, has_running_shoes, has_pokegear...</summary>
         public readonly HashSet<string> Flags = new HashSet<string>();
         /// <summary>Items stored in the player's PC.</summary>

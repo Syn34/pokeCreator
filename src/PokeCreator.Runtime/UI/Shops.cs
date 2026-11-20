@@ -196,120 +196,6 @@ namespace PokeCreator.Runtime.UI
         }
     }
 
-    // =====================================================================================
-    /// <summary>
-    /// Pokémon Storage: boxes of 30. Withdraw, deposit, see the summary, release.
-    /// </summary>
-    public class StorageScene : Scene
-    {
-        public const int BoxSize = 30;
-        readonly bool _deposit;
-        int _box, _cursor;
-        CommandList _popup;
-        List<Pokemon> Store { get { return Game.State.Storage; } }
-        int Boxes { get { return Math.Max(1, (Store.Count + BoxSize) / BoxSize); } }
-
-        public StorageScene(Game g, bool deposit) : base(g) { Opaque = true; _deposit = deposit; }
-
-        protected override void Update()
-        {
-            if (_deposit) { DepositFlow(); return; }
-            if (_popup != null)
-            {
-                int r = _popup.Update(this, Cursor);
-                if (r == -2 || (r >= 0 && _popup.Items[r] == "Cancel")) { Cancel(); _popup = null; return; }
-                if (r < 0) return;
-                string cmd = _popup.Items[r]; _popup = null;
-                int idx = _box * BoxSize + _cursor;
-                var pk = Store[idx];
-                if (cmd == "Withdraw")
-                {
-                    if (Game.State.Party.Count >= GameState.MaxParty) { Game.Message.Show("Your party is full!"); return; }
-                    Store.RemoveAt(idx); Game.State.Party.Add(pk);
-                    Game.Message.Show(pk.Name(Game.Project) + " was taken out of the box.");
-                    ClampCursor();
-                }
-                else if (cmd == "Summary")
-                {
-                    // The summary screen works on the party list, so show it from a temporary one
-                    Game.PushScene(new SummaryScene(Game, 0, new List<Pokemon> { pk }));
-                }
-                else if (cmd == "Release")
-                {
-                    Game.Message.Show("Release " + pk.Name(Game.Project) + "?", new List<string> { "Yes", "No" }, 1, c =>
-                    {
-                        if (c != 0) return;
-                        Store.Remove(pk); ClampCursor();
-                        Game.Message.Show(pk.Name(Game.Project) + " was released.\\nBye-bye, " + pk.Name(Game.Project) + "!");
-                    });
-                }
-                return;
-            }
-            int inBox = Math.Max(0, Math.Min(BoxSize, Store.Count - _box * BoxSize));
-            if (Input.Repeat(Button.Right)) { if (_cursor % 6 == 5) { _box = (_box + 1) % Boxes; } else _cursor++; Cursor(); }
-            if (Input.Repeat(Button.Left)) { if (_cursor % 6 == 0) { _box = (_box + Boxes - 1) % Boxes; } else _cursor--; Cursor(); }
-            if (Input.Repeat(Button.Down)) { _cursor = (_cursor + 6) % BoxSize; Cursor(); }
-            if (Input.Repeat(Button.Up)) { _cursor = (_cursor + BoxSize - 6) % BoxSize; Cursor(); }
-            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); return; }
-            if (Input.Trigger(Button.Action))
-            {
-                if (_cursor >= inBox) { Buzz(); return; }
-                Decide();
-                _popup = new CommandList(new[] { "Withdraw", "Summary", "Release", "Cancel" });
-            }
-        }
-
-        void ClampCursor() { int inBox = Store.Count - _box * BoxSize; if (inBox <= 0 && _box > 0) { _box--; } }
-
-        bool _depositOpen;
-        void DepositFlow()
-        {
-            if (_depositOpen) return;
-            _depositOpen = true;
-            Game.PushScene(new PartyScene(Game, "Deposit which Pokémon?", null, (i, close) =>
-            {
-                var party = Game.State.Party;
-                var pk = party[i];
-                if (party.Count(p => Battle.Able(p)) <= 1 && Battle.Able(pk)) { Game.Message.Show("That's your last Pokémon that can battle!"); return; }
-                party.RemoveAt(i); Store.Add(pk);
-                Game.Audio.PlaySe("PC access");
-                Game.Message.Show(pk.Name(Game.Project) + " was stored in Box " + ((Store.Count - 1) / BoxSize + 1) + ".");
-                if (party.Count == 0) close();
-            }, () => Close()));
-        }
-
-        public override void Draw(Gfx g)
-        {
-            if (_deposit) return;
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(152, 208, 168), new Color(64, 136, 104));
-            Ui.Panel(g, 196, 8, g.Width - 204, 40, new Color(248, 248, 248), new Color(32, 80, 64));
-            Ui.TextCenter(g, 196 + (g.Width - 204) / 2, 12, "◀ Box " + (_box + 1) + " ▶");
-            Ui.Panel(g, 196, 56, g.Width - 204, 260, new Color(208, 236, 216), new Color(32, 80, 64));
-            for (int i = 0; i < BoxSize; i++)
-            {
-                int idx = _box * BoxSize + i;
-                int x = 206 + (i % 6) * 50, y = 64 + (i / 6) * 50;
-                if (i == _cursor) g.FillRect(x - 2, y - 2, 52, 52, new Color(248, 216, 120));
-                if (idx < Store.Count) Ui.PokemonIcon(g, Game, Store[idx], x - 7, y - 10, i == _cursor ? Frame * 2 : 0);
-            }
-            // Selected Pokémon
-            Ui.Panel(g, 8, 8, 180, 308, new Color(248, 248, 248), new Color(32, 80, 64));
-            int sel = _box * BoxSize + _cursor;
-            if (sel < Store.Count)
-            {
-                var pk = Store[sel];
-                Ui.PokemonFront(g, Game, pk, 98, 180, 160);
-                Ui.Text(g, 20, 190, pk.Name(Game.Project));
-                Ui.Text(g, 20, 222, "Lv. " + pk.Level);
-                Ui.GenderSymbol(g, 150, 190, pk.Gender);
-                if (!string.IsNullOrEmpty(pk.Item)) { var it = Game.Project.Items.FirstOrDefault(x => x.Id == pk.Item); Ui.Text(g, 20, 254, it != null ? it.Name : pk.Item); }
-            }
-            Ui.Box(g, 4, 324, g.Width - 8, 56);
-            Ui.Text(g, 22, 336, Store.Count == 0 ? "The boxes are empty." : Store.Count + " Pokémon stored. A: options   B: close");
-            if (_popup != null) { int w = _popup.Width(g); _popup.Draw(g, g.Width - w - 8, 324 - _popup.Height(g) - 4); }
-        }
-    }
-
     /// <summary>The PC menus: Someone's PC (Pokémon storage), the player's PC (item storage), Log off.</summary>
     public static class PcMenu
     {
@@ -334,11 +220,10 @@ namespace PokeCreator.Runtime.UI
         static void StoragePc(Game g)
         {
             g.Audio.PlaySe("PC access");
-            var options = new List<string> { "Withdraw Pokémon", "Deposit Pokémon", "See ya!" };
-            g.Message.Show("The Pokémon Storage System was opened.", options, 2, c =>
+            var options = new List<string> { "Organize Boxes", "Withdraw Pokémon", "Deposit Pokémon", "See ya!" };
+            g.Message.Show("The Pokémon Storage System was opened.", options, 3, c =>
             {
-                if (c == 0) g.PushScene(new ReturnTo(g, new StorageScene(g, false), () => StoragePc(g)));
-                else if (c == 1) g.PushScene(new ReturnTo(g, new StorageScene(g, true), () => StoragePc(g)));
+                if (c >= 0 && c <= 2) g.PushScene(new ReturnTo(g, new StorageScene(g, (StorageScene.Mode)c), () => StoragePc(g)));
                 else ShowMain(g);
             });
         }

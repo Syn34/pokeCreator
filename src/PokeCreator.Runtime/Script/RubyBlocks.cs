@@ -265,6 +265,13 @@ namespace PokeCreator.Runtime.Script
                 if (negate ? c : !c) return Flow.None;
                 return ExecStatement(body, ctx);
             }
+            // "statement rescue fallback"
+            int rescueAt = FindTopLevel(s, " rescue ");
+            if (rescueAt > 0)
+            {
+                try { Eval(s.Substring(0, rescueAt), ctx); } catch { try { Eval(s.Substring(rescueAt + 8), ctx); } catch { } }
+                return Flow.None;
+            }
             try { Eval(s, ctx); }
             catch (Exception ex) { WarnOnce("Script error in \"" + s + "\": " + ex.Message); }
             return Flow.None;
