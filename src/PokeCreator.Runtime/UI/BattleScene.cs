@@ -432,6 +432,8 @@ namespace PokeCreator.Runtime.UI
         void CommandMenu()
         {
             if (_b.Safari) { SafariMenu(); return; }
+            // Battle Palace: the Pokémon decide for themselves
+            if (_b.FacilityRule == "palace") { Commit(BattleCommand.Fight(-1)); return; }
             if (Input.Repeat(Button.Right) && _cmd % 2 == 0) { _cmd++; Cursor(); }
             if (Input.Repeat(Button.Left) && _cmd % 2 == 1) { _cmd--; Cursor(); }
             if (Input.Repeat(Button.Down) && _cmd < 2) { _cmd += 2; Cursor(); }
@@ -452,8 +454,11 @@ namespace PokeCreator.Runtime.UI
                     if (Me.Charging != null || Me.MustRecharge || Me.LockedMove != null || !_b.HasUsableMove(Me)) { Commit(BattleCommand.Fight(-1)); return; }
                     _mode = Mode.Fight; if (_move >= Me.Pk.Moves.Count) _move = 0; break;
                 case 1: OpenBag(); break;
-                case 2: OpenParty(); break;
+                case 2:
+                    if (_b.FacilityRule == "arena") { Game.Message.Show("Pokémon can't be switched in the Battle Arena!"); return; }
+                    OpenParty(); break;
                 case 3:
+                    if (_b.FacilityRule != null) { Game.Message.Show("There's no running from here!"); return; }
                     if (_setup.Link) { Game.Message.Show("There's no running from a link battle!"); return; }
                     if (_cmdSlot != (_b.PlayerControlled().FirstOrDefault() ?? Me).Slot) { Game.Message.Show("Only the first Pokémon can choose to run."); return; }
                     Commit(BattleCommand.Run()); break;

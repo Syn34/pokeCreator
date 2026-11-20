@@ -495,8 +495,15 @@ namespace PokeCreator.Runtime
         /// <summary>A battle facility round: a generated trainer, no prize money, losing doesn't black out.</summary>
         public void StartFacilityBattle(PokeCreator.Data.TrainerTypeData tt, string name, List<PokeCreator.Pkmn.Pokemon> foes, bool dbl, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
-            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, dbl)
+            StartFacilityBattle(tt, name, foes, dbl, null, onEnd);
+        }
+
+        /// <summary>A Battle Frontier battle; rule "palace" or "arena" changes how it's fought.</summary>
+        public void StartFacilityBattle(PokeCreator.Data.TrainerTypeData tt, string name, List<PokeCreator.Pkmn.Pokemon> foes, bool dbl, string rule, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, foes, false, Rng, dbl && rule != "arena")
             {
+                FacilityRule = rule == "palace" || rule == "arena" ? rule : null,
                 PlayerName = State.PlayerName, TrainerName = name,
                 TrainerTypeName = tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name : "Trainer", TrainerSkill = 100, NoExp = true,
             };

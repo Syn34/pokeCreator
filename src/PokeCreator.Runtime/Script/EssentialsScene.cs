@@ -390,6 +390,22 @@ namespace PokeCreator.Runtime.Script
                 new BattleChallengeApi(_game).Battle(won => _game.SetPrompt(c, won));
                 return false;
             });
+            Register("pbBattleChallenge.extra.pbChooseRentals", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                new BattleChallengeApi(_game).ChooseRentals(ok => _game.SetPrompt(c, ok));
+                return false;
+            });
+            Register("pbBattleChallenge.extra.pbChooseSwaps", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                new BattleChallengeApi(_game).ChooseSwap(ok => _game.SetPrompt(c, ok));
+                return false;
+            });
             Register("pbBattleChallengeBeginSpeech", (c, a) => new BattleChallengeApi(_game).BeginSpeech());
             Register("pbBattleChallengeGraphic", (c, a) =>
             {

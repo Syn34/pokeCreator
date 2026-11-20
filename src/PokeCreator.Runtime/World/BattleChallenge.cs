@@ -32,6 +32,8 @@ namespace PokeCreator.Runtime.World
         public List<int> Entries { get; set; }
         public List<Pokemon> RealParty { get; set; }
         public List<Pokemon> Rentals { get; set; }
+        /// <summary>The last opponent's team (the Battle Factory lets the player swap for one of them).</summary>
+        public List<Pokemon> LastFoes { get; set; }
         public string NextType { get; set; }
         public string NextName { get; set; }
         public int StartMap { get; set; }
@@ -154,8 +156,56 @@ namespace PokeCreator.Runtime.World
             }
         }
         public bool pbChooseRentals() { return true; }
+
+        /// <summary>Battle Factory: pick the team from the six rentals; it replaces the party for the challenge.</summary>
+        public void ChooseRentals(Action<bool> done)
+        {
+            var s = S;
+            if (s.Rentals == null) pbPrepareRentals();
+            int need = s.Rules != null ? Math.Max(1, s.Rules.Size) : 3;
+            var left = s.Rentals.ToList(); var chosen = new List<Pokemon>();
+            Action pick = null;
+            pick = () =>
+            {
+                if (chosen.Count >= need)
+                {
+                    s.Rentals = chosen.Concat(left).ToList();
+                    if (s.Started) { if (s.RealParty == null) s.RealParty = _g.State.Party.ToList(); _g.State.Party = chosen.ToList(); }
+                    done(true); return;
+                }
+                var names = left.Select(p => p.Name(_g.Project) + " Lv" + p.Level + "  " + string.Join("/", p.Moves.Select(m => { var md = _g.Project.Moves.FirstOrDefault(x => x.Id == m.Id); return md != null ? md.Name : m.Id; }).Take(2))).ToList();
+                _g.Message.Show("Choose rental Pokémon " + (chosen.Count + 1) + " of " + need + ".", names, -1, k =>
+                {
+                    if (k < 0 || k >= left.Count) { pick(); return; }
+                    chosen.Add(left[k]); left.RemoveAt(k); pick();
+                });
+            };
+            pick();
+        }
         public void pbPrepareSwaps() { }
         public bool pbChooseSwaps() { return false; }
+
+        /// <summary>Battle Factory: offer to trade one of the player's rentals for one of the beaten trainer's Pokémon.</summary>
+        public void ChooseSwap(Action<bool> done)
+        {
+            var s = S;
+            if (s.LastFoes == null || s.LastFoes.Count == 0) { done(false); return; }
+            {
+                _g.PushScene(new UI.PartyScene(_g, "Swap which Pokémon?", null, (i, close) =>
+                {
+                    close();
+                    var names = s.LastFoes.Select(f => f.Name(_g.Project) + " Lv" + f.Level).ToList();
+                    names.Add("Cancel");
+                    _g.Message.Show("Take which Pokémon?", names, names.Count - 1, k =>
+                    {
+                        if (k < 0 || k >= s.LastFoes.Count) { done(false); return; }
+                        var got = s.LastFoes[k]; got.Heal(_g.Project);
+                        _g.State.Party[i] = got; s.LastFoes.RemoveAt(k);
+                        _g.Message.Show("You received " + got.Name(_g.Project) + "!", null, -1, _ => done(true));
+                    });
+                }, () => done(false)));
+            }
+        }
 
         /// <summary>pbBattleChallengeBattle: fights the next trainer; the answer (won?) comes when the event checks again.</summary>
         public void Battle(Action<bool> done)
@@ -172,8 +222,9 @@ namespace PokeCreator.Runtime.World
                 for (int t = 0; t < 10 && (pk == null || used.Contains(pk.Species)); t++) pk = BattleTower.Generate(_g, set, level);
                 used.Add(pk.Species); foes.Add(pk);
             }
+            s.LastFoes = foes.Select(f => BattleTower.Copy(_g, f, f.Level)).ToList();
             var tt = _g.Project.TrainerTypes.FirstOrDefault(t => t.Id == s.NextType);
-            _g.StartFacilityBattle(tt, s.NextName ?? "Trainer", foes, s.Rules != null && s.Rules.Double, o =>
+            _g.StartFacilityBattle(tt, s.NextName ?? "Trainer", foes, s.Rules != null && s.Rules.Double, s.Rules != null ? s.Rules.Kind : null, o =>
             {
                 _g.ResumeOutcome = null;
                 foreach (var p in _g.State.Party) p.Heal(_g.Project);

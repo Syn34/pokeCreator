@@ -326,6 +326,8 @@ namespace PokeCreator.Battles
                 var cmd = commands.FirstOrDefault(c => c != null && c.Slot == me.Slot) ?? BattleCommand.Fight(-1);
                 // A charging or recharging Pokémon has its command decided for it
                 if (me.Charging != null || me.MustRecharge) cmd = new BattleCommand { Kind = BattleCommandKind.Fight, Index = me.ChargingSlot, Slot = me.Slot, TargetSide = cmd.TargetSide, TargetSlot = cmd.TargetSlot };
+                else if (FacilityRule == "palace") cmd = PalaceCommand(me);
+                else if (FacilityRule == "arena" && cmd.Kind == BattleCommandKind.Switch) cmd = BattleCommand.Fight(-1);
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(me, cmd));
             }
             foreach (var foe in Live(1))
@@ -337,7 +339,8 @@ namespace PokeCreator.Battles
                     orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, ec));
                     continue;
                 }
-                var item = foe.Charging == null && !foe.MustRecharge ? FoeItemChoice(foe) : null;
+                if (FacilityRule == "palace") { orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : PalaceCommand(foe))); continue; }
+                var item = foe.Charging == null && !foe.MustRecharge && FacilityRule == null ? FoeItemChoice(foe) : null;
                 if (item != null) { FoeUseItem(foe, item); continue; }
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe)));
             }
@@ -418,7 +421,7 @@ namespace PokeCreator.Battles
                 CheckAllItems();
             }
 
-            if (Outcome == BattleOutcome.Ongoing && Live(0).Count > 0 && Live(1).Count > 0) EndOfTurn();
+            if (Outcome == BattleOutcome.Ongoing && Live(0).Count > 0 && Live(1).Count > 0) { EndOfTurn(); ArenaEndOfTurn(); }
             if (Outcome == BattleOutcome.Ongoing && WildFlees && IsWild) WildTriesToFlee();
             AfterFaints();
             if (Outcome == BattleOutcome.Ongoing) ResolveSwitchOuts();
@@ -707,6 +710,7 @@ namespace PokeCreator.Battles
 
             StanceChange(user, md);
             Say(n + " used " + (md.Name ?? md.Id) + "!");
+            ArenaMoveUsed(user, md);
             ProteanBefore(user, md, code);
             if (code == "RaiseUserSpDef1PowerUpElectricMove") { user.Charged = true; Say(n + " began charging power!"); }
             _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveUsed, Side = user.Side, Party = user.PartyIndex, Text = md.Id });
@@ -782,12 +786,12 @@ namespace PokeCreator.Battles
                     else if (contactMove && HasAbility(user, "PIERCINGDRILL")) pierce = 0.25;
                     else { Say(Name(t) + " protected itself!"); continue; }
                 }
-                if (t.Invulnerable && md.Accuracy > 0 && !HitsInvulnerable(t, code) && user.LockOnTurns == 0) { Say(Name(user) + "'s attack missed!"); user.LastMoveFailed = true; continue; }
+                if (t.Invulnerable && md.Accuracy > 0 && !HitsInvulnerable(t, code) && user.LockOnTurns == 0) { Say(Name(user) + "'s attack missed!"); user.LastMoveFailed = true; ArenaMissed(user); continue; }
                 if (t.SubstituteHP > 0 && md.Category == "Status" && t.Side != user.Side && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR")) { Say("But it failed!"); user.LastMoveFailed = true; continue; }
                 if (AbilityAbsorbs(user, t, md, MoveType(user, md, code))) continue;
                 if (Gen9Absorbs(user, t, md, MoveType(user, md, code), code)) continue;
                 if (AbilityStopsMove(user, t, md, code)) { user.LastMoveFailed = true; continue; }
-                if (!Hits(user, t, md, code)) { user.LastMoveFailed = true; _missedThisMove = true; Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
+                if (!Hits(user, t, md, code)) { user.LastMoveFailed = true; _missedThisMove = true; ArenaMissed(user); Say(targets.Count > 1 ? Name(t) + " avoided the attack!" : Name(user) + "'s attack missed!"); _ev.Add(new BattleEvent { Kind = BattleEventKind.Miss, Side = t.Side, Party = t.PartyIndex }); continue; }
                 if (!animShown) { MoveAnim(user, t, md); animShown = true; }
                 if (MagicBounce(user, t, md, code)) continue;
                 double spreadBefore = _spread; _spread *= pierce;
