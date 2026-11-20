@@ -33,7 +33,9 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Battle weather, ~90 common abilities, common held items
 - [x] Screens (Reflect, Light Screen, Aurora Veil), Tailwind, Safeguard, Mist, Trick Room, Gravity, terrains, entry hazards (Stealth Rock, Spikes, Toxic Spikes, Sticky Web) with Rapid Spin / Defog
 - [x] Taunt, Encore, Disable, Substitute, Leech Seed, Curse, Perish Song, Destiny Bond, Attract, Wish, Baton Pass, U-turn / Volt Switch, Roar / Dragon Tail in trainer battles, Metronome, Sleep Talk, Outrage / Rollout locks, Counter, Future Sight, Knock Off, variable power and type (Low Kick, Gyro Ball, Hex, Hidden Power...)
-- [ ] Remaining abilities and items, about 85 rarer move effects (Pledges, Fling, Pursuit, type-changing moves...)
+- [x] Rare move effects: type changes (Soak, Reflect Type, Conversion, Burn Up), Transform, Mimic, Sketch, Trick, Heal Block, Torment, Imprison, rooms, sports, Fling, Natural Gift, Beat Up, Present, Retaliate, Echoed Voice, Round, Fusion moves, Instruct, After You, Quash, Ally Switch, Beak Blast, Octolock...
+- [x] About 240 of 316 abilities
+- [ ] Pledge combinations, Pursuit hitting a switching Pokémon, form-changing abilities (Zen Mode, Schooling...)
 - [x] Battle animations for moves: Essentials' PkmnAnimations imported and played (Move / OppMove / Common, extra hits, charging turns, type defaults, sounds, flashes, hue), "Battle Effects" option
 - [x] Double battles (one trainer, two trainers, wild pairs; targeting and spread moves)
 - [x] Mega Evolution (Mega Ring, Mega Stones / Mega move, AI trainers, reverts after battle)

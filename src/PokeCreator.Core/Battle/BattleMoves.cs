@@ -31,7 +31,7 @@ namespace PokeCreator.Battles
         bool IsGrounded(Battler b)
         {
             if (b.Grounded || Gravity > 0) return true;
-            if (b.AirborneTurns > 0 || b.Pk.Types(P).Contains("FLYING") || HasAbility(b, "LEVITATE") || b.Pk.Item == "AIRBALLOON") return false;
+            if (b.AirborneTurns > 0 || TypesOf(b).Contains("FLYING") || HasAbility(b, "LEVITATE") || b.Pk.Item == "AIRBALLOON") return false;
             return true;
         }
 
@@ -71,6 +71,8 @@ namespace PokeCreator.Battles
                 if (Terrain == "Psychic" && type == "PSYCHIC") m *= 1.3;
             }
             if (Terrain == "Misty" && type == "DRAGON" && IsGrounded(target)) m *= 0.5;
+            if (MudSport > 0 && type == "ELECTRIC") m /= 3;
+            if (WaterSport > 0 && type == "FIRE") m /= 3;
             if (Terrain == "Grassy" && (md.Id == "EARTHQUAKE" || md.Id == "BULLDOZE" || md.Id == "MAGNITUDE")) m *= 0.5;
             return m;
         }
@@ -120,7 +122,7 @@ namespace PokeCreator.Battles
                 case "MultiTurnAttackPowersUpEachTurn": return md.Power * (1 << Math.Min(4, user.RolloutCount));
                 case "PowerHigherWithConsecutiveUse": return Math.Min(160, md.Power * (1 << Math.Min(3, user.FuryCutterCount)));
             }
-            return -1;
+            return MoreSpecialPower(user, target, md, code);
         }
 
         /// <summary>Power multiplier from the situation: Hex, Facade, Brine, Payback, Earthquake on Dig...</summary>
@@ -149,7 +151,7 @@ namespace PokeCreator.Battles
                 case "RemoveTargetItem": return !string.IsNullOrEmpty(target.Pk.Item) ? 1.5 : 1;   // Knock Off
                 case "HitsAllFoesAndPowersUpInPsychicTerrain": return Terrain == "Psychic" && IsGrounded(user) ? 1.5 : 1;
             }
-            return 1;
+            return MoreSituationPower(user, target, md, code);
         }
 
         /// <summary>Moves whose type changes: Hidden Power, Judgment, Revelation Dance, Terrain Pulse...</summary>
@@ -164,7 +166,7 @@ namespace PokeCreator.Battles
                         int bits = (iv[0] & 1) | ((iv[1] & 1) << 1) | ((iv[2] & 1) << 2) | ((iv[5] & 1) << 3) | ((iv[3] & 1) << 4) | ((iv[4] & 1) << 5);
                         return types[bits * 15 / 63];
                     }
-                case "TypeIsUserFirstType": { var t = user.Pk.Types(P); return t.Count > 0 ? t[0] : md.Type; }
+                case "TypeIsUserFirstType": { var t = TypesOf(user); return t.Count > 0 ? t[0] : md.Type; }
                 case "TypeAndPowerDependOnTerrain":
                     switch (Terrain) { case "Electric": return "ELECTRIC"; case "Grassy": return "GRASS"; case "Misty": return "FAIRY"; case "Psychic": return "PSYCHIC"; }
                     break;
@@ -176,7 +178,7 @@ namespace PokeCreator.Battles
                         break;
                     }
             }
-            return null;
+            return MoreSpecialType(user, md, code, md.Type);
         }
 
         /// <summary>Two-turn moves that the target can still be hit through (Earthquake on Dig, Thunder on Fly...).</summary>
@@ -273,7 +275,7 @@ namespace PokeCreator.Battles
                     target.DisableTurns = 4; target.DisableMove = target.LastMoveUsed;
                     Say(tn + "'s " + MoveNameOf(target.LastMoveUsed) + " was disabled!"); return true;
                 case "StartLeechSeedTarget":
-                    if (target.LeechSeeded || target.Pk.Types(P).Contains("GRASS") || target.SubstituteHP > 0) { Say("It doesn't affect " + NameL(target) + "..."); return true; }
+                    if (target.LeechSeeded || TypesOf(target).Contains("GRASS") || target.SubstituteHP > 0) { Say("It doesn't affect " + NameL(target) + "..."); return true; }
                     target.LeechSeeded = true; Say(tn + " was seeded!"); return true;
                 case "TrapTargetInBattle":
                     if (target.Trapped) { Say("But it failed!"); return true; }
@@ -290,7 +292,7 @@ namespace PokeCreator.Battles
                 case "EnsureNextMoveAlwaysHits":
                     user.LockOnTurns = 2; Say(n + " took aim at " + NameL(target) + "!"); return true;
                 case "CurseTargetOrLowerUserSpd1RaiseUserAtkDef1":
-                    if (user.Pk.Types(P).Contains("GHOST"))
+                    if (TypesOf(user).Contains("GHOST"))
                     {
                         if (target.Cursed) { Say("But it failed!"); return true; }
                         int f = user.Pk.HP; user.Pk.HP = Math.Max(0, user.Pk.HP - user.Pk.TotalHP(P) / 2); Hp(user, f);
@@ -521,7 +523,7 @@ namespace PokeCreator.Battles
                         return true;
                     }
             }
-            return false;
+            return MoreStatusMoves(user, target, md, code);
         }
 
         /// <summary>Moves Metronome and friends may call: no Max/Z moves, Struggle or other move-calling moves.</summary>
@@ -566,7 +568,7 @@ namespace PokeCreator.Battles
             string code = md.FunctionCode ?? "None";
             Say(Name(user) + " used " + (md.Name ?? md.Id) + "!");
             _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveUsed, Side = user.Side, Party = user.PartyIndex, Text = md.Id });
-            bool selfTarget = md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies";
+            bool selfTarget = md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies" || md.Target == "UserOrNearAlly";
             if (!selfTarget) target = OpponentFor(user, target != null && target.Side != user.Side ? target : null);
             if (target == null) { Say("But there was no target..."); return; }
             if (!selfTarget && !Hits(user, target, md, code)) { Say(Name(user) + "'s attack missed!"); return; }
@@ -660,6 +662,7 @@ namespace PokeCreator.Battles
                 case "PowerHigherWithConsecutiveUse": user.FuryCutterCount++; break;
                 case "LowerTargetHPToUserHP": break; // handled as fixed damage
             }
+            MoreDamagingAfter(user, target, md, code, total);
         }
 
         bool ClearHazards(int side)
@@ -676,7 +679,7 @@ namespace PokeCreator.Battles
             if (b.Pk.Item == "HEAVYDUTYBOOTS") return;
             if (StealthRock[s] && !HasAbility(b, "MAGICGUARD"))
             {
-                double eff = Effectiveness("ROCK", b.Pk);
+                double eff = EffectivenessOn("ROCK", b);
                 int dmg = Math.Max(1, (int)(max * eff / 8));
                 if (eff > 0) Residual(b, Math.Min(b.Pk.HP, dmg), "Pointed stones dug into " + NameL(b) + "!");
             }
@@ -687,7 +690,7 @@ namespace PokeCreator.Battles
             if (b.Pk.Fainted) return;
             if (ToxicSpikes[s] > 0 && grounded)
             {
-                if (b.Pk.Types(P).Contains("POISON")) { ToxicSpikes[s] = 0; Say(Name(b) + " absorbed the poison spikes!"); }
+                if (TypesOf(b).Contains("POISON")) { ToxicSpikes[s] = 0; Say(Name(b) + " absorbed the poison spikes!"); }
                 else if (CanStatus(b, "POISON", false)) Inflict(b, ToxicSpikes[s] >= 2 ? "TOXIC" : "POISON", false);
             }
             if (StickyWeb[s] && grounded) { Say(Name(b) + " was caught in a sticky web!"); ChangeStat(b, PokeCreator.Pkmn.Stat.Speed, -1); }
@@ -808,6 +811,7 @@ namespace PokeCreator.Battles
             if (TrickRoom > 0 && --TrickRoom == 0) Say("The twisted dimensions returned to normal!");
             if (Gravity > 0 && --Gravity == 0) Say("Gravity returned to normal!");
             if (TerrainTurns > 0 && --TerrainTurns == 0) { Say("The battlefield returned to normal."); Terrain = ""; }
+            MoreEndOfTurn();
         }
 
         /// <summary>Future Sight: the damage is worked out now and lands two turns later.</summary>

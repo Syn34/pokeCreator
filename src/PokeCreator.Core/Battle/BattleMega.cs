@@ -70,6 +70,7 @@ namespace PokeCreator.Battles
         {
             foreach (var kv in _formBeforeMega) kv.Key.Form = kv.Value;
             _formBeforeMega.Clear();
+            RestoreItems();
         }
     }
 }

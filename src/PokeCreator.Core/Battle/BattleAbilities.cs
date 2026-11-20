@@ -170,6 +170,7 @@ namespace PokeCreator.Battles
             if (HasAbility(b, "GALEWINGS") && md.Type == "FLYING" && b.Pk.HP >= b.Pk.TotalHP(P)) p++;
             string c = md.FunctionCode ?? "";
             if (HasAbility(b, "TRIAGE") && (c.StartsWith("HealUser") || c.StartsWith("HealTarget") || c.Contains("HealUserBy"))) p += 3;
+            if (c == "HigherPriorityInGrassyTerrain" && Terrain == "Grassy" && IsGrounded(b)) p++;
             return p;
         }
 
@@ -184,7 +185,7 @@ namespace PokeCreator.Battles
                     if (b != null && (TargetHas(user, b, "QUEENLYMAJESTY") || TargetHas(user, b, "DAZZLING") || TargetHas(user, b, "ARMORTAIL")))
                     { Splash(b); Say(Name(target) + " cannot use " + (md.Name ?? md.Id) + "!"); return true; }
             }
-            if (foe && md.Category == "Status" && HasAbility(user, "PRANKSTER") && target.Pk.Types(P).Contains("DARK"))
+            if (foe && md.Category == "Status" && HasAbility(user, "PRANKSTER") && TypesOf(target).Contains("DARK"))
             { Say("It doesn't affect " + NameL(target) + "..."); return true; }
             if (!foe && md.Category != "Status" && TargetHas(user, target, "TELEPATHY")) { Splash(target); Say(Name(target) + " avoids attacks by its ally Pokémon!"); return true; }
             if (md.Category == "Status" && md.Accuracy > 0 && TargetHas(user, target, "WONDERSKIN") && Rng.Next(100) >= 50) { Splash(target); Say(Name(user) + "'s attack missed!"); return true; }
@@ -194,8 +195,8 @@ namespace PokeCreator.Battles
         /// <summary>Magic Bounce reflects status moves aimed at it back at the user.</summary>
         bool MagicBounce(Battler user, Battler target, MoveData md, string code)
         {
-            if (md.Category != "Status" || target.Side == user.Side || !md.Flags.Contains("CanMirrorMove") || !TargetHas(user, target, "MAGICBOUNCE") || _bouncing) return false;
-            Splash(target);
+            if (md.Category != "Status" || target.Side == user.Side || !md.Flags.Contains("CanMirrorMove") || !(TargetHas(user, target, "MAGICBOUNCE") || target.MagicCoat) || _bouncing) return false;
+            if (!target.MagicCoat) Splash(target);
             Say(Name(target) + " bounced the " + (md.Name ?? md.Id) + " back!");
             _bouncing = true;
             try { StatusMove(target, user, md, code); } finally { _bouncing = false; }
@@ -221,11 +222,14 @@ namespace PokeCreator.Battles
             bool contact = md.Flags.Contains("Contact") && !HasAbility(user, "LONGREACH") && user.Pk.Item != "PROTECTIVEPADS";
             if (target.Pk.Fainted)
             {
+                if (target.Grudge && !user.Pk.Fainted) { var gm = user.Pk.Moves.FirstOrDefault(m => m.Id == md.Id); if (gm != null) { gm.PP = 0; Say(Name(user) + "'s " + (md.Name ?? md.Id) + " lost all its PP due to the grudge!"); } }
                 if (ta == "AFTERMATH" && contact && !user.Pk.Fainted && !OnField.Any(b => HasAbility(b, "DAMP")))
                 { Splash(target); Residual(user, Math.Max(1, user.Pk.TotalHP(P) / 4), Name(user) + " was caught in the aftermath!"); }
                 if (ta == "INNARDSOUT" && !user.Pk.Fainted) { Splash(target); Residual(user, Math.Max(1, hpBefore), Name(user) + " was hurt!"); }
                 return;
             }
+            if (target.BeakBlast && contact && !user.Pk.Fainted && CanStatus(user, "BURN", false, target)) Inflict(user, "BURN", false, target);
+            if (target.Rage && target.Stages[S.Attack] < 6) { Say(Name(target) + "'s rage is building!"); ChangeStat(target, S.Attack, 1); }
             switch (ta)
             {
                 case "WEAKARMOR": if (md.Category == "Physical") { Splash(target); ChangeStat(target, S.Defense, -1); ChangeStat(target, S.Speed, 2); } break;

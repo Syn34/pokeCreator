@@ -85,7 +85,7 @@ namespace PokeCreator.Battles
             foreach (var b in OnField.Where(x => !x.Pk.Fainted).OrderByDescending(x => Speed(x)).ToList())
             {
                 if (b.Pk.Fainted || b.Invulnerable) continue;
-                var types = b.Pk.Types(P);
+                var types = TypesOf(b);
                 if (HasAbility(b, "MAGICGUARD") || HasAbility(b, "OVERCOAT") || b.Pk.Item == "SAFETYGOGGLES") continue;
                 if (EffWeather == Sandstorm)
                 {
@@ -112,7 +112,9 @@ namespace PokeCreator.Battles
         /// <summary>"Gyarados's Intimidate!" (Essentials shows this as the ability splash).</summary>
         void Splash(Battler b) { Say(Name(b) + "'s " + AbilityName(b) + "!"); }
 
-        bool MoldBreaker(Battler user) { return HasAbility(user, "MOLDBREAKER") || HasAbility(user, "TERAVOLT") || HasAbility(user, "TURBOBLAZE"); }
+        bool MoldBreaker(Battler user) { return _ignoreAbilityMove || HasAbility(user, "MOLDBREAKER") || HasAbility(user, "TERAVOLT") || HasAbility(user, "TURBOBLAZE"); }
+        /// <summary>Moongeist Beam, Sunsteel Strike, Photon Geyser: the current move ignores the target's ability.</summary>
+        bool _ignoreAbilityMove;
         /// <summary>The target's ability counts against this attacker (Mold Breaker ignores most defensive abilities).</summary>
         bool TargetHas(Battler user, Battler target, string id) { return HasAbility(target, id) && !MoldBreaker(user); }
 
@@ -294,7 +296,7 @@ namespace PokeCreator.Battles
             double m = 1;
             if (physical && TargetHas(user, target, "MARVELSCALE") && !string.IsNullOrEmpty(target.Pk.Status)) m *= 1.5;
             if (physical && TargetHas(user, target, "FURCOAT")) m *= 2;
-            if (!physical && EffWeather == Sandstorm && target.Pk.Types(P).Contains("ROCK")) m *= 1.5;
+            if (!physical && EffWeather == Sandstorm && TypesOf(target).Contains("ROCK")) m *= 1.5;
             if (!physical && target.Pk.Item == "ASSAULTVEST") m *= 1.5;
             if (target.Pk.Item == "EVIOLITE")
             {
@@ -345,7 +347,7 @@ namespace PokeCreator.Battles
         {
             Func<string, bool> has = id => source != null && source != b ? TargetHas(source, b, id) : HasAbility(b, id);
             if (has("PURIFYINGSALT") || has("COMATOSE") || (has("LEAFGUARD") && EffWeather == Sun)) return true;
-            if (b.Pk.Types(P).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
+            if (TypesOf(b).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
             if ((status == "POISON" || status == "TOXIC") && (has("PASTELVEIL") || (Ally(b) != null && HasAbility(Ally(b), "PASTELVEIL")))) return true;
             if (status == "BURN" && has("THERMALEXCHANGE")) return true;
             if (status == "SLEEP" && Ally(b) != null && HasAbility(Ally(b), "SWEETVEIL")) return true;
@@ -366,7 +368,7 @@ namespace PokeCreator.Battles
             if (source == null || source == b) return false;
             Func<string, bool> has = id => TargetHas(source, b, id);
             if (has("CLEARBODY") || has("WHITESMOKE") || has("FULLMETALBODY")) return true;
-            if (b.Pk.Types(P).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
+            if (TypesOf(b).Contains("GRASS") && (has("FLOWERVEIL") || (Ally(b) != null && HasAbility(Ally(b), "FLOWERVEIL")))) return true;
             if (stat == PokeCreator.Pkmn.Stat.Attack && has("HYPERCUTTER")) return true;
             if (stat == 6 && has("KEENEYE")) return true;
             if (stat == PokeCreator.Pkmn.Stat.Defense && has("BIGPECKS")) return true;
@@ -386,7 +388,7 @@ namespace PokeCreator.Battles
                 case "POISONPOINT": if (Rng.Next(100) < 30 && CanStatus(user, "POISON", false)) { Splash(target); Inflict(user, "POISON", false); } break;
                 case "EFFECTSPORE":
                     {
-                        if (user.Pk.Types(P).Contains("GRASS") || HasAbility(user, "OVERCOAT") || Rng.Next(100) >= 30) break;
+                        if (TypesOf(user).Contains("GRASS") || HasAbility(user, "OVERCOAT") || Rng.Next(100) >= 30) break;
                         string st = new[] { "POISON", "PARALYSIS", "SLEEP" }[Rng.Next(3)];
                         if (CanStatus(user, st, false)) { Splash(target); Inflict(user, st, false); }
                         break;
