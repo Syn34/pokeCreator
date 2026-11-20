@@ -83,6 +83,7 @@ namespace PokeCreator.Runtime.UI
                 new KeyValuePair<string, Action>("Variables", () => Variables(g)),
                 new KeyValuePair<string, Action>("Heal party", () => { foreach (var p in g.State.Party) p.Heal(g.Project); g.Message.Show("Your party was healed."); }),
                 new KeyValuePair<string, Action>("Add Pokémon", () => AddPokemon(g)),
+                new KeyValuePair<string, Action>("Edit party Pokémon", () => EditParty(g)),
                 new KeyValuePair<string, Action>("Add item", () => AddItem(g)),
                 new KeyValuePair<string, Action>("Fill Bag (99 of every item)", () => { foreach (var it in g.Project.Items) if (g.State.ItemCount(it.Id) < 99) g.State.AddItem(it.Id, 99 - g.State.ItemCount(it.Id)); g.Message.Show("The Bag was filled."); }),
                 new KeyValuePair<string, Action>("Money / Coins / BP", () => Money(g)),
@@ -150,6 +151,43 @@ namespace PokeCreator.Runtime.UI
                     if (g.State.Party.Count < GameState.MaxParty) g.State.Party.Add(pk); else g.State.Storage.Add(pk);
                     g.Message.Show(pk.Name(g.Project) + " (Lv. " + pk.Level + ") was added.");
                 })));
+        }
+
+        static void EditParty(Game g)
+        {
+            g.PushScene(new PickListScene(g, "Edit party", () => g.State.Party.Select(p => p.Name(g.Project) + "  Lv. " + p.Level + (p.Shiny ? "  ★" : "") + (p.IsEgg ? "  (Egg)" : "")).ToList(), (i, s) => EditPokemon(g, g.State.Party[i])));
+        }
+
+        static void EditPokemon(Game g, Pokemon pk)
+        {
+            var moves = g.Project.Moves.Where(m => !string.IsNullOrEmpty(m.Name)).OrderBy(m => m.Name).ToList();
+            Func<List<string>> rows = () => new List<string>
+            {
+                "Level: " + pk.Level, "Shiny: " + (pk.Shiny ? "yes" : "no"), "IVs: " + string.Join("/", pk.IV), "Max IVs", "Nature: " + pk.Nature,
+                "Teach a move", "Held item: " + (pk.Item ?? "none"), "Heal", "Happiness: " + pk.Happiness, "Hatch / make Egg: " + (pk.IsEgg ? "Egg" : "not an Egg"), "Remove from party",
+            };
+            g.PushScene(new PickListScene(g, "Edit " + pk.Name(g.Project), rows, (i, s) =>
+            {
+                var d = pk.Data(g.Project);
+                switch (i)
+                {
+                    case 0: g.AskNumber("Level?", pk.Level, 3, lv => { pk.Level = Math.Max(1, Math.Min(GrowthRates.MaxLevel, lv)); pk.Exp = GrowthRates.ExpForLevel(d != null ? d.GrowthRate : "Medium", pk.Level); pk.HP = pk.TotalHP(g.Project); }); break;
+                    case 1: pk.Shiny = !pk.Shiny; break;
+                    case 3: for (int k = 0; k < 6; k++) pk.IV[k] = 31; pk.HP = pk.TotalHP(g.Project); break;
+                    case 4: { var natures = Natures.All; int at = Math.Max(0, Array.IndexOf(natures, pk.Nature)); pk.Nature = natures[(at + 1) % natures.Length]; break; }
+                    case 5: g.PushScene(new PickListScene(g, "Teach a move", () => moves.Select(m => m.Name).ToList(), (k, s2) => { if (pk.Moves.Count >= 4) pk.Moves.RemoveAt(0); pk.Moves.Add(new PokemonMove { Id = moves[k].Id, PP = moves[k].TotalPP }); s2.Close(); })); break;
+                    case 6: g.PushScene(new BagScene(g, id => { if (!string.IsNullOrEmpty(pk.Item)) g.State.AddItem(pk.Item, 1); g.State.AddItem(id, -1); pk.Item = id; FormRules.UpdateItemForm(g.Project, pk); })); break;
+                    case 7: pk.Heal(g.Project); break;
+                    case 8: pk.Happiness = pk.Happiness >= 255 ? 0 : Math.Min(255, pk.Happiness + 50); break;
+                    case 9: if (pk.IsEgg) DayCare.Hatch(g, pk); else { pk.IsEgg = true; pk.EggSteps = 255; } break;
+                    case 10: if (g.State.Party.Count > 1) { g.State.Party.Remove(pk); s.Close(); } break;
+                }
+            }, (i, delta, s) =>
+            {
+                if (i == 0) { var d = pk.Data(g.Project); pk.Level = Math.Max(1, Math.Min(GrowthRates.MaxLevel, pk.Level + delta)); pk.Exp = GrowthRates.ExpForLevel(d != null ? d.GrowthRate : "Medium", pk.Level); pk.HP = Math.Min(pk.HP, pk.TotalHP(g.Project)); }
+                else if (i == 8) pk.Happiness = Math.Max(0, Math.Min(255, pk.Happiness + delta * 10));
+                else if (i == 2) { for (int k = 0; k < 6; k++) pk.IV[k] = Math.Max(0, Math.Min(31, pk.IV[k] + delta)); }
+            }));
         }
 
         static void AddItem(Game g)
