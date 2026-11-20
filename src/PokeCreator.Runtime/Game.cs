@@ -466,6 +466,14 @@ namespace PokeCreator.Runtime
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
         }
 
+        /// <summary>A wild battle against a Pokémon made by the caller (Poké Radar, shiny patches...).</summary>
+        public void StartWildPokemonBattle(PokeCreator.Pkmn.Pokemon wild, Action<PokeCreator.Battles.BattleOutcome> onEnd)
+        {
+            var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { wild }, true, Rng) { PlayerName = State.PlayerName };
+            b.AlreadyCaught = sp => State.Caught.Contains(sp);
+            StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });
+        }
+
         /// <summary>A roaming Pokémon: the same Pokémon object each time (its HP and status carry over); it tries to flee every turn.</summary>
         public void StartRoamerBattle(PokeCreator.Pkmn.Pokemon roamer, PokeCreator.Data.RoamerDef def, Action<PokeCreator.Battles.BattleOutcome> onEnd)
         {
@@ -814,6 +822,7 @@ namespace PokeCreator.Runtime
                 DrawDarkness();
                 Weather.Draw(Gfx);
                 Pictures.Draw(Gfx, this);
+                World.PokeRadar.Draw(this, Gfx, DisplayX - (int)_shake, DisplayY, FrameCount);
                 DrawExclaim();
                 DrawLocationSign();
             }

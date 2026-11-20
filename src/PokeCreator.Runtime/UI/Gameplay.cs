@@ -98,6 +98,7 @@ namespace PokeCreator.Runtime.UI
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
                 case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
+                case "POKERADAR": g.CloseAllScenes(); PokeRadar.Use(g); return;
                 case "ITEMFINDER": case "DOWSINGMACHINE": case "DOWSINGMCHN":
                     g.CloseAllScenes(); FieldMoves.Itemfinder(g, item.Name); return;
             }

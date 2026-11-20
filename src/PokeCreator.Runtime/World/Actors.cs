@@ -323,6 +323,7 @@ namespace PokeCreator.Runtime.World
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
                 if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
             if (!Game.InterpreterRunning && Game.CheckTrainerSight()) return;
+            if (PokeRadar.OnStep(Game)) return;
             Game.Encounters.OnStep(X, Y);
         }
 
