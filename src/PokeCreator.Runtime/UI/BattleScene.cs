@@ -614,6 +614,12 @@ namespace PokeCreator.Runtime.UI
         {
             _mode = Mode.Busy;
             int slot = _b.PlayerSlotsToFill[0];
+            // Battle Palace and Arena: the next Pokémon in order goes out by itself
+            if (_b.FacilityRule != null)
+            {
+                for (int i = 0; i < _party.Count; i++)
+                    if (Battle.Able(_party[i]) && !OnField(i)) { Run(_b.SwitchAfterFaint(slot, i)); return; }
+            }
             Game.PushScene(new PartyScene(Game, "Choose a Pokémon to send out.", null, (i, close) =>
             {
                 var pk = _party[i];

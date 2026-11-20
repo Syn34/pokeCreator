@@ -192,6 +192,12 @@ namespace PokeCreator.Runtime.Script
             Register("pbBugContestStartOver", (c, a) => { BugContest.End(_game, true); return true; });
 
             // Battle Tower: pbBattleTower(rounds = 7, double = false, level = 50)
+            Register("pbBattleFacility", (c, a) =>
+            {
+                string kind = Str(a, 0).TrimStart(':').ToLowerInvariant();
+                BattleTower.Run(_game, a.Count > 1 ? ToInt(a[1]) : 7, a.Count > 2 && Truthy(a[2]), a.Count > 3 ? ToInt(a[3]) : 50, kind);
+                return true;
+            });
             Register("pbBattleTower", (c, a) => { BattleTower.Run(_game, a.Count > 0 ? ToInt(a[0]) : 7, a.Count > 1 && Truthy(a[1]), a.Count > 2 ? ToInt(a[2]) : 50); return true; });
             Register("pbBattleChallenge.record", (c, a) => { int r; BattleTower.State(_game).Records.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });
             Register("pbBattleChallenge.streak", (c, a) => { int r; BattleTower.State(_game).Streaks.TryGetValue(a.Count > 0 && Truthy(a[0]) ? "double" : "single", out r); return r; });

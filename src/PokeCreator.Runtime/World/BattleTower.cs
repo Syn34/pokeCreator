@@ -12,6 +12,9 @@ namespace PokeCreator.Runtime.World
         public int Wins { get; set; }
         public int Rounds { get; set; }
         public bool Double { get; set; }
+        /// <summary>null / "tower", "palace", "arena" or "factory".</summary>
+        public string Rule { get; set; }
+        public int Level { get; set; }
         /// <summary>1 = won every round, 2 = lost, 3 = gave up.</summary>
         public int Decision { get; set; }
         /// <summary>The real party while the challenge team (copies at the challenge level) is in use.</summary>
@@ -55,10 +58,18 @@ namespace PokeCreator.Runtime.World
         }
 
         /// <summary>Starts a challenge: choose the team, then fight the rounds one after another.</summary>
-        public static void Run(Game g, int rounds, bool dbl, int level)
+        public static void Run(Game g, int rounds, bool dbl, int level) { Run(g, rounds, dbl, level, null); }
+
+        static string Mode(ChallengeState s) { string m = s.Double ? "double" : "single"; return string.IsNullOrEmpty(s.Rule) || s.Rule == "tower" ? m : s.Rule + "_" + m; }
+
+        /// <summary>A Battle Frontier run: rule null/"tower", "palace" (Pokémon act on their own), "arena" (judged after 3 turns, singles) or "factory" (rental Pokémon, swaps after wins).</summary>
+        public static void Run(Game g, int rounds, bool dbl, int level, string rule)
         {
             var s = State(g);
+            if (rule == "arena") dbl = false;
+            s.Rule = rule == "tower" ? null : rule; s.Level = level;
             int size = dbl ? 4 : 3;
+            if (rule == "factory") { g.ScriptHolds++; s.Double = dbl; ChooseRentals(g, size, team => BeginWith(g, team, rounds, dbl, level)); return; }
             if (g.State.Party.Count(p => !p.IsEgg) < size) { g.Message.Show("You need at least " + size + " Pokémon to take the challenge."); return; }
             g.ScriptHolds++;
             var chosen = new List<int>();
@@ -80,12 +91,60 @@ namespace PokeCreator.Runtime.World
 
         static void Begin(Game g, List<int> chosen, int rounds, bool dbl, int level)
         {
+            BeginWith(g, chosen.Select(i => Copy(g, g.State.Party[i], level)).ToList(), rounds, dbl, level);
+        }
+
+        static void BeginWith(Game g, List<Pokemon> team, int rounds, bool dbl, int level)
+        {
             var s = State(g);
             s.InProgress = true; s.Wins = 0; s.Rounds = Math.Max(1, rounds); s.Double = dbl; s.Decision = 0;
             s.RealParty = g.State.Party.ToList();
-            var team = chosen.Select(i => Copy(g, g.State.Party[i], level)).ToList();
             g.State.Party = team;
             NextRound(g, level);
+        }
+
+        /// <summary>Battle Factory: six rentals; the player keeps the given number.</summary>
+        static void ChooseRentals(Game g, int size, Action<List<Pokemon>> done)
+        {
+            var s = State(g);
+            string mode = Mode(s); int streak; s.Streaks.TryGetValue(mode, out streak);
+            var left = new List<Pokemon>(); var seen = new HashSet<string>();
+            while (left.Count < 6) { var pk = Generate(g, streak / 7, s.Level > 0 ? s.Level : 50); if (seen.Add(pk.Species)) left.Add(pk); }
+            var chosen = new List<Pokemon>();
+            Action pick = null;
+            pick = () =>
+            {
+                if (chosen.Count >= size) { done(chosen); return; }
+                var names = left.Select(p => p.Name(g.Project) + " Lv" + p.Level).ToList();
+                g.Message.Show("Choose rental Pokémon " + (chosen.Count + 1) + " of " + size + ".", names, -1, k =>
+                {
+                    if (k >= 0 && k < left.Count) { chosen.Add(left[k]); left.RemoveAt(k); }
+                    pick();
+                });
+            };
+            pick();
+        }
+
+        /// <summary>Battle Factory: after a win, the player may swap one Pokémon for one of the beaten trainer's.</summary>
+        static void OfferSwap(Game g, List<Pokemon> foes, Action next)
+        {
+            g.Message.Show("Would you like to swap a Pokémon?", new List<string> { "Yes", "No" }, 1, yn =>
+            {
+                if (yn != 0) { next(); return; }
+                var mine = g.State.Party.Select(p => p.Name(g.Project) + " Lv" + p.Level).ToList(); mine.Add("Cancel");
+                g.Message.Show("Give up which Pokémon?", mine, mine.Count - 1, a =>
+                {
+                    if (a < 0 || a >= g.State.Party.Count) { next(); return; }
+                    var theirs = foes.Select(p => p.Name(g.Project) + " Lv" + p.Level).ToList(); theirs.Add("Cancel");
+                    g.Message.Show("Take which Pokémon?", theirs, theirs.Count - 1, b =>
+                    {
+                        if (b < 0 || b >= foes.Count) { next(); return; }
+                        var got = Copy(g, foes[b], foes[b].Level); got.Heal(g.Project);
+                        g.State.Party[a] = got;
+                        g.Message.Show("You received " + got.Name(g.Project) + "!", null, -1, _ => next());
+                    });
+                });
+            });
         }
 
         public static Pokemon Generate(Game g, int set, int level)
@@ -105,7 +164,7 @@ namespace PokeCreator.Runtime.World
         static void NextRound(Game g, int level)
         {
             var s = State(g);
-            string mode = s.Double ? "double" : "single";
+            string mode = Mode(s);
             int streak; s.Streaks.TryGetValue(mode, out streak);
             int set = (streak + s.Wins) / 7;
             var types = g.Project.TrainerTypes.Where(t => !g.Project.Players.Any(p => p.TrainerType == t.Id) && !t.Id.StartsWith("LEADER") && !t.Id.StartsWith("ELITE") && !t.Id.StartsWith("CHAMPION") && !t.Id.Contains("RIVAL")).ToList();
@@ -122,10 +181,11 @@ namespace PokeCreator.Runtime.World
                 used.Add(pk.Species); foes.Add(pk);
             }
             foreach (var pk in g.State.Party) pk.Heal(g.Project);
+            var foeCopies = foes.Select(f => Copy(g, f, f.Level)).ToList();
             string label = (tt != null && !string.IsNullOrEmpty(tt.Name) ? tt.Name + " " : "") + name;
             g.Message.Show("Battle " + (s.Wins + 1) + " of " + s.Rounds + "!", null, -1, _ =>
                 g.Message.Show(label + ": " + Intros[g.Rng.Next(Intros.Length)], null, -1, __ =>
-                    g.StartFacilityBattle(tt, name, foes, s.Double, o =>
+                    g.StartFacilityBattle(tt, name, foes.Select(f => f).ToList(), s.Double, s.Rule, o =>
                     {
                         g.ResumeOutcome = null;
                         if (o == PokeCreator.Battles.BattleOutcome.Win)
@@ -135,6 +195,7 @@ namespace PokeCreator.Runtime.World
                             g.Message.Show("Congratulations! You won battle " + s.Wins + "!", new List<string> { "Continue", "Quit" }, 0, c =>
                             {
                                 if (c == 1) Finish(g, 3);
+                                else if (s.Rule == "factory") OfferSwap(g, foeCopies, () => NextRound(g, level));
                                 else NextRound(g, level);
                             });
                         }
@@ -147,7 +208,7 @@ namespace PokeCreator.Runtime.World
             var s = State(g);
             s.Decision = decision; s.InProgress = false;
             if (s.RealParty != null) { g.State.Party = s.RealParty; s.RealParty = null; }
-            string mode = s.Double ? "double" : "single";
+            string mode = Mode(s);
             int streak; s.Streaks.TryGetValue(mode, out streak);
             streak = decision == 2 ? 0 : streak + s.Wins;
             s.Streaks[mode] = streak;

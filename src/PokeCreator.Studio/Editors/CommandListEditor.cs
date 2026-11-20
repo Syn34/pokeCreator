@@ -258,6 +258,17 @@ namespace PokeCreator.Studio.Editors
                 int lv = NumberDialog.Ask(FindForm(), "Level the team fights at", 50); if (lv < 1) return;
                 Insert(new EventCommand(355, 0, "pbBattleTower(" + rounds + ", " + (k == 1 ? "true" : "false") + ", " + Math.Min(100, lv) + ")"));
             });
+            cmd(battle, "Battle Frontier Challenge (Tower / Palace / Arena / Factory)", () =>
+            {
+                int f = ChoiceDialog.Ask(FindForm(), "Facility", new[] { "Battle Tower (normal battles)", "Battle Palace (Pokémon choose their own moves)", "Battle Arena (judged after 3 turns, no switching)", "Battle Factory (rental Pokémon, swaps)" }, false); if (f < 0) return;
+                int rounds = NumberDialog.Ask(FindForm(), "Rounds (trainers in a row)", 7); if (rounds < 1) return;
+                int k = f == 2 ? 0 : ChoiceDialog.Ask(FindForm(), "Battle style", new[] { "Single battles", "Double battles" }, false); if (k < 0) return;
+                int lv = NumberDialog.Ask(FindForm(), "Level the team fights at", 50); if (lv < 1) return;
+                string kind = new[] { "tower", "palace", "arena", "factory" }[f];
+                Insert(new EventCommand(355, 0, "pbBattleFacility(:" + kind + ", " + rounds + ", " + (k == 1 ? "true" : "false") + ", " + Math.Min(100, lv) + ")"));
+            });
+            cmd(battle, "Keep Last Frontier Battle Recording", () => Insert(new EventCommand(355, 0, "pbRecordLastBattle")));
+            cmd(battle, "Watch Kept Battle Recording", () => Insert(new EventCommand(355, 0, "pbPlayLastBattle")));
             cmd(battle, "Link Battle with Another Player", () =>
             {
                 int k = ChoiceDialog.Ask(FindForm(), "Battle style", new[] { "Single battle", "Double battle" }, false); if (k < 0) return;
@@ -279,6 +290,15 @@ namespace PokeCreator.Studio.Editors
             cmd(extras, "Start Bug-Catching Contest", () => { int b = NumberDialog.Ask(FindForm(), "Sport Balls", 20); if (b > 0) Insert(new EventCommand(355, 0, "pbBugContestState.pbStart(" + b + ")")); });
             cmd(extras, "Judge Bug-Catching Contest", () => Insert(new EventCommand(355, 0, "pbBugContestState.pbJudge")));
             cmd(extras, "Relic Stone (purify a Shadow Pokémon)", () => Insert(new EventCommand(355, 0, "pbRelicStone")));
+            cmd(extras, "Unlock / Lock a Pokédex", () =>
+            {
+                var names = _p.RegionalDexes.Select((d, i) => "Regional dex " + i + (string.IsNullOrEmpty(d.Name) ? "" : ": " + d.Name)).ToList(); names.Add("National Pokédex");
+                int k = ChoiceDialog.Ask(FindForm(), "Pokédex", names.ToArray(), false); if (k < 0) return;
+                int l = ChoiceDialog.Ask(FindForm(), "Action", new[] { "Unlock", "Lock" }, false); if (l < 0) return;
+                int dex = k >= _p.RegionalDexes.Count ? -1 : k;
+                Insert(new EventCommand(355, 0, (l == 0 ? "pbUnlockDex(" : "pbLockDex(") + dex + ")"));
+            });
+            cmd(extras, "Open Pokémon Storage (PC boxes)", () => Insert(new EventCommand(355, 0, "pbPokeCenterPC")));
 
             var field = group("Field Moves");
             cmd(field, "Cut Tree (asks to use Cut)", () => Insert(new EventCommand(111, 0, 12, "pbCut"), new EventCommand(355, 1, "pbSmashThisEvent"), new EventCommand(0, 1), new EventCommand(412, 0)));
