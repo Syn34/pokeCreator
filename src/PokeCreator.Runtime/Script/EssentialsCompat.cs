@@ -34,11 +34,21 @@ namespace PokeCreator.Runtime.Script
         // ------------------------------------------------------------------ entry points
         /// <summary>Ruby local variables (pkmn = pbGetPokemon(1)) for the script being run.</summary>
         Dictionary<string, object> _locals = new Dictionary<string, object>();
+        /// <summary>Ruby global variables set by scripts.</summary>
+        readonly Dictionary<string, object> _globals = new Dictionary<string, object>();
 
         public void RunScript(string script, Interpreter ctx)
         {
             _locals = ctx != null ? ctx.Locals : new Dictionary<string, object>();
             var stmts = SplitStatements(script).ToList();
+            if (true)
+            {
+                int pos = 0;
+                var tree = ParseBlock(stmts, ref pos);
+                _steps = 0;
+                ExecBlock(tree, ctx);
+                return;
+            }
             for (int i = 0; i < stmts.Count; i++)
             {
                 string stmt = stmts[i];
@@ -97,7 +107,7 @@ namespace PokeCreator.Runtime.Script
                 char c = s[i];
                 if (inStr) { if (c == '\\') i++; else if (c == q) inStr = false; continue; }
                 if (c == '"' || c == '\'') { inStr = true; q = c; continue; }
-                if (c == '#' && depth == 0) { while (i < s.Length && s[i] != '\n') i++; parts.Add(s.Substring(start, i - start)); start = i + 1; continue; }
+                if (c == '#' && depth == 0 && !(i + 1 < s.Length && s[i + 1] == '{')) { int hashAt = i; while (i < s.Length && s[i] != '\n') i++; parts.Add(s.Substring(start, hashAt - start)); start = i + 1; continue; }
                 if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth = Math.Max(0, depth - 1);
                 else if ((c == '\n' || c == ';') && depth == 0) { parts.Add(s.Substring(start, i - start)); start = i + 1; }
@@ -117,19 +127,6 @@ namespace PokeCreator.Runtime.Script
             if (e.Length == 0) return null;
             if (e.StartsWith("(") && MatchingParen(e, 0) == e.Length - 1) return Eval(e.Substring(1, e.Length - 2), ctx);
 
-            // Boolean operators (lowest precedence)
-            foreach (var op in new[] { "||", " or ", "&&", " and " })
-            {
-                int i = FindTopLevel(e, op);
-                if (i > 0)
-                {
-                    bool isOr = op.Trim() == "||" || op.Trim() == "or";
-                    bool l = Truthy(Eval(e.Substring(0, i), ctx));
-                    if (isOr && l) return true;
-                    if (!isOr && !l) return false;
-                    return Truthy(Eval(e.Substring(i + op.Length), ctx));
-                }
-            }
             if (e.StartsWith("!") && !e.StartsWith("!=")) return !Truthy(Eval(e.Substring(1), ctx));
             if (e.StartsWith("not ")) return !Truthy(Eval(e.Substring(4), ctx));
 
@@ -147,6 +144,31 @@ namespace PokeCreator.Runtime.Script
                 return val;
             }
 
+            // Ternary: cond ? a : b
+            int qm = FindTopLevel(e, " ? ");
+            if (qm > 0)
+            {
+                int colon = FindTopLevel(e.Substring(qm + 3), " : ");
+                if (colon >= 0)
+                {
+                    string rest = e.Substring(qm + 3);
+                    return Truthy(Eval(e.Substring(0, qm), ctx)) ? Eval(rest.Substring(0, colon), ctx) : Eval(rest.Substring(colon + 3), ctx);
+                }
+            }
+            // Boolean operators
+            foreach (var op in new[] { "||", " or ", "&&", " and " })
+            {
+                int i = FindTopLevel(e, op);
+                if (i > 0)
+                {
+                    bool isOr = op.Trim() == "||" || op.Trim() == "or";
+                    bool l = Truthy(Eval(e.Substring(0, i), ctx));
+                    if (isOr && l) return true;
+                    if (!isOr && !l) return false;
+                    return Truthy(Eval(e.Substring(i + op.Length), ctx));
+                }
+            }
+
             // Comparisons
             foreach (var op in new[] { "==", "!=", ">=", "<=", ">", "<" })
             {
@@ -157,10 +179,64 @@ namespace PokeCreator.Runtime.Script
                     return CompareValues(a, b, op);
                 }
             }
-            foreach (var op in new[] { "+", "-", "*", "/" })
+            // Ranges: 0...16, 1..5
+            var rg = Regex.Match(e, @"^(-?\w+|\([^()]*\))\s*(\.\.\.?)\s*(-?\w+|\([^()]*\))$");
+            if (rg.Success && !e.Contains("\""))
             {
-                int i = FindTopLevel(e, op);
-                if (i > 0) return Arith(Eval(e.Substring(0, i), ctx), Eval(e.Substring(i + 1), ctx), op[0]);
+                object lo = Eval(rg.Groups[1].Value, ctx), hi = Eval(rg.Groups[3].Value, ctx);
+                if ((lo is int) && (hi is int))
+                {
+                    int l = (int)lo, h = (int)hi + (rg.Groups[2].Value == "..." ? 0 : 1);
+                    var r = new List<object>(); for (int k = l; k < h && r.Count < 100000; k++) r.Add(k); return r;
+                }
+            }
+            // Arithmetic, left to right: a - b + c
+            foreach (var group in new[] { new[] { "+", "-" }, new[] { "*", "/", "%" } })
+            {
+                int best = -1; string bop = null;
+                foreach (var op in group) { int i = FindLastTopLevel(e, op); if (i > best) { best = i; bop = op; } }
+                if (best > 0) return Arith(Eval(e.Substring(0, best), ctx), Eval(e.Substring(best + 1), ctx), bop[0]);
+            }
+
+            // One-line blocks: list.each { |x| ... }, party.count { |p| p.able? }, ivs.map { |v| v * 2 }
+            if (e.EndsWith("}"))
+            {
+                int ob = -1;
+                for (int k = 0; k < e.Length; k++)
+                {
+                    if (e[k] == '"' || e[k] == '\'') { int cl = e.IndexOf(e[k], k + 1); if (cl < 0) break; k = cl; continue; }
+                    if (e[k] == '{' && MatchingBracket(e, k) == e.Length - 1) { ob = k; break; }
+                    if (e[k] == '(' || e[k] == '[' || e[k] == '{') { int cl = MatchingBracket(e, k); if (cl < 0) break; k = cl; }
+                }
+                var bm = ob > 0 ? Regex.Match(e.Substring(0, ob), @"^(.+)\.(\w+[?!]?)(?:\((.*)\))?\s*$") : Match.Empty;
+                if (bm.Success)
+                {
+                    var inner = Regex.Match(e.Substring(ob + 1, e.Length - ob - 2), @"^\s*\|\s*([^|]*)\|(.*)$", RegexOptions.Singleline);
+                    string vars = inner.Success ? inner.Groups[1].Value : "", code = inner.Success ? inner.Groups[2].Value : e.Substring(ob + 1, e.Length - ob - 2);
+                    return BlockCall(Eval(bm.Groups[1].Value, ctx), bm.Groups[2].Value, bm.Groups[3].Success ? Eval(bm.Groups[3].Value, ctx) : null, vars.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToArray(), code.Trim(), ctx);
+                }
+            }
+
+            // A member of a literal or a bracketed value: [1, 2].include?(2), (1..10).to_a, list.map { … }.max
+            {
+                int lastDot = -1;
+                for (int k = 0; k < e.Length; k++)
+                {
+                    char ch = e[k];
+                    if (ch == '"' || ch == '\'') { int cl = e.IndexOf(ch, k + 1); if (cl < 0) break; k = cl; continue; }
+                    if (ch == '(' || ch == '[' || ch == '{') { int cl = MatchingBracket(e, k); if (cl < 0) break; k = cl; continue; }
+                    if (ch == '.' && k > 0 && (e[k - 1] == ']' || e[k - 1] == ')' || e[k - 1] == '}') && k + 1 < e.Length && char.IsLetter(e[k + 1])) lastDot = k;
+                }
+                if (lastDot > 0)
+                {
+                    var lm2 = Regex.Match(e.Substring(lastDot + 1), @"^(\w+[?!]?)(?:\((.*)\))?$");
+                    string recvText = e.Substring(0, lastDot);
+                    if (lm2.Success && (recvText.StartsWith("[") || recvText.StartsWith("(") || recvText.EndsWith("}")))
+                    {
+                        var margs = lm2.Groups[2].Success && lm2.Groups[2].Value.Trim().Length > 0 ? SplitTopLevel(lm2.Groups[2].Value, ',').Select(x => Eval(x, ctx)).ToList() : new List<object>();
+                        return Member(Eval(recvText, ctx), lm2.Groups[1].Value, margs);
+                    }
+                }
             }
 
             // Literals
@@ -212,6 +288,9 @@ namespace PokeCreator.Runtime.Script
             if (e == "$player.battle_points") return _game.State.BattlePoints;
             m = Regex.Match(e, @"^\$stats\.set_time_to_(\w+?)(?:\((.*)\))?$");
             if (m.Success) { World.GameStats.SetTimeTo(_game, m.Groups[1].Value + (m.Groups[2].Success && m.Groups[2].Value != "" ? "_" + Eval(m.Groups[2].Value, ctx) : "")); return true; }
+            m = Regex.Match(e, @"^\$stats\.(\w+)\[(.+)\]$");
+            if (m.Success) return World.GameStats.Int(_game, m.Groups[1].Value + "_" + ToInt(Eval(m.Groups[2].Value, ctx)));
+            if (Regex.IsMatch(e, @"^\$[A-Za-z_]\w*$") && _globals.ContainsKey(e)) return _globals[e];
             m = Regex.Match(e, @"^\$stats\.(\w+)$");
             if (m.Success) return World.GameStats.Get(_game, m.Groups[1].Value);
             if (e == "$player.badge_count" || e == "$Trainer.numbadges") return _game.State.Badges.Count;
@@ -320,19 +399,27 @@ namespace PokeCreator.Runtime.Script
             string key = name;
             Handler h;
             if (_commands.TryGetValue(key, out h)) return h(ctx, args);
-            // An API object's member: pbBattleChallenge.setDecision(1), pbBattleChallenge.extra.pbPrepareSwaps
-            int firstDot = name.IndexOf('.');
-            if (firstDot > 0 && _commands.TryGetValue(name.Substring(0, firstDot), out h))
+            // A script-made global's member: $speeches.push(text)
+            int gd = name.IndexOf('.');
+            if (name.StartsWith("$") && gd > 0 && _globals.ContainsKey(name.Substring(0, gd)))
             {
-                object obj = h(ctx, new List<object>());
-                if (obj != null && !(obj is bool) && !(obj is int) && !(obj is string))
-                {
-                    var parts = name.Substring(firstDot + 1).Split('.');
-                    for (int k = 0; k < parts.Length && obj != null; k++) obj = Member(obj, parts[k], k == parts.Length - 1 ? args : new List<object>());
-                    return obj;
-                }
+                object gobj = _globals[name.Substring(0, gd)];
+                var gparts = name.Substring(gd + 1).Split('.');
+                for (int k = 0; k < gparts.Length; k++) gobj = Member(gobj, gparts[k], k == gparts.Length - 1 ? args : new List<object>());
+                return gobj;
             }
+            // The longest registered start: $game_temp.last_battle_record.nil?, pbBattleChallenge.extra.pbPrepareSwaps
             int dot = name.LastIndexOf('.');
+            for (int cut = dot; cut > 0; cut = name.LastIndexOf('.', cut - 1))
+            {
+                if (!_commands.TryGetValue(name.Substring(0, cut), out h)) continue;
+                var parts = name.Substring(cut + 1).Split('.');
+                Handler direct;
+                object obj = h(ctx, new List<object>());
+                if (parts.Length == 1 && (obj == null || obj is Interpreter) && parts[0] != "nil?" && _commands.TryGetValue(parts[0], out direct)) return direct(ctx, args);
+                for (int k = 0; k < parts.Length; k++) obj = Member(obj, parts[k], k == parts.Length - 1 ? args : new List<object>());
+                return obj;
+            }
             if (dot > 0 && _commands.TryGetValue(name.Substring(dot + 1), out h)) return h(ctx, args);
             WarnOnce("Unsupported Essentials call: " + name + " (ignored)");
             return null;
@@ -340,6 +427,19 @@ namespace PokeCreator.Runtime.Script
 
         void Assign(string lhs, object val, Interpreter ctx)
         {
+            // A local's element: best[0] = x, counts[:key] = 3
+            var im = Regex.Match(lhs, @"^([a-z_]\w*)\[(.+)\]$");
+            if (im.Success && _locals.ContainsKey(im.Groups[1].Value))
+            {
+                var coll = _locals[im.Groups[1].Value];
+                var idx = Eval(im.Groups[2].Value, ctx);
+                var dict = coll as Dictionary<string, object>;
+                if (dict != null) { dict[Convert.ToString(idx, CultureInfo.InvariantCulture)] = val; return; }
+                var ivs = coll as List<int>;
+                if (ivs != null) { int si = StatIndex(idx); if (si >= 0 && si < ivs.Count) ivs[si] = ToInt(val); return; }
+                var lst = coll as System.Collections.IList;
+                if (lst != null) { int k = ToInt(idx); if (k < 0) k += lst.Count; while (lst.Count <= k) lst.Add(null); if (k >= 0) lst[k] = val; return; }
+            }
             var m = Regex.Match(lhs, @"^\$game_switches\[(.+)\]$");
             if (m.Success) { _game.State.SetSwitch(ToInt(Eval(m.Groups[1].Value, ctx)), Truthy(val)); _game.Map.RefreshEvents(); return; }
             m = Regex.Match(lhs, @"^\$game_variables\[(.+)\]$");
@@ -374,7 +474,29 @@ namespace PokeCreator.Runtime.Script
                 SetMember(_locals[lm.Groups[1].Value], lm.Groups[2].Value, lm.Groups[3].Success ? Eval(lm.Groups[3].Value, ctx) : null, val);
                 return;
             }
+            var sm = Regex.Match(lhs, @"^\$stats\.(\w+)\[(.+)\]$");
+            if (sm.Success) { World.GameStats.Set(_game, sm.Groups[1].Value + "_" + ToInt(Eval(sm.Groups[2].Value, ctx)), ToInt(val)); return; }
             if (lhs.StartsWith("$stats.")) { World.GameStats.Set(_game, lhs.Substring(7), ToInt(val)); return; }
+            // Ruby globals made by scripts ($speeches = [], $DEBUG = true) live as long as the game runs
+            if (Regex.IsMatch(lhs, @"^\$[A-Za-z_]\w*$")) { _globals[lhs] = val; return; }
+            var cm = Regex.Match(lhs, @"^get_character\((.*)\)\.(\w+)$");
+            if (cm.Success && ctx != null)
+            {
+                var ch = ctx.GetCharacter(ToInt(Eval(cm.Groups[1].Value, ctx)));
+                if (ch != null)
+                {
+                    switch (cm.Groups[2].Value)
+                    {
+                        case "pattern": ch.Pattern = ToInt(val); return;
+                        case "direction": ch.Turn(ToInt(val)); return;
+                        case "opacity": ch.Opacity = ToInt(val); return;
+                        case "through": ch.Through = Truthy(val); return;
+                        case "move_speed": ch.MoveSpeed = ToInt(val); return;
+                        case "character_name": ch.CharacterName = Convert.ToString(val); return;
+                        case "transparent": ch.Transparent = Truthy(val); return;
+                    }
+                }
+            }
             if (lhs == "$PokemonGlobal.encounter_version") { _game.State.Extras.EncounterVersion = ToInt(val); return; }
             if (lhs == "$PokemonGlobal.dungeon_area") { _game.State.Extras.DungeonArea = val == null ? null : Convert.ToString(val, CultureInfo.InvariantCulture); return; }
             if (lhs == "$PokemonGlobal.dungeon_version") { _game.State.Extras.DungeonVersion = ToInt(val); return; }
@@ -401,6 +523,15 @@ namespace PokeCreator.Runtime.Script
             Register("pbCommonEvent", (c, a) => c != null && c.CallCommonEvent(ToInt(Arg(a, 0))));
             Register("pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
             Register("Kernel.pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
+            // Phone calls made from common events (Essentials' Phone::Call.start_message / end_message)
+            Register("Phone::Call.start_message", (c, a) => { _game.Audio.PlaySe("Phone call"); _game.Message.Show("......\\wt[5] ......\\wt[5]"); return true; });
+            Register("Phone::Call.end_message", (c, a) => { _game.Message.Show("Click!\\wt[10]\\n......\\wt[5] ......"); return true; });
+            Register("GameData::Stat.get", (c, a) =>
+            {
+                string id = Str(a, 0);
+                var names = new Dictionary<string, string> { { "HP", "HP" }, { "ATTACK", "Attack" }, { "DEFENSE", "Defense" }, { "SPECIAL_ATTACK", "Sp. Atk" }, { "SPECIAL_DEFENSE", "Sp. Def" }, { "SPEED", "Speed" }, { "ACCURACY", "accuracy" }, { "EVASION", "evasiveness" } };
+                string n; return new Dictionary<string, object> { { "id", id }, { "name", names.TryGetValue(id ?? "", out n) ? n : id }, { "real_name", names.TryGetValue(id ?? "", out n) ? n : id } };
+            });
             Register("pbConfirmMessage", (c, a) =>
             {
                 bool result = false;
@@ -772,7 +903,14 @@ namespace PokeCreator.Runtime.Script
             Register("$player.has_species?", (c, a) => _game.Party.Any(p => p.Species.Equals(Str(a, 0), StringComparison.OrdinalIgnoreCase)));
             Register("Tone.new", (c, a) => a.Select(x => (object)ToInt(x)).ToList());
             Register("pbToneChangeAll", (c, a) => { _game.SetScreenTone(Arg(a, 0) as List<object>, ToInt(Arg(a, 1)) * 3 / 2); return true; });
-            foreach (var n in new[] { "hide_choice", "setBattleRule", "$game_screen.weather", "pbPickBerry", "setPrice", "setVariable", "$speeches.push", "pbToneChangeAll" })
+            Register("rename_choice", (c, a) => { if (c != null && (a.Count < 3 || Truthy(a[2]))) c.ChoiceRenames[ToInt(Arg(a, 0))] = Str(a, 1); return true; });
+            Register("hide_choice", (c, a) => { if (c != null && (a.Count < 2 || Truthy(a[1]))) c.ChoiceHidden.Add(ToInt(Arg(a, 0))); return true; });
+            Register("$player.pokemon_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg).ToList());
+            Register("$player.able_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg && !p.Fainted).ToList());
+            Register("$player.party", (c, a) => _game.State.Party);
+            Register("$Trainer.party", (c, a) => _game.State.Party);
+            Register("follower_animation", (c, a) => { var f = World.Followers.Characters.FirstOrDefault(); if (f != null) _game.Exclaim(f, 30); return true; });
+            foreach (var n in new[] { "setBattleRule", "$game_screen.weather", "pbPickBerry", "setPrice", "setVariable", "pbToneChangeAll" })
                 if (!_commands.ContainsKey(n)) Register(n, noop);
             // ---- Pokégear phone and trainer rematches
             Func<Interpreter, object, int> eventOf = (c, o2) => { int id = o2 is string ? 0 : ToInt(o2); return id > 0 ? id : (c != null ? c.EventId : 0); };
@@ -1119,6 +1257,9 @@ namespace PokeCreator.Runtime.Script
             if (member == "to_s") return obj == null ? "" : obj is bool ? ((bool)obj ? "true" : "false") : Convert.ToString(obj, CultureInfo.InvariantCulture);
             if (member == "to_i") { if (obj == null) return 0; int iv; return obj is string ? (int.TryParse((string)obj, out iv) ? iv : 0) : ToInt(obj); }
             if (member == "nil?") return obj == null;
+            // Data records built as hashes (GameData::Stat.get(x).name)
+            var rec = obj as Dictionary<string, object>;
+            if (rec != null && args.Count == 0 && rec.ContainsKey(member)) return rec[member];
             if (member == "is_a?" || member == "kind_of?")
             {
                 string t = args.Count > 0 ? Convert.ToString(args[0]) : "";
@@ -1165,6 +1306,26 @@ namespace PokeCreator.Runtime.Script
                     case "sum": return items.Sum(x => ToInt(x));
                     case "max": return items.Count > 0 ? items.Max(x => ToInt(x)) : 0;
                     case "min": return items.Count > 0 ? items.Min(x => ToInt(x)) : 0;
+                    case "uniq": return items.Distinct().ToList();
+                    case "uniq!": { var u = items.Distinct().ToList(); list.Clear(); foreach (var x in u) list.Add(x); return list; }
+                    case "reverse": { var r = items.ToList(); r.Reverse(); return r; }
+                    case "sort": return items.OrderBy(x => x is int ? (object)(int)x : Convert.ToString(x, CultureInfo.InvariantCulture)).ToList();
+                    case "shuffle": return items.OrderBy(_ => _game.Rng.Next()).ToList();
+                    case "pop": { if (list.Count == 0) return null; var x = list[list.Count - 1]; list.RemoveAt(list.Count - 1); return x; }
+                    case "shift": { if (list.Count == 0) return null; var x = list[0]; list.RemoveAt(0); return x; }
+                    case "unshift": { for (int k = args.Count - 1; k >= 0; k--) list.Insert(0, args[k]); return list; }
+                    case "delete": { object hit = null; for (int k = list.Count - 1; k >= 0; k--) if (SameValue(list[k], args.Count > 0 ? args[0] : null)) { hit = list[k]; list.RemoveAt(k); } return hit; }
+                    case "delete_at": { int k = ToInt(args.Count > 0 ? args[0] : null); if (k < 0) k += list.Count; if (k < 0 || k >= list.Count) return null; var x = list[k]; list.RemoveAt(k); return x; }
+                    case "index": { for (int k = 0; k < items.Count; k++) if (SameValue(items[k], args.Count > 0 ? args[0] : null)) return k; return null; }
+                    case "clear": list.Clear(); return list;
+                    case "concat": case "+": { var r = items.ToList(); foreach (var a2 in args) { var l2 = a2 as System.Collections.IList; if (l2 != null) r.AddRange(l2.Cast<object>()); } if (member == "concat") { foreach (var x in r.Skip(items.Count)) list.Add(x); return list; } return r; }
+                    case "flatten": return items.SelectMany(x => x is System.Collections.IList && !(x is string) ? ((System.Collections.IList)x).Cast<object>() : new[] { x }).ToList();
+                    case "join": return string.Join(args.Count > 0 ? Convert.ToString(args[0]) : "", items.Select(x => Convert.ToString(x, CultureInfo.InvariantCulture)));
+                    case "any?": return items.Count > 0;
+                    case "none?": return items.Count == 0;
+                    case "each_value": return items;
+                    case "to_a": case "dup": case "clone": return items.ToList();
+                    case "rand": return items.Count > 0 ? items[_game.Rng.Next(items.Count)] : null;
                 }
             }
             if (obj is string)
@@ -1177,6 +1338,14 @@ namespace PokeCreator.Runtime.Script
                     case "downcase": return s.ToLowerInvariant();
                     case "empty?": return s.Length == 0;
                     case "to_sym": return s;
+                    case "capitalize": return s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
+                    case "strip": return s.Trim();
+                    case "include?": return args.Count > 0 && s.Contains(Convert.ToString(args[0], CultureInfo.InvariantCulture));
+                    case "start_with?": return args.Count > 0 && s.StartsWith(Convert.ToString(args[0], CultureInfo.InvariantCulture));
+                    case "end_with?": return args.Count > 0 && s.EndsWith(Convert.ToString(args[0], CultureInfo.InvariantCulture));
+                    case "reverse": return new string(s.Reverse().ToArray());
+                    case "chars": return s.Select(ch => (object)ch.ToString()).ToList();
+                    case "split": return s.Split(new[] { args.Count > 0 ? Convert.ToString(args[0]) : " " }, StringSplitOptions.None).Cast<object>().ToList();
                 }
             }
             var pk = obj as PokeCreator.Pkmn.Pokemon;
@@ -1260,6 +1429,27 @@ namespace PokeCreator.Runtime.Script
                     case "tough": return pk.Tough;
                     case "sheen": return pk.Sheen;
                     case "calcIV": case "ivs": return pk.IV;
+                    case "item_id": return pk.Item;
+                    case "gender": return pk.Gender == "M" ? 0 : pk.Gender == "F" ? 1 : 2;
+                    case "ability_index": return pk.AbilityIndex;
+                    case "poke_ball": case "ballused": return pk.Ball;
+                    case "makeMale": pk.Gender = "M"; return true;
+                    case "makeFemale": pk.Gender = "F"; return true;
+                    case "makeShiny": pk.Shiny = true; return true;
+                    case "makeNotShiny": pk.Shiny = false; return true;
+                    case "genderless?": return string.IsNullOrEmpty(pk.Gender);
+                    case "types": return pk.Types(P).Cast<object>().ToList();
+                    case "type1": return pk.Types(P).FirstOrDefault();
+                    case "type2": { var ts = pk.Types(P); return ts.Count > 1 ? ts[1] : ts.FirstOrDefault(); }
+                    case "getMoveList": { var d = pk.Data(P); return d == null ? new List<object>() : d.Moves.Select(m => (object)new List<object> { m.Level, m.Move }).ToList(); }
+                    case "baseStats": { var d = pk.Data(P); return d == null ? new List<object>() : d.BaseStats.Cast<object>().ToList(); }
+                    case "exp": return pk.Exp;
+                    case "status": return string.IsNullOrEmpty(pk.Status) ? "NONE" : pk.Status;
+                    case "heal_status": pk.Status = ""; return true;
+                    case "heal_HP": pk.HP = pk.TotalHP(P); return true;
+                    case "heal_PP": pk.Heal(P); return true;
+                    case "obtain_map": return pk.MetMap;
+                    case "obtain_level": return pk.MetLevel;
                 }
                 WarnOnce("Unsupported Pokémon member: " + member);
                 return null;
@@ -1315,6 +1505,13 @@ namespace PokeCreator.Runtime.Script
                 case "owner": case "ot": pk.OTName = Convert.ToString(val); return;
                 case "gender": pk.Gender = ToInt(val) == 1 ? "F" : ToInt(val) == 0 ? "M" : ""; return;
                 case "iv": { int s = StatIndex(index); if (s >= 0 && s < 6) pk.IV[s] = Math.Max(0, Math.Min(31, ToInt(val))); return; }
+                case "ability_index": pk.AbilityIndex = ToInt(val); pk.Ability = null; return;
+                case "poke_ball": case "ballused": pk.Ball = val == null ? null : Convert.ToString(val); return;
+                case "species": pk.Species = Convert.ToString(val); return;
+                case "exp": pk.Exp = ToInt(val); return;
+                case "hp": pk.HP = Math.Max(0, Math.Min(pk.TotalHP(_game.Project), ToInt(val))); return;
+                case "status": pk.Status = val == null || Convert.ToString(val) == "NONE" ? "" : Convert.ToString(val); return;
+                case "obtain_text": case "obtain_map": case "obtain_level": case "hatched_map": return;
                 case "ev": { int s = StatIndex(index); if (s >= 0 && s < 6) pk.EV[s] = Math.Max(0, Math.Min(252, ToInt(val))); return; }
             }
             WarnOnce("Can't set Pokémon member " + member);
@@ -1357,9 +1554,28 @@ namespace PokeCreator.Runtime.Script
 
         static object Arith(object a, object b, char op)
         {
-            if (op == '+' && (a is string || b is string)) return Convert.ToString(a) + Convert.ToString(b);
+            if (op == '+' && (a is string || b is string)) return Convert.ToString(a, CultureInfo.InvariantCulture) + Convert.ToString(b, CultureInfo.InvariantCulture);
+            var la = a as System.Collections.IList; var lb = b as System.Collections.IList;
+            if (la != null && !(a is string))
+            {
+                var items = la.Cast<object>().ToList();
+                if (op == '+' && lb != null) { items.AddRange(lb.Cast<object>()); return items; }
+                if (op == '-' && lb != null) { var rm = lb.Cast<object>().ToList(); return items.Where(it => !rm.Any(r => SameValue(it, r))).ToList(); }
+                if (op == '*') { var r = new List<object>(); for (int k = 0; k < ToInt(b); k++) r.AddRange(items); return r; }
+            }
+            if (op == '*' && a is string) return string.Concat(Enumerable.Repeat((string)a, Math.Max(0, ToInt(b))));
+            if (a is double || b is double)
+            {
+                double dx = Convert.ToDouble(a ?? 0, CultureInfo.InvariantCulture), dy = Convert.ToDouble(b ?? 0, CultureInfo.InvariantCulture);
+                switch (op) { case '+': return dx + dy; case '-': return dx - dy; case '*': return dx * dy; case '/': return dy == 0 ? 0 : dx / dy; case '%': return dy == 0 ? 0 : dx % dy; }
+            }
             int x = ToInt(a), y = ToInt(b);
-            switch (op) { case '+': return x + y; case '-': return x - y; case '*': return x * y; case '/': return y == 0 ? 0 : x / y; }
+            switch (op)
+            {
+                case '+': return x + y; case '-': return x - y; case '*': return x * y;
+                case '/': return y == 0 ? 0 : (int)Math.Floor((double)x / y);
+                case '%': if (y == 0) return 0; int m = x % y; return m != 0 && ((m < 0) != (y < 0)) ? m + y : m;
+            }
             return 0;
         }
 
@@ -1389,6 +1605,36 @@ namespace PokeCreator.Runtime.Script
         }
 
         /// <summary>Index of op outside strings/brackets, or -1.</summary>
+        static int FindLastTopLevel(string s, string op)
+        {
+            int last = -1, from = 0;
+            while (true)
+            {
+                int i = FindTopLevel(s.Substring(from), op);
+                if (i < 0) break;
+                // FindTopLevel works on the tail: make sure the cut isn't inside brackets of the whole string
+                int abs = from + i;
+                if (DepthAt(s, abs) == 0) last = abs;
+                from = abs + op.Length;
+                if (from >= s.Length) break;
+            }
+            return last;
+        }
+
+        static int DepthAt(string s, int pos)
+        {
+            int depth = 0; bool inStr = false; char q = '\0';
+            for (int i = 0; i < pos; i++)
+            {
+                char c = s[i];
+                if (inStr) { if (c == '\\') i++; else if (c == q) inStr = false; continue; }
+                if (c == '"' || c == '\'') { inStr = true; q = c; continue; }
+                if (c == '(' || c == '[' || c == '{') depth++;
+                else if (c == ')' || c == ']' || c == '}') depth--;
+            }
+            return inStr ? 1 : depth;
+        }
+
         static int FindTopLevel(string s, string op)
         {
             int depth = 0; bool inStr = false; char q = '\0';

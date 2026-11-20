@@ -1001,7 +1001,7 @@ namespace PokeCreator.Runtime
                         pk.Exp = pk.ExpForNextLevel(_g.Project) - 1;
                         break;
                     }
-                case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)), null); break;
+                case "script": _g.Compat.RunScript(string.Join(" ", p.Skip(1)).Replace("\\n", "\n"), null); break;
                 case "berryage": // berryage HOURS: makes every planted berry older
                     foreach (var bp in _g.State.BerryPlants.Values) { long dt = (long)(double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture) * TimeSpan.TicksPerHour); bp.PlantedAt -= dt; bp.MoistureAt -= dt; }
                     Berries.Refresh(_g);

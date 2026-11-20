@@ -352,6 +352,10 @@ namespace PokeCreator.Runtime.Script
             return true;
         }
 
+        /// <summary>Set by rename_choice(n, name) / hide_choice(n) for the next Show Choices (1-based).</summary>
+        public readonly Dictionary<int, string> ChoiceRenames = new Dictionary<int, string>();
+        public readonly HashSet<int> ChoiceHidden = new HashSet<int>();
+
         bool ShowChoices(EventCommand c, string text)
         {
             var raw = c.Params.Count > 0 ? c.Params[0] as List<object> : null;
@@ -359,7 +363,22 @@ namespace PokeCreator.Runtime.Script
             int cancel = c.IntParam(1); // RMXP: 0 = disallow, 1-4 = choice n, 5 = branch
             int indent = c.Indent;
             int cancelIndex = cancel == 0 ? -1 : (cancel == 5 ? 4 : cancel - 1);
-            _game.Message.Show(text ?? "", choices, cancelIndex, r => _branch[indent] = r);
+            if (ChoiceRenames.Count == 0 && ChoiceHidden.Count == 0)
+            {
+                _game.Message.Show(text ?? "", choices, cancelIndex, r => _branch[indent] = r);
+                return true;
+            }
+            // rename_choice / hide_choice (Essentials) change this Show Choices only
+            var map = new List<int>(); var shown = new List<string>();
+            for (int k = 0; k < choices.Count; k++)
+            {
+                if (ChoiceHidden.Contains(k + 1)) continue;
+                string nm; map.Add(k); shown.Add(ChoiceRenames.TryGetValue(k + 1, out nm) ? nm : choices[k]);
+            }
+            ChoiceRenames.Clear(); ChoiceHidden.Clear();
+            int shownCancel = cancelIndex == 4 ? -2 : map.IndexOf(cancelIndex);
+            if (cancelIndex >= 0 && cancelIndex < 4 && shownCancel < 0) shownCancel = -1;
+            _game.Message.Show(text ?? "", shown, shownCancel == -2 ? 4 : shownCancel, r => _branch[indent] = r >= 0 && r < map.Count ? map[r] : (cancelIndex == 4 ? 4 : r));
             return true;
         }
 
