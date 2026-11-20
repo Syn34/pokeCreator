@@ -528,3 +528,249 @@ namespace PokeCreator.Runtime.UI
         }
     }
 }
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>Triple Triad cards: one per species, side values (1-10) from its base stats.</summary>
+    public static class TriadCards
+    {
+        public static int[] Values(Game g, string species)
+        {
+            var d = g.Project.Species.FirstOrDefault(s => s.Id == species && s.Form == 0);
+            if (d == null || d.BaseStats == null || d.BaseStats.Count < 6) return new[] { 1, 1, 1, 1 };
+            Func<int, int> v = st => Math.Max(1, Math.Min(10, (st + 9) / 15));
+            return new[] { v(d.BaseStats[1]), v(d.BaseStats[2]), v(d.BaseStats[4]), v(d.BaseStats[3]) }; // N E S W
+        }
+        public static int Price(Game g, string species) { var v = Values(g, species); return v.Sum() * 30; }
+        public static Dictionary<string, int> Owned(Game g)
+        {
+            if (g.State.Extras.TriadCards == null) g.State.Extras.TriadCards = new Dictionary<string, int>();
+            return g.State.Extras.TriadCards;
+        }
+        public static int Count(Game g) { return Owned(g).Values.Sum(); }
+        public static void Give(Game g, string species, int n)
+        {
+            var o = Owned(g); int have; o.TryGetValue(species, out have);
+            have += n; if (have <= 0) o.Remove(species); else o[species] = Math.Min(99, have);
+        }
+        public static string Name(Game g, string species) { var d = g.Project.Species.FirstOrDefault(s => s.Id == species); return d != null ? d.Name : species; }
+
+        public static void DrawCard(Gfx g, Game game, string species, int x, int y, int w, int h, bool mine)
+        {
+            g.FillRect(x, y, w, h, mine ? new Color(120, 168, 240) : new Color(240, 128, 128));
+            g.FillRect(x + 2, y + 2, w - 4, h - 4, mine ? new Color(176, 208, 248) : new Color(248, 184, 184));
+            var v = Values(game, species);
+            Func<int, string> t = n => n >= 10 ? "A" : n.ToString();
+            g.DrawText(x + w / 2 - 6, y + 2, t(v[0]), Ui.Dark, Ui.DarkShadow);
+            g.DrawText(x + w - 18, y + h / 2 - 12, t(v[1]), Ui.Dark, Ui.DarkShadow);
+            g.DrawText(x + w / 2 - 6, y + h - 28, t(v[2]), Ui.Dark, Ui.DarkShadow);
+            g.DrawText(x + 6, y + h / 2 - 12, t(v[3]), Ui.Dark, Ui.DarkShadow);
+            var icon = g.Load(game.Project.FindAsset("Graphics/Pokemon/Icons", species));
+            if (icon != null) { int fw = Math.Min(icon.Width, icon.Height); g.Draw(icon, 0, 0, fw, icon.Height, x + w / 2 - fw / 2, y + h / 2 - icon.Height / 2); }
+        }
+    }
+
+    /// <summary>
+    /// A Triple Triad duel (pbTriadDuel): each player places 5 cards on a 3×3 board; a card captures neighbouring
+    /// opponent cards whose touching side is lower. Most cards wins; the winner takes one of the loser's cards.
+    /// </summary>
+    public class TriadDuelScene : Scene
+    {
+        readonly string _foe; readonly Action<int> _done; // 1 win, 2 lose, 3 draw
+        readonly List<string> _hand, _foeHand;
+        readonly string[] _board = new string[9];
+        readonly bool[] _mine = new bool[9];
+        int _sel, _cell = 4; bool _choosingCell, _myTurn = true, _over;
+        string _msg = "Choose a card.";
+
+        public TriadDuelScene(Game g, string foe, int minLevel, int maxLevel, Action<int> done) : base(g)
+        {
+            Opaque = true; _foe = foe; _done = done;
+            var owned = TriadCards.Owned(g).SelectMany(kv => Enumerable.Repeat(kv.Key, kv.Value)).ToList();
+            _hand = owned.OrderByDescending(s => TriadCards.Values(g, s).Sum()).ThenBy(_ => g.Rng.Next()).Take(5).ToList();
+            // The opponent's hand: species whose card strength is near the player's
+            int target = _hand.Count > 0 ? (int)_hand.Average(s => TriadCards.Values(g, s).Sum()) : 16;
+            var pool = g.Project.Species.Where(s => s.Form == 0 && s.BaseStats != null && s.BaseStats.Count == 6).Select(s => s.Id)
+                .Where(id => Math.Abs(TriadCards.Values(g, id).Sum() - target) <= 4).ToList();
+            if (pool.Count < 5) pool = g.Project.Species.Where(s => s.Form == 0).Select(s => s.Id).ToList();
+            _foeHand = Enumerable.Range(0, 5).Select(_ => pool[g.Rng.Next(pool.Count)]).ToList();
+        }
+
+
+        void Place(int cell, string card, bool mine)
+        {
+            _board[cell] = card; _mine[cell] = mine;
+            var v = TriadCards.Values(Game, card);
+            int x = cell % 3, y = cell / 3;
+            // N, E, S, W neighbours: my side index vs their opposite side
+            int[][] dirs = { new[] { 0, -1, 0, 2 }, new[] { 1, 0, 1, 3 }, new[] { 0, 1, 2, 0 }, new[] { -1, 0, 3, 1 } };
+            foreach (var d in dirs)
+            {
+                int nx = x + d[0], ny = y + d[1];
+                if (nx < 0 || ny < 0 || nx > 2 || ny > 2) continue;
+                int n = ny * 3 + nx;
+                if (_board[n] == null || _mine[n] == mine) continue;
+                if (v[d[2]] > TriadCards.Values(Game, _board[n])[d[3]]) _mine[n] = mine;
+            }
+        }
+
+        int Score(bool mine) { return Enumerable.Range(0, 9).Count(i => _board[i] != null && _mine[i] == mine) + (mine ? _hand.Count : _foeHand.Count); }
+
+        void FoeMove()
+        {
+            int bestCell = -1, bestCard = 0, best = int.MinValue;
+            for (int c = 0; c < _foeHand.Count; c++)
+                for (int cell = 0; cell < 9; cell++)
+                {
+                    if (_board[cell] != null) continue;
+                    var saveB = (string[])_board.Clone(); var saveM = (bool[])_mine.Clone();
+                    Place(cell, _foeHand[c], false);
+                    int s = Enumerable.Range(0, 9).Count(i => _board[i] != null && !_mine[i]) * 10 - TriadCards.Values(Game, _foeHand[c]).Sum() + Game.Rng.Next(3);
+                    Array.Copy(saveB, _board, 9); Array.Copy(saveM, _mine, 9);
+                    if (s > best) { best = s; bestCell = cell; bestCard = c; }
+                }
+            if (bestCell < 0) return;
+            Place(bestCell, _foeHand[bestCard], false);
+            _foeHand.RemoveAt(bestCard);
+        }
+
+        void CheckEnd()
+        {
+            if (_board.Any(b => b == null)) return;
+            _over = true;
+            int me = Score(true), them = Score(false);
+            if (me > them)
+            {
+                string prize = _foeHand.Concat(Enumerable.Range(0, 9).Where(i => !_mine[i]).Select(i => _board[i])).Concat(_board.Where(b => b != null)).FirstOrDefault();
+                if (prize != null) TriadCards.Give(Game, prize, 1);
+                _msg = "You won! You got " + TriadCards.Name(Game, prize) + "'s card.";
+            }
+            else if (me < them)
+            {
+                var lose = _hand.Concat(_board.Where((b, i) => b != null && TriadCards.Owned(Game).ContainsKey(b))).FirstOrDefault();
+                if (lose != null && TriadCards.Owned(Game).ContainsKey(lose)) TriadCards.Give(Game, lose, -1);
+                _msg = "You lost..." + (lose != null ? " " + _foe + " took " + TriadCards.Name(Game, lose) + "'s card." : "");
+            }
+            else _msg = "It's a draw.";
+        }
+
+        protected override void Update()
+        {
+            if (_over) { if (Input.Trigger(Button.Action)) { int me = Score(true), them = Score(false); Close(); _done(me > them ? 1 : me < them ? 2 : 3); } return; }
+            if (!_myTurn) { if (Frame % 30 == 0) { FoeMove(); _myTurn = true; _msg = "Choose a card."; CheckEnd(); } return; }
+            if (!_choosingCell)
+            {
+                if (_hand.Count == 0) { _myTurn = false; return; }
+                if (Input.Repeat(Button.Down)) { _sel = (_sel + 1) % _hand.Count; Cursor(); }
+                if (Input.Repeat(Button.Up)) { _sel = (_sel + _hand.Count - 1) % _hand.Count; Cursor(); }
+                if (Input.Trigger(Button.Action)) { _choosingCell = true; _msg = "Where?"; Decide(); }
+                return;
+            }
+            if (Input.Repeat(Button.Left) && _cell % 3 > 0) { _cell--; Cursor(); }
+            if (Input.Repeat(Button.Right) && _cell % 3 < 2) { _cell++; Cursor(); }
+            if (Input.Repeat(Button.Up) && _cell > 2) { _cell -= 3; Cursor(); }
+            if (Input.Repeat(Button.Down) && _cell < 6) { _cell += 3; Cursor(); }
+            if (Input.Trigger(Button.Cancel)) { _choosingCell = false; _msg = "Choose a card."; Cancel(); return; }
+            if (Input.Trigger(Button.Action))
+            {
+                if (_board[_cell] != null) { Buzz(); return; }
+                Place(_cell, _hand[_sel], true);
+                _hand.RemoveAt(_sel); _sel = 0; _choosingCell = false;
+                Decide();
+                CheckEnd();
+                if (!_over) { _myTurn = false; _msg = _foe + " is thinking..."; }
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(64, 96, 64), new Color(24, 40, 24));
+            int cw = 76, ch = 84, bx = (g.Width - cw * 3) / 2, by = 16;
+            for (int i = 0; i < 9; i++)
+            {
+                int x = bx + (i % 3) * cw, y = by + (i / 3) * ch;
+                g.FillRect(x, y, cw - 4, ch - 4, new Color(40, 64, 40));
+                if (_board[i] != null) TriadCards.DrawCard(g, Game, _board[i], x, y, cw - 4, ch - 4, _mine[i]);
+                if (_choosingCell && i == _cell) { var c = new Color(248, 232, 64); g.FillRect(x, y, cw - 4, 3, c); g.FillRect(x, y + ch - 7, cw - 4, 3, c); }
+            }
+            for (int i = 0; i < _hand.Count; i++)
+            {
+                int y = 16 + i * 58;
+                TriadCards.DrawCard(g, Game, _hand[i], 14 + (i == _sel && !_choosingCell ? 10 : 0), y, 64, 54, true);
+            }
+            for (int i = 0; i < _foeHand.Count; i++) { g.FillRect(g.Width - 78, 16 + i * 58, 64, 54, new Color(160, 64, 64)); g.FillRect(g.Width - 74, 20 + i * 58, 56, 46, new Color(208, 96, 96)); }
+            Ui.Box(g, 4, g.Height - 64, g.Width - 8, 60);
+            g.DrawText(18, g.Height - 52, "You " + Score(true) + " - " + Score(false) + " " + _foe + ".  " + _msg, Ui.Dark, Ui.DarkShadow);
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>The Triple Triad card shop: buy (a daily selection) or sell cards; also just a list of owned cards.</summary>
+    public class TriadShopScene : Scene
+    {
+        readonly bool _sell, _viewOnly;
+        List<string> _list;
+        int _index;
+
+        public TriadShopScene(Game g, bool sell, bool viewOnly = false) : base(g)
+        {
+            Opaque = true; _sell = sell; _viewOnly = viewOnly;
+            if (sell) _list = TriadCards.Owned(g).Keys.OrderBy(k => k).ToList();
+            else
+            {
+                var rng = new Random(DateTime.Now.DayOfYear + DateTime.Now.Year * 400);
+                var all = g.Project.Species.Where(s => s.Form == 0 && s.BaseStats != null && s.BaseStats.Count == 6).Select(s => s.Id).ToList();
+                _list = Enumerable.Range(0, Math.Min(12, all.Count)).Select(_ => all[rng.Next(all.Count)]).Distinct().ToList();
+            }
+        }
+
+        protected override void Update()
+        {
+            if (Input.Trigger(Button.Cancel) || _list.Count == 0 && Input.Trigger(Button.Action)) { Cancel(); Close(); return; }
+            if (_list.Count == 0) return;
+            if (Input.Repeat(Button.Down)) { _index = (_index + 1) % _list.Count; Cursor(); }
+            if (Input.Repeat(Button.Up)) { _index = (_index + _list.Count - 1) % _list.Count; Cursor(); }
+            if (!Input.Trigger(Button.Action) || _viewOnly) return;
+            string sp = _list[_index]; int price = TriadCards.Price(Game, sp);
+            if (_sell)
+            {
+                Game.Message.Show("Sell " + TriadCards.Name(Game, sp) + "'s card for $" + price / 2 + "?", new List<string> { "Yes", "No" }, 1, k =>
+                {
+                    if (k != 0) return;
+                    TriadCards.Give(Game, sp, -1); Game.State.Money += price / 2; Game.Audio.PlaySe("Mart buy item");
+                    if (!TriadCards.Owned(Game).ContainsKey(sp)) { _list.Remove(sp); _index = Math.Max(0, Math.Min(_index, _list.Count - 1)); }
+                });
+            }
+            else
+            {
+                if (Game.State.Money < price) { Buzz(); Game.Message.Show("You don't have enough money."); return; }
+                Game.Message.Show("Buy " + TriadCards.Name(Game, sp) + "'s card for $" + price + "?", new List<string> { "Yes", "No" }, 1, k =>
+                {
+                    if (k != 0) return;
+                    Game.State.Money -= price; TriadCards.Give(Game, sp, 1); Game.Audio.PlaySe("Mart buy item");
+                });
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(64, 96, 64), new Color(24, 40, 24));
+            Ui.Panel(g, 8, 8, 280, g.Height - 80, new Color(248, 248, 248), new Color(32, 64, 32));
+            int start = Math.Max(0, _index - 8);
+            for (int i = start; i < _list.Count && i < start + 9; i++)
+            {
+                int y = 16 + (i - start) * 30;
+                if (i == _index) Ui.Arrow(g, 18, y + 6);
+                string label = TriadCards.Name(Game, _list[i]);
+                int have; TriadCards.Owned(Game).TryGetValue(_list[i], out have);
+                Ui.Text(g, 38, y, label);
+                Ui.TextRight(g, 280, y, _viewOnly || _sell ? "×" + have : "$" + TriadCards.Price(Game, _list[i]));
+            }
+            if (_list.Count > 0) TriadCards.DrawCard(g, Game, _list[_index], 330, 40, 120, 130, true);
+            Ui.Box(g, 4, g.Height - 64, g.Width - 8, 60);
+            Ui.Text(g, 18, g.Height - 52, _list.Count == 0 ? "No cards." : "Money: $" + Game.State.Money + "   Cards: " + TriadCards.Count(Game));
+        }
+    }
+}

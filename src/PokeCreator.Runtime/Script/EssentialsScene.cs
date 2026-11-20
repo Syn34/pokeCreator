@@ -321,6 +321,22 @@ namespace PokeCreator.Runtime.Script
             Register("pbSlotMachine", (c, a) => { _game.PushScene(new UI.SlotMachineScene(_game, a.Count > 0 ? ToInt(a[0]) : 1)); return true; });
             Register("pbVoltorbFlip", (c, a) => { _game.PushScene(new UI.VoltorbFlipScene(_game)); return true; });
 
+            // Triple Triad
+            Register("pbCanTriadDuel?", (c, a) => UI.TriadCards.Count(_game) >= 5);
+            Register("pbGiveTriadCard", (c, a) => { UI.TriadCards.Give(_game, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1); return true; });
+            Register("pbTriadDuel", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                if (UI.TriadCards.Count(_game) < 5) { _game.Message.Show("You need at least 5 cards."); return 0; }
+                _game.PromptPending = true;
+                _game.PushScene(new UI.TriadDuelScene(_game, a.Count > 0 ? Str(a, 0) : "Opponent", a.Count > 1 ? ToInt(a[1]) : 0, a.Count > 2 ? ToInt(a[2]) : 100, r => _game.SetPrompt(c, r)));
+                return 0;
+            });
+            Register("pbBuyTriads", (c, a) => { _game.PushScene(new UI.TriadShopScene(_game, false)); return true; });
+            Register("pbSellTriads", (c, a) => { _game.PushScene(new UI.TriadShopScene(_game, true)); return true; });
+            Register("pbTriadList", (c, a) => { _game.PushScene(new UI.TriadShopScene(_game, true, true)); return true; });
+
             Register("pbMiningGame", (c, a) => { _game.PushScene(new UI.MiningScene(_game)); return true; });
             Register("pbTilePuzzle", (c, a) =>
             {
