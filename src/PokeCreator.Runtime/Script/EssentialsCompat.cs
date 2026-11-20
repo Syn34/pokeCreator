@@ -627,7 +627,6 @@ namespace PokeCreator.Runtime.Script
             Register("$Trainer.heal_party", heal);
             Register("$player.able_pokemon_count", (c, a) => _game.State.Party.Count(pk => !pk.Fainted));
             Register("$player.party_full?", (c, a) => _game.State.Party.Count >= GameState.MaxParty);
-            Register("pbBoxesFull?", (c, a) => false);
             Register("pbPokeCenterPC", (c, a) => { PcMenu.Open(_game, true); return true; });
             Register("pbTrainerPC", (c, a) => { PcMenu.Open(_game, false); return true; });
             // pbPokemonMart([:POTION, :ANTIDOTE, ...], speech = nil, cantsell = false)
@@ -784,7 +783,6 @@ namespace PokeCreator.Runtime.Script
             Register("pbGetTimeNow", (c, a) => DateTime.Now);
             Register("PBDayNight.isNight?", (c, a) => DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20);
             Register("PBDayNight.isDay?", (c, a) => DateTime.Now.Hour >= 6 && DateTime.Now.Hour < 20);
-            Register("pbIsWeekday", (c, a) => true);
             // Pokédex
             Register("set_seen", (c, a) => { string sp = Convert.ToString(Arg(a, 0)); if (!string.IsNullOrEmpty(sp)) _game.State.Seen.Add(sp.ToUpperInvariant()); return true; });
             Register("set_owned", (c, a) => { string sp = Convert.ToString(Arg(a, 0)); if (!string.IsNullOrEmpty(sp)) { _game.State.Seen.Add(sp.ToUpperInvariant()); _game.State.Caught.Add(sp.ToUpperInvariant()); } return true; });
