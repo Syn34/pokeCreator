@@ -490,6 +490,7 @@ namespace PokeCreator.Runtime
         {
             var wild = PokeCreator.Pkmn.Pokemon.Create(Project, species, level, Rng);
             World.EncounterModifiers.ApplyToWild(this, wild);
+            Script.GameEvents.RaiseWildPokemonCreated(this, wild);
             if (wild.Data(Project) == null || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
             var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { wild }, true, Rng) { PlayerName = State.PlayerName };
             b.AlreadyCaught = sp => State.Caught.Contains(sp);
@@ -686,6 +687,7 @@ namespace PokeCreator.Runtime
             if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
                 b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
             if (rules != null) ApplyBattleRules(b, setup, rules);
+            Script.GameEvents.RaiseBattleStarting(this, b);
             setup.OnEnd = o =>
             {
                 LastOutcome = o; ResumeOutcome = o;

@@ -99,6 +99,9 @@ public static class Rewards
         GameEvents.BattleEnded += (g, outcome) => { /* Win, Loss, Escaped, Caught */ };
         GameEvents.GameStarted += g => { /* new game or loaded save */ };
         GameEvents.Frame += g => { /* every frame on the map */ };
+        GameEvents.WildPokemonCreated += (g, pk) => { /* change the wild Pokémon before the battle */ };
+        GameEvents.BattleStarting += (g, battle) => { /* battle fields: weather, rules... */ };
+        GameEvents.GameSaved += g => { /* after saving */ };
     }
 }
 ```

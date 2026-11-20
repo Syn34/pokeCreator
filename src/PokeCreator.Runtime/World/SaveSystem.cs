@@ -150,6 +150,7 @@ namespace PokeCreator.Runtime.World
             string path = FilePath(g.Project), bak = Path.Combine(Folder(g.Project), "Game.bak.json");
             if (File.Exists(path)) File.Copy(path, bak, true);
             Json.Json.ToFile(path, d);
+            Script.GameEvents.RaiseGameSaved(g);
         }
 
         /// <summary>Loads the save into a fresh GameState and returns the saved position.</summary>

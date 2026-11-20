@@ -19,6 +19,12 @@ namespace PokeCreator.Runtime.Script
         public static event Action<Game> Frame;
         /// <summary>A new game started or a save was loaded.</summary>
         public static event Action<Game> GameStarted;
+        /// <summary>A wild Pokémon was just made for a battle (change its moves, shininess, form...).</summary>
+        public static event Action<Game, PokeCreator.Pkmn.Pokemon> WildPokemonCreated;
+        /// <summary>A battle is about to start (set battle fields, weather, rules).</summary>
+        public static event Action<Game, PokeCreator.Battles.Battle> BattleStarting;
+        /// <summary>The game was saved.</summary>
+        public static event Action<Game> GameSaved;
 
         static void Safe(Action a, string what)
         {
@@ -30,5 +36,8 @@ namespace PokeCreator.Runtime.Script
         internal static void RaiseBattleEnded(Game g, BattleOutcome o) { var h = BattleEnded; if (h != null) Safe(() => h(g, o), "BattleEnded"); }
         internal static void RaiseFrame(Game g) { var h = Frame; if (h != null) Safe(() => h(g), "Frame"); }
         internal static void RaiseGameStarted(Game g) { var h = GameStarted; if (h != null) Safe(() => h(g), "GameStarted"); }
+        internal static void RaiseWildPokemonCreated(Game g, PokeCreator.Pkmn.Pokemon pk) { var h = WildPokemonCreated; if (h != null) Safe(() => h(g, pk), "WildPokemonCreated"); }
+        internal static void RaiseBattleStarting(Game g, PokeCreator.Battles.Battle b) { var h = BattleStarting; if (h != null) Safe(() => h(g, b), "BattleStarting"); }
+        internal static void RaiseGameSaved(Game g) { var h = GameSaved; if (h != null) Safe(() => h(g), "GameSaved"); }
     }
 }
