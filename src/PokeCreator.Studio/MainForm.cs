@@ -515,6 +515,7 @@ namespace PokeCreator.Studio
             else if (s == "sys:appearance") OpenAppearance();
             else if (s == "sys:players") OpenPlayers();
             else if (s == "sys:switches") OpenDocument(s, () => new SwitchesEditor(this, Project));
+            else if (s == "sys:townmaps") OpenDocument(s, () => new TownMapEditor(Project));
             else if (s == "sys:tilesets") OpenDocument(s, () => new TilesetEditor(Project));
             else if (s == "sys:world") OpenWorld();
             else if (s == "sys:commonevents") OpenDocument(s, () => new CommonEventsEditor(this, Project));
@@ -595,7 +596,12 @@ namespace PokeCreator.Studio
             OpenDocument("sys:world", () => new WorldEditor(this, Project));
         }
 
-        DatabaseEditor OpenTable(DatabaseTable t) { return OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)) as DatabaseEditor; }
+        DatabaseEditor OpenTable(DatabaseTable t)
+        {
+            // Town Maps get the visual editor (click squares on the region image)
+            if (t.Key == "town_maps") { OpenDocument("sys:townmaps", () => new TownMapEditor(Project)); return null; }
+            return OpenDocument("db:" + t.Key, () => new DatabaseEditor(Project, t)) as DatabaseEditor;
+        }
 
         // ------------------------------------------------------------------ build
         void BuildGame()
@@ -981,7 +987,17 @@ namespace PokeCreator.Studio
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Idle += (s, e) => { foreach (Form f in Application.OpenForms) Theme.ApplyIfNeeded(f); };
             Application.ThreadException += (s, e) => MessageBox.Show("Something went wrong:\n\n" + e.Exception.Message + "\n\n" + e.Exception.StackTrace, "PokeCreator Studio", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Application.Run(new MainForm(args.Length > 0 ? args[0] : null));
+            var form = new MainForm(args.Length > 0 ? args[0] : null);
+            // PokeCreatorStudio.exe <project> --open <target>  (e.g. sys:townmaps, db:species, map:3)
+            int oi = Array.IndexOf(args, "--open");
+            if (oi >= 0 && oi + 1 < args.Length)
+            {
+                string target = args[oi + 1];
+                EventHandler once = null;
+                once = (s, e) => { form.Shown -= once; form.BeginInvoke(new Action(() => form.NavigateTo(target))); };
+                form.Shown += once;
+            }
+            Application.Run(form);
         }
     }
 }
