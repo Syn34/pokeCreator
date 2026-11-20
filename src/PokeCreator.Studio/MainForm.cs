@@ -124,6 +124,7 @@ namespace PokeCreator.Studio
             var game = new ToolStripMenuItem("&Game");
             game.DropDownItems.Add(new ToolStripMenuItem("&Playtest", null, (s, e) => Playtest(null)) { ShortcutKeys = Keys.F5 });
             game.DropDownItems.Add(new ToolStripMenuItem("Playtest from Current Map", null, (s, e) => PlaytestHere()) { ShortcutKeys = Keys.Shift | Keys.F5 });
+            game.DropDownItems.Add(new ToolStripMenuItem("Test &Battle…", null, (s, e) => TestBattle()) { ShortcutKeys = Keys.Control | Keys.F5 });
             game.DropDownItems.Add(new ToolStripSeparator());
             game.DropDownItems.Add(new ToolStripMenuItem("&Build Game…", null, (s, e) => BuildGame()) { ShortcutKeys = Keys.Control | Keys.B });
             game.DropDownItems.Add(new ToolStripSeparator());
@@ -667,6 +668,7 @@ namespace PokeCreator.Studio
                 if (ed != null && parts.Length >= 3) ed.SelectById(t.Substring(4 + parts[1].Length));
             }
             else if (t == "settings") OpenSettings();
+            else if (t == "testbattle") TestBattle();
             else if (t == "players") OpenPlayers();
             else if (t == "connections") OpenWorld();
             else if (t.StartsWith("file:"))
@@ -893,6 +895,14 @@ namespace PokeCreator.Studio
         }
 
         static string Quote(string s) { return "\"" + s + "\""; }
+
+        /// <summary>Game → Test Battle: pick a team and an opponent and jump straight into the battle.</summary>
+        void TestBattle()
+        {
+            if (Project == null) return;
+            using (var dlg = new BattleTestDialog(Project))
+                if (dlg.ShowDialog(this) == DialogResult.OK && dlg.GameArgs != null) Playtest(dlg.GameArgs);
+        }
 
         public static void OpenInShell(string path)
         {

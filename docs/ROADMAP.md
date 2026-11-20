@@ -64,7 +64,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Move-route editor and full command palette in the event editor
 - [x] Problems panel: missing graphics and audio, broken references, script errors
 - [x] Common events
-- [ ] Troops/battle setup screens
+- [x] Battle setup / tester: Game → Test Battle… (your team or a database trainer's team vs a trainer or wild Pokémon, single/double/triple)
 - [x] Animation editor for battle animations (preview, frames, cels, sheet palette, sounds, import from Essentials)
 - [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 

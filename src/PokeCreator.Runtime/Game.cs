@@ -21,6 +21,9 @@ namespace PokeCreator.Runtime
         public bool NoEncounters;
         public bool SkipTitle;
         public int Scale = 0;
+        /// <summary>Battle test from the Studio: party "SPECIES:LV,..." or "trainer:TYPE:Name:Version"; opponent trainer "TYPE:Name:Version" or wild "SPECIES:LV,...".</summary>
+        public string TestParty, TestTrainer, TestWild, TestItems;
+        public int TestSize = 1;
     }
 
     /// <summary>Top-level game: owns the window, the current map and the main loop.</summary>
@@ -123,7 +126,8 @@ namespace PokeCreator.Runtime
             ScriptLoader.Load(this, Project.ScriptsDir);
 
             Player = new Player(this);
-            if (_opt.StartMap > 0 || _opt.SkipTitle) NewGame();
+            if (_opt.TestParty != null) { NewGame(); StartTestBattle(); }
+            else if (_opt.StartMap > 0 || _opt.SkipTitle) NewGame();
             else PushScene(new TitleScene(this));
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
             MessageWindow.Echo = test != null;
@@ -168,6 +172,50 @@ namespace PokeCreator.Runtime
         }
 
         public void Quit() { _quit = true; }
+
+        /// <summary>Studio's Test Battle: a fresh game with the chosen team fights the chosen opponent, then the game closes.</summary>
+        void StartTestBattle()
+        {
+            State.Party.Clear();
+            string party = _opt.TestParty ?? "";
+            if (party.StartsWith("trainer:"))
+            {
+                var parts = party.Substring(8).Split(':');
+                int v = parts.Length > 2 ? int.Parse(parts[2]) : 0;
+                var tr = Project.Trainers.FirstOrDefault(t => t.TrainerType == parts[0] && t.Name == (parts.Length > 1 ? parts[1] : "") && t.Version == v)
+                      ?? Project.Trainers.FirstOrDefault(t => t.TrainerType == parts[0] && t.Name == (parts.Length > 1 ? parts[1] : ""));
+                if (tr != null) foreach (var tp in tr.Pokemon.Take(6)) State.Party.Add(PokeCreator.Pkmn.Pokemon.FromTrainer(Project, tp, Rng));
+            }
+            else
+                foreach (var entry in party.Split(',').Where(x => x.Trim().Length > 0).Take(6))
+                {
+                    var kv = entry.Split(':');
+                    int lv; if (kv.Length < 2 || !int.TryParse(kv[1], out lv)) lv = 50;
+                    var pk = PokeCreator.Pkmn.Pokemon.Create(Project, kv[0].Trim(), lv, Rng);
+                    if (pk.Data(Project) != null) { pk.OTName = State.PlayerName; State.Party.Add(pk); }
+                }
+            foreach (var entry in (_opt.TestItems ?? "").Split(',').Where(x => x.Trim().Length > 0))
+            {
+                var kv = entry.Split(':'); int n; if (kv.Length < 2 || !int.TryParse(kv[1], out n)) n = 1;
+                State.AddItem(kv[0].Trim(), n);
+            }
+            foreach (var r in PokeCreator.Battles.Battle.MegaRings) if (Project.Items.Any(i => i.Id == r)) { State.AddItem(r, 1); break; }
+            Action<PokeCreator.Battles.BattleOutcome> done = o =>
+                Message.Show("Test battle over: " + (o == PokeCreator.Battles.BattleOutcome.Win ? "you won." : o == PokeCreator.Battles.BattleOutcome.Loss ? "you lost." : o == PokeCreator.Battles.BattleOutcome.Caught ? "Pokémon caught." : "the battle ended (" + o + ").") + "\\nThe game will close.", null, -1, _ => Quit());
+            if (State.Party.Count == 0) { Message.Show("The test team is empty.", null, -1, _ => Quit()); return; }
+            if (_opt.TestTrainer != null)
+            {
+                var t = _opt.TestTrainer.Split(':');
+                string type = t[0], name = t.Length > 1 ? t[1] : ""; int ver = t.Length > 2 ? int.Parse(t[2]) : 0;
+                bool ok = _opt.TestSize >= 2 ? StartDoubleTrainerBattle(type, name, ver, null, null, 0, true, done, _opt.TestSize >= 3) : StartTrainerBattle(type, name, ver, true, done);
+                if (!ok) Message.Show("That trainer wasn't found or has no Pokémon.", null, -1, _ => Quit());
+                return;
+            }
+            var wild = (_opt.TestWild ?? "PIDGEY:5").Split(',').Select(x => x.Split(':')).Select(x => new { S = x[0].Trim(), L = x.Length > 1 ? int.Parse(x[1]) : 5 }).ToList();
+            if (wild.Count >= 3 && _opt.TestSize >= 3) StartTripleWildBattle(wild[0].S, wild[0].L, wild[1].S, wild[1].L, wild[2].S, wild[2].L, done);
+            else if (wild.Count >= 2 && _opt.TestSize >= 2) StartDoubleWildBattle(wild[0].S, wild[0].L, wild[1].S, wild[1].L, done);
+            else StartWildBattle(wild[0].S, wild[0].L, done);
+        }
 
         void LoadGame()
         {
@@ -916,6 +964,11 @@ namespace PokeCreator.Runtime
                 else if (a == "--scale" && i + 1 < args.Length) opt.Scale = int.Parse(args[++i]);
                 else if (a == "--no-encounters") opt.NoEncounters = true;
                 else if (a == "--skip-title") opt.SkipTitle = true;
+                else if (a == "--test-party" && i + 1 < args.Length) opt.TestParty = args[++i];
+                else if (a == "--test-trainer" && i + 1 < args.Length) opt.TestTrainer = args[++i];
+                else if (a == "--test-wild" && i + 1 < args.Length) opt.TestWild = args[++i];
+                else if (a == "--test-items" && i + 1 < args.Length) opt.TestItems = args[++i];
+                else if (a == "--test-size" && i + 1 < args.Length) opt.TestSize = int.Parse(args[++i]);
                 else if (!a.StartsWith("--")) opt.ProjectDir = a;
             }
             if (opt.ProjectDir == null)
