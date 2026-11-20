@@ -1039,6 +1039,29 @@ namespace PokeCreator.Studio.Editors
             p2.Graphic.CharacterName = p1.Graphic.CharacterName; p2.Graphic.Direction = p1.Graphic.Direction;
             p2.Trigger = Triggers.Action;
             p2.List = new List<EventCommand> { new EventCommand(101, 0, after), new EventCommand(0, 0) };
+            // Rematches: when the database has later versions of this trainer, offer to register them in the Pokégear
+            int maxVersion = _p.Trainers.Where(t => t.TrainerType == tr.TrainerType && t.Name == tr.Name).Select(t => t.Version).DefaultIfEmpty(0).Max();
+            if (maxVersion > tr.Version && MessageBox.Show(FindForm(), "This trainer has " + maxVersion + " rematch version(s) in the database.\n\nLet the player register them in the Pokégear phone for rematches?", "Rematches", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                string t = ":" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"";
+                // After the first win, ask to register (inserted before pbTrainerEnd)
+                p1.List.Insert(p1.List.Count - 2, new EventCommand(355, 0, "pbPhoneRegisterBattle(\"Let's trade numbers so we can battle again!\", get_self, " + t + ", " + maxVersion + ")"));
+                p2.List = new List<EventCommand>
+                {
+                    new EventCommand(111, 0, 12, "pbPhoneReadyToBattle?(" + t + ")"),
+                    new EventCommand(101, 1, before),
+                    new EventCommand(111, 1, 12, "TrainerBattle.start(" + t + ", pbPhoneBattleCount(" + t + "))"),
+                    new EventCommand(355, 2, "pbPhoneIncrement(" + t + ")"),
+                    new EventCommand(0, 2),
+                    new EventCommand(412, 1),
+                    new EventCommand(0, 1),
+                    new EventCommand(411, 0),
+                    new EventCommand(101, 1, after),
+                    new EventCommand(0, 1),
+                    new EventCommand(412, 0),
+                    new EventCommand(0, 0)
+                };
+            }
             ev.Pages.Add(p2);
             _ed.EditEvent(ev);
         }

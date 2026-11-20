@@ -324,7 +324,7 @@ namespace PokeCreator.Runtime.Script
             Handler noop = (c, a) => true;
             foreach (var n in new[] { "pbCallBub", "pbFadeOutIn",
                                       "pbWait", "pbSEPlay", "pbBGMPlay", "pbMEPlay", "pbUpdateSceneMap", "pbExclaim", "pbTurnTowardEvent",
-                                      "pbMoveRoute", "pbPhoneRegisterBattle", "pbPhoneRegister", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
+                                      "pbMoveRoute", "pbShowMap", "pbTownMap", "pbSetEscapePoint",
                                       "pbEraseEscapePoint", "pbDayCareDeposit", "pbDayCareWithdraw", "pbRegisterPartner", "pbDeregisterPartner",
                                       "pbBridgeOn", "pbBridgeOff", "pbStartOver", "pbUnlockWallpaper" })
                 Register(n, noop);
@@ -680,9 +680,45 @@ namespace PokeCreator.Runtime.Script
             Register("$player.has_species?", (c, a) => _game.Party.Any(p => p.Species.Equals(Str(a, 0), StringComparison.OrdinalIgnoreCase)));
             Register("Tone.new", (c, a) => a.Select(x => (object)ToInt(x)).ToList());
             Register("pbToneChangeAll", (c, a) => { _game.SetScreenTone(Arg(a, 0) as List<object>, ToInt(Arg(a, 1)) * 3 / 2); return true; });
-            foreach (var n in new[] { "hide_choice", "setBattleRule", "$game_screen.weather", "Phone.add", "pbPickBerry", "setPrice", "setVariable", "$speeches.push", "pbToneChangeAll" })
+            foreach (var n in new[] { "hide_choice", "setBattleRule", "$game_screen.weather", "pbPickBerry", "setPrice", "setVariable", "$speeches.push", "pbToneChangeAll" })
                 if (!_commands.ContainsKey(n)) Register(n, noop);
-            Register("Phone.can_add?", (c, a) => false);
+            // ---- Pokégear phone and trainer rematches
+            Func<Interpreter, object, int> eventOf = (c, o2) => { int id = o2 is string ? 0 : ToInt(o2); return id > 0 ? id : (c != null ? c.EventId : 0); };
+            Func<Interpreter, int> mapOf = c => c != null && c.MapId > 0 ? c.MapId : (_game.Map != null ? _game.Map.Id : 0);
+            Register("Phone.can_add?", (c, a) => Phone.CanAdd(_game, Str(a, 0), Str(a, 1)));
+            Register("Phone.add", (c, a) =>
+            {
+                // Phone.add(event, :TYPE, "Name", startVersion) for trainers; Phone.add(event, "Name", commonEvent) for people
+                string a1 = Str(a, 1);
+                if (_game.Project.TrainerTypes.Any(t => t.Id == a1) && a.Count > 2)
+                    Phone.AddTrainer(_game, mapOf(c), eventOf(c, Arg(a, 0)), a1, Str(a, 2), a.Count > 3 ? ToInt(a[3]) : 0);
+                else Phone.AddPerson(_game, mapOf(c), eventOf(c, Arg(a, 0)), a1, a.Count > 2 ? ToInt(a[2]) : 0);
+                return true;
+            });
+            Register("pbPhoneRegister", (c, a) => { Phone.AddTrainer(_game, mapOf(c), eventOf(c, Arg(a, 0)), Str(a, 1), Str(a, 2), 0); return true; });
+            Register("pbPhoneRegisterBattle", (c, a) =>
+            {
+                // pbPhoneRegisterBattle(message, event, :TYPE, "Name", maxBattles)
+                string type = Str(a, 2), name = Str(a, 3);
+                if (!Phone.CanAdd(_game, type, name)) return true;
+                int mapId = mapOf(c), evId = eventOf(c, Arg(a, 1));
+                Action ask = () => _game.Message.Show("Register " + name + " in the Pokégear?", new List<string> { "Yes", "No" }, 1, ch =>
+                {
+                    if (ch != 0) return;
+                    Phone.AddTrainer(_game, mapId, evId, type, name, 0);
+                    _game.Message.Show("\\PN registered " + name + " in the Pokégear.");
+                });
+                string msg = Str(a, 0);
+                if (msg.Length > 0) _game.Message.Show(msg, null, -1, _ => ask()); else ask();
+                return true;
+            });
+            Handler ready = (c, a) => Phone.ReadyToBattle(_game, Str(a, 0), Str(a, 1));
+            Register("Phone.can_rematch?", ready); Register("Phone.rematch?", ready); Register("pbPhoneReadyToBattle?", ready);
+            Handler variant = (c, a) => Phone.Variant(_game, Str(a, 0), Str(a, 1));
+            Register("Phone.variant", variant); Register("pbPhoneBattleCount", variant);
+            Handler rematched = (c, a) => { Phone.Rematched(_game, Str(a, 0), Str(a, 1)); return true; };
+            Register("Phone.increment_version", rematched); Register("pbPhoneIncrement", rematched); Register("Phone.rematched", rematched);
+            Register("$player.has_pokegear=", (c, a) => { if (Truthy(Arg(a, 0))) _game.State.Flags.Add("has_pokegear"); else _game.State.Flags.Remove("has_pokegear"); return true; });
 
             Register("pbGetPokemon", (c, a) => { int i = _game.State.GetVar(ToInt(Arg(a, 0))); return i >= 0 && i < _game.State.Party.Count ? _game.State.Party[i] : null; });
             Register("pbPartyCount", (c, a) => _game.Party.Count);
@@ -973,6 +1009,10 @@ namespace PokeCreator.Runtime.Script
         /// <summary>Reads a member of an object held in a local variable (Pokémon, item, species, move data).</summary>
         object Member(object obj, string member, List<object> args)
         {
+            // Ruby conversions that work on anything
+            if (member == "to_s") return obj == null ? "" : obj is bool ? ((bool)obj ? "true" : "false") : Convert.ToString(obj, CultureInfo.InvariantCulture);
+            if (member == "to_i") { if (obj == null) return 0; int iv; return obj is string ? (int.TryParse((string)obj, out iv) ? iv : 0) : ToInt(obj); }
+            if (member == "nil?") return obj == null;
             if (obj == null) return null;
             var pk = obj as PokeCreator.Pkmn.Pokemon;
             var P = _game.Project;

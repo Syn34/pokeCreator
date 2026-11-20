@@ -588,6 +588,13 @@ namespace PokeCreator.Runtime
 
         // ------------------------------------------------------------------ update
         int _berryTimer;
+
+        /// <summary>Runs a common event now (e.g. calling someone on the Pokégear).</summary>
+        public void RunCommonEvent(PokeCreator.Maps.CommonEventData ce)
+        {
+            if (ce == null || Interpreter.Running) return;
+            Interpreter.Setup(ce.List, 0);
+        }
         void Update()
         {
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
@@ -861,7 +868,7 @@ namespace PokeCreator.Runtime
                 case "bagitem": UI.ItemFlow.UseFromBag(_g, p[1], null); break;
                 case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
                 case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
-                case "steps": for (int k = int.Parse(p[1]); k > 0; k--) World.DayCare.OnStep(_g); break;
+                case "steps": for (int k = int.Parse(p[1]); k > 0; k--) { World.DayCare.OnStep(_g); World.Phone.OnStep(_g); } break;
                 case "gender": _g.State.Party[int.Parse(p[1])].Gender = p[2]; break;
                 case "surf": _g.Player.Surfing = true; break;
                 case "visit": foreach (var v in p[1].Split(',')) _g.State.Visited.Add(int.Parse(v)); break;

@@ -105,6 +105,7 @@ namespace PokeCreator.Runtime.UI
             if (g.State.HasPokedex) { _ids.Add("dex"); labels.Add("Pokédex"); }
             if (g.State.Party.Count > 0) { _ids.Add("party"); labels.Add("Pokémon"); }
             _ids.Add("bag"); labels.Add("Bag");
+            if (g.State.Flags.Contains("has_pokegear")) { _ids.Add("pokegear"); labels.Add("Pokégear"); }
             _ids.Add("card"); labels.Add(g.State.PlayerName);
             _ids.Add("save"); labels.Add("Save");
             _ids.Add("options"); labels.Add("Options");
@@ -126,6 +127,7 @@ namespace PokeCreator.Runtime.UI
                 case "options": Game.PushScene(new OptionsScene(Game)); break;
                 case "party": Game.PushScene(new PartyScene(Game)); break;
                 case "bag": Game.PushScene(new BagScene(Game)); break;
+                case "pokegear": Game.PushScene(new PokegearScene(Game)); break;
                 case "card": Game.PushScene(new TrainerCardScene(Game)); break;
                 case "save":
                     Game.Message.Show("Would you like to save the game?", new List<string> { "Yes", "No" }, 1, c =>

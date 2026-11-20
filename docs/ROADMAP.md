@@ -44,7 +44,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Berry planting and growth (real time, watering, regrowth)
 - [x] Pokémon Centers, Poké Marts, PC storage, Day Care and Eggs
 - [x] Trainer line-of-sight (`Trainer(n)` events)
-- [ ] Trainer rematches
+- [x] Trainer rematches through the Pokégear phone (trainer versions)
 - [x] Fishing (Old/Good/Super Rod), Repel
 - [x] Bicycle, Escape Rope, Town Map
 - [x] Running shoes toggle

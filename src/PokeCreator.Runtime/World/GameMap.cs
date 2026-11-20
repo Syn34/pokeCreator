@@ -39,6 +39,8 @@ namespace PokeCreator.Runtime.World
         public readonly Dictionary<string, long> EventTimes = new Dictionary<string, long>();
         /// <summary>Berries planted in soil, "map,event" -> plant.</summary>
         public Dictionary<string, BerryPlantState> BerryPlants = new Dictionary<string, BerryPlantState>();
+        /// <summary>Pokégear phone contacts.</summary>
+        public List<PhoneContact> Phone = new List<PhoneContact>();
         /// <summary>Game Corner coins, Battle Points and gym badges (0-based, as $player.badges[n]).</summary>
         public int Coins, BattlePoints;
         public readonly HashSet<int> Badges = new HashSet<int>();
