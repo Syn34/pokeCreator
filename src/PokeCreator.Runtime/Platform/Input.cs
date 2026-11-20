@@ -121,6 +121,13 @@ namespace PokeCreator.Runtime.Platform
 
         public void PlaySe(string name, int volume = 100) { PlayChunk("Audio/SE", name, volume); }
         public void PlayMe(string name, int volume = 100) { PlayChunk("Audio/ME", name, volume); }
+        /// <summary>A Pokémon's cry (Audio/SE/Cries/SPECIES, or SPECIES_form).</summary>
+        public void PlayCry(PokeCreator.Pkmn.Pokemon pk)
+        {
+            if (pk == null || pk.IsEgg) return;
+            string name = pk.Form > 0 && _project.FindAsset("Audio/SE", "Cries/" + pk.Species + "_" + pk.Form) != null ? pk.Species + "_" + pk.Form : pk.Species;
+            PlayChunk("Audio/SE", "Cries/" + name, 100);
+        }
         public void PlayBgs(string name, int volume = 100) { /* ambient loops: planned */ }
 
         void PlayChunk(string folder, string name, int volume)

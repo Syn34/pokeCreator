@@ -224,6 +224,9 @@ namespace PokeCreator.Studio.Editors
                 if (k >= 0) Insert(new EventCommand(355, 0, "pbChangePlayer(" + (k + 1) + ")"));
             });
 
+            cmd(party, "Enter Hall of Fame (saves the game)", () => Insert(new EventCommand(355, 0, "pbHallOfFameEntry")));
+            cmd(party, "Play Credits", () => Insert(new EventCommand(355, 0, "$scene = Scene_Credits.new")));
+
             var battle = group("Battles");
             cmd(battle, "Trainer Battle", AddTrainerBattle);
             cmd(battle, "Wild Battle", AddWildBattle);

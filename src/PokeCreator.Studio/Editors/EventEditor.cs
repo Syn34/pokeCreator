@@ -111,6 +111,8 @@ namespace PokeCreator.Studio.Editors
                         if (sc == "pbEraseEscapePoint") return "◆ Clear Escape Point";
                         if (sc.StartsWith("pbShowMap") || sc == "pbTownMap") return "◆ Show Town Map";
                         if (sc == "pbMountBike") return "◆ Get On the Bicycle";
+                        if (sc == "pbHallOfFameEntry") return "◆ Enter Hall of Fame";
+                        if (sc.Replace(" ", "") == "$scene=Scene_Credits.new") return "◆ Play Credits";
                         if (sc == "pbDismountBike") return "◆ Get Off the Bicycle";
                         gm = System.Text.RegularExpressions.Regex.Match(sc, @"^pbPickBerry\(\s*:(\w+)\s*(?:,\s*(\d+))?\s*\)$");
                         if (gm.Success) return "◆ Pick Berry: " + gm.Groups[1].Value + " ×" + (gm.Groups[2].Success ? gm.Groups[2].Value : "1");

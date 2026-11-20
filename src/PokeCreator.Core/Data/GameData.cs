@@ -326,6 +326,8 @@ namespace PokeCreator.Data
         [Field("Surf BGM", Asset = "Audio/BGM", Group = "Music")] public string SurfBGM { get; set; }
         [Field("Bicycle BGM", Asset = "Audio/BGM", Group = "Music")] public string BicycleBGM { get; set; }
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }
+        [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
+        [Field("Credits", Multiline = true, Group = "Ending", Help = "Text that scrolls after the Hall of Fame ($scene = Scene_Credits.new). One line per row; an empty line makes a gap.")] public string Credits { get; set; }
 
         public GameSettings()
         {

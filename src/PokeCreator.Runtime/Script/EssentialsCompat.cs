@@ -34,10 +34,40 @@ namespace PokeCreator.Runtime.Script
         // ------------------------------------------------------------------ entry points
         public void RunScript(string script, Interpreter ctx)
         {
-            foreach (var stmt in SplitStatements(script))
+            var stmts = SplitStatements(script).ToList();
+            for (int i = 0; i < stmts.Count; i++)
             {
+                string stmt = stmts[i];
+                // "<party>.each do |pkmn| ... end": run simple per-Pokémon statements
+                var each = Regex.Match(stmt, @"^\$(?:player|Trainer)\.(?:pokemon_party|party|able_party)\.each\s+do\s*\|(\w+)\|$");
+                if (each.Success)
+                {
+                    var body = new List<string>();
+                    int depth = 1;
+                    for (i++; i < stmts.Count; i++)
+                    {
+                        if (Regex.IsMatch(stmts[i], @"\bdo\b(\s*\|[^|]*\|)?$")) depth++;
+                        if (stmts[i] == "end" && --depth == 0) break;
+                        body.Add(stmts[i]);
+                    }
+                    EachPokemon(each.Groups[1].Value, body);
+                    continue;
+                }
                 try { Eval(stmt, ctx); }
                 catch (Exception ex) { WarnOnce("Script error in \"" + stmt + "\": " + ex.Message); }
+            }
+        }
+
+        /// <summary>Statements inside a party .each block: heal, ribbons (not tracked), status cures.</summary>
+        void EachPokemon(string v, List<string> body)
+        {
+            foreach (var line in body)
+            {
+                string l = line.Trim();
+                if (l == v + ".heal") { foreach (var pk in _game.State.Party) pk.Heal(_game.Project); continue; }
+                if (l == v + ".heal_status") { foreach (var pk in _game.State.Party) pk.Status = ""; continue; }
+                if (l.StartsWith(v + ".giveRibbon") || l.StartsWith(v + ".record_first_moves")) continue; // ribbons aren't tracked
+                WarnOnce("Unsupported statement in a party .each block: " + l);
             }
         }
 
@@ -80,6 +110,7 @@ namespace PokeCreator.Runtime.Script
             e = e.Trim();
             if (e.Length == 0) return null;
             if (e.StartsWith("(") && MatchingParen(e, 0) == e.Length - 1) return Eval(e.Substring(1, e.Length - 2), ctx);
+            if (Regex.IsMatch(e, @"^\$stats\.\w+[?!]?$")) return 0; // play statistics aren't tracked
 
             // Boolean operators (lowest precedence)
             foreach (var op in new[] { "||", " or ", "&&", " and " })
@@ -216,6 +247,8 @@ namespace PokeCreator.Runtime.Script
                 if (Truthy(val)) _game.State.Flags.Add(flag); else _game.State.Flags.Remove(flag);
                 return;
             }
+            if (lhs == "$scene" && Convert.ToString(val) == "Scene_Credits") { _game.PushScene(new UI.CreditsScene(_game)); return; }
+            if (lhs.StartsWith("$stats.")) return; // play statistics aren't tracked
             WarnOnce("Can't assign to " + lhs);
         }
 
@@ -270,6 +303,10 @@ namespace PokeCreator.Runtime.Script
             Register("pbPickBerry", (c, a) => { FieldMoves.PickBerry(_game, c, Str(a, 0), a.Count > 1 ? ToInt(a[1]) : 1); return true; });
             Register("pbBerryPlant", (c, a) => { FieldMoves.BerryPlant(_game, c); return true; });
             Register("pbCanUseHiddenMove?", (c, a) => true);
+            // Hall of Fame and credits
+            Register("pbHallOfFameEntry", (c, a) => { _game.PushScene(new UI.HallOfFameScene(_game)); return true; });
+            Register("Scene_Credits.new", (c, a) => "Scene_Credits");
+            Register("pbHallOfFamePC", (c, a) => { _game.PushScene(new UI.HallOfFameScene(_game, true)); return true; });
             Register("pbShowMap", (c, a) => { _game.PushScene(new UI.TownMapScene(_game, false, null)); return true; });
             Register("pbTownMap", (c, a) => { _game.PushScene(new UI.TownMapScene(_game, false, null)); return true; });
             Register("pbSetEscapePoint", (c, a) => { FieldMoves.SetEscapePoint(_game); return true; });
