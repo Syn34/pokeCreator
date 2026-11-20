@@ -376,6 +376,9 @@ namespace PokeCreator.Runtime
         void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
         {
             var end = setup.OnEnd;
+            // Rain, snow, sandstorm and sun on the map carry into the battle (as Essentials)
+            if (Weather.Type != World.WeatherSystem.None && Weather.Power > 0)
+                b.Weather = PokeCreator.Battles.Battle.FromFieldWeather(World.WeatherSystem.Names[Weather.Type]);
             setup.OnEnd = o => { LastOutcome = o; ResumeOutcome = o; if (end != null) end(o); };
             BattleJustStarted = true;
             Audio.PlaySe("Encounter");
@@ -698,6 +701,7 @@ namespace PokeCreator.Runtime
                 case "fish": World.FieldMoves.Fish(_g, p[1]); break;
                 case "bagitem": UI.ItemFlow.UseFromBag(_g, p[1], null); break;
                 case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
+                case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
                 case "visit": foreach (var v in p[1].Split(',')) _g.State.Visited.Add(int.Parse(v)); break;
                 case "party":
                     foreach (var pk in _g.State.Party)

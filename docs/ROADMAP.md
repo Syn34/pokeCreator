@@ -30,7 +30,8 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Trainer battles from `trainers.json`, AI by skill level, prize money, lose text, blacking out
 - [x] Move effects read from Essentials function code names (stat changes, status, confusion, flinch, multi-hit, recoil, draining, healing, fixed damage, OHKO, two-turn, Protect, binding...)
 - [x] Status conditions and stat stages; Leftovers and healing berries
-- [ ] Weather, abilities and more held items (incremental)
+- [x] Battle weather, ~90 common abilities, common held items
+- [ ] Remaining abilities and items, terrain, entry hazards (incremental)
 - [ ] Battle animations for moves
 - [ ] Double battles
 
