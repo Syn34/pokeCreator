@@ -69,6 +69,8 @@ namespace PokeCreator.Runtime
 
         /// <summary>Overworld weather (map metadata "Weather" or the Set Weather Effects command).</summary>
         public readonly World.WeatherSystem Weather = new World.WeatherSystem();
+        /// <summary>Grass rustle, dust, "!" on the map.</summary>
+        public World.MapEffects Effects;
         public readonly World.MapPlanes Planes = new World.MapPlanes();
         public int FrameCount;
         bool _quit;
@@ -98,6 +100,7 @@ namespace PokeCreator.Runtime
             if (pluginRecords > 0) Console.WriteLine("[plugins] Added " + pluginRecords + " database record(s)");
             if (SDL.SDL_Init(SDL.INIT_VIDEO | SDL.INIT_EVENTS) != 0) throw new Exception("SDL_Init failed: " + SDL.GetError());
             Input.InitControllers();
+            Effects = new World.MapEffects(this);
             SDL.SDL_InitSubSystem(SDL.INIT_AUDIO);
             SDL.IMG_Init(0x2 | 0x1); // PNG | JPG
             SDL.TTF_Init();
@@ -847,6 +850,7 @@ namespace PokeCreator.Runtime
             }
             if (_signTimer > 0) _signTimer--;
             Weather.Update(DisplayX, DisplayY, Gfx.Width, Gfx.Height);
+            if (Effects != null) Effects.Update();
             Planes.Update();
             Pictures.Update();
             UpdateShake();
@@ -936,6 +940,7 @@ namespace PokeCreator.Runtime
                 chars.InsertRange(chars.Count - 1, World.Followers.Visible);
                 Planes.DrawPanorama(this, DisplayX - (int)_shake, DisplayY);
                 _renderer.Draw(Map, DisplayX - (int)_shake, DisplayY, chars, FrameCount);
+                if (Effects != null) Effects.Draw(Gfx, DisplayX - (int)_shake, DisplayY);
                 Planes.DrawFog(this, DisplayX - (int)_shake, DisplayY);
                 DrawTone();
                 DrawDarkness();

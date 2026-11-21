@@ -53,11 +53,21 @@ namespace PokeCreator.Runtime.World
         public virtual GameMap Map { get { return Game.Map; } }
 
         // ------------------------------------------------------------------ update
+        bool _fxMoving, _fxJumping;
+
         public virtual void Update()
         {
             if (Jumping) UpdateJump();
             else if (Moving) UpdateMove();
             else UpdateStop();
+            // Overworld effects: rustling grass at the end of a step into tall grass, dust where a jump lands
+            bool moving = Moving && !Jumping, jumping = Jumping;
+            if (Game != null && Game.Effects != null && Map == Game.Map && !Transparent && (!string.IsNullOrEmpty(CharacterName) || this is Player))
+            {
+                if (_fxJumping && !jumping) { int tag = Map.TerrainTag(X, Y); if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) Game.Effects.Play("grass", X, Y); else Game.Effects.Play("dust", X, Y); }
+                else if (_fxMoving && !moving && !jumping) { int tag = Map.TerrainTag(X, Y); if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) Game.Effects.Play("grass", X, Y); }
+            }
+            _fxMoving = moving; _fxJumping = jumping;
 
             if (AnimeCount > 18 - MoveSpeed * 2)
             {

@@ -148,6 +148,14 @@ namespace PokeCreator.Runtime.Render
             int cw = tex.Width / 4, ch = tex.Height / 4;
             int row = c.Direction == 2 ? 0 : c.Direction == 4 ? 1 : c.Direction == 6 ? 2 : 3;
             int col = c.Pattern % 4;
+            // A shadow on the ground while jumping
+            if (c.Jumping)
+            {
+                int gy = c.ScreenY(displayY) + c.JumpHeight;
+                var sh = _g.Load(_p.FindAsset("Graphics/Characters", "shadow"));
+                if (sh != null) _g.Draw(sh, 0, 0, sh.Width, sh.Height, sx - sh.Width / 2, gy - sh.Height);
+                else { var shade = new PokeCreator.Runtime.Platform.Color(0, 0, 0, 80); _g.FillRect(sx - 10, gy - 6, 20, 4, shade); _g.FillRect(sx - 7, gy - 8, 14, 2, shade); _g.FillRect(sx - 7, gy - 2, 14, 2, shade); }
+            }
             // Reflection on still water or puddles just below (as Essentials)
             int below = map.TerrainTag(c.X, c.Y + 1);
             if (!c.Jumping && (below == 6 || below == 16))

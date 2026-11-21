@@ -248,7 +248,15 @@ namespace PokeCreator.Runtime.Script
                         return true;
                     }
                 case 206: _game.Planes.FadeFog(c.IntParam(0), c.IntParam(1) * 3 / 2); return true; // Change Fog Opacity (duration in RMXP frames at 40 fps)
-                case 203: case 205: case 207: case 221: case 222: return true;
+                case 207:
+                    {
+                        // Show Animation on a character: Essentials' overworld animations (1 grass, 2 dust, 3 "!")
+                        var ch = GetCharacter(c.IntParam(0));
+                        string kind = World.MapEffects.KindForAnimation(c.IntParam(1));
+                        if (ch != null && kind != null) { if (kind == "exclaim") _game.Exclaim(ch, 30); else _game.Effects.Play(kind, ch.X, ch.Y); }
+                        return true;
+                    }
+                case 203: case 205: case 221: case 222: return true;
                 case 236: _game.Weather.Set(WeatherType(c.Params.Count > 0 ? c.Params[0] : null), c.IntParam(1), c.IntParam(2)); return true;
                 case 208: _game.Player.Transparent = c.IntParam(0) == 0; return true;
                 case 209:
