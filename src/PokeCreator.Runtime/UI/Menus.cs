@@ -597,7 +597,16 @@ namespace PokeCreator.Runtime.UI
     /// <summary>Bag: pockets (Left/Right), item list, icon and description.</summary>
     public class BagScene : Scene
     {
-        public static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
+        static readonly string[] DefaultPocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
+        /// <summary>Bag pocket names: Game Settings → Bag pocket names where set, else Essentials' names.</summary>
+        public static string[] PocketNames = DefaultPocketNames;
+        public static void UseSettings(PokeCreator.Projects.Project p)
+        {
+            var names = (string[])DefaultPocketNames.Clone();
+            var custom = p.Settings.BagPocketNames;
+            if (custom != null) for (int i = 0; i < names.Length && i < custom.Count; i++) if (!string.IsNullOrWhiteSpace(custom[i])) names[i] = custom[i].Trim();
+            PocketNames = names;
+        }
         int _pocket, _index, _scroll;
         CommandList _popup;
         readonly Action<string> _choose; // choose mode: picking an item to give or use in battle

@@ -360,6 +360,7 @@ namespace PokeCreator.Data
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }
         [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
         [Field("Safari steps", Group = "Safari Zone", Help = "Steps allowed in a Safari game (0 = no limit).")] public int SafariSteps { get; set; }
+        [Field("Bag pocket names", Group = "Bag", Help = "Names of the 8 bag pockets, in order (empty = Items, Medicine, Poké Balls, TMs & HMs, Berries, Mail, Battle Items, Key Items).")] public List<string> BagPocketNames { get; set; }
         [Field("Maximum level", Group = "Pokémon", Help = "Highest level Pokémon can reach (0 = 100). Essentials' MAXIMUM_LEVEL.")] public int MaxLevel { get; set; }
         [Field("Shiny odds (1 in N)", Group = "Pokémon", Help = "0 = 1 in 4096.")] public int ShinyOdds { get; set; }
         [Field("Hyper Training level", Group = "Battle", Help = "Level a Pokémon needs before Bottle Caps work (0 = the maximum level, as Essentials).")] public int HyperTrainingLevel { get; set; }
