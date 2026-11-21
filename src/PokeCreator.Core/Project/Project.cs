@@ -309,6 +309,21 @@ namespace PokeCreator.Projects
             return m;
         }
 
+        /// <summary>Copies a map (tiles, events, properties) to a new map right after it in the map tree.</summary>
+        public MapData DuplicateMap(int sourceId)
+        {
+            var src = LoadMap(sourceId);
+            var srcInfo = MapInfos.FirstOrDefault(mi => mi.Id == sourceId);
+            if (src == null || srcInfo == null) return null;
+            int id = 1; while (MapInfos.Any(mi => mi.Id == id)) id++;
+            var copy = Json.Json.Deserialize<MapData>(Json.Json.Write(src, false));
+            copy.Id = id;
+            foreach (var mi in MapInfos) if (mi.Order > srcInfo.Order) mi.Order++;
+            MapInfos.Add(new MapInfo { Id = id, Name = srcInfo.Name + " (copy)", ParentId = srcInfo.ParentId, Order = srcInfo.Order + 1 });
+            SaveMap(copy);
+            return copy;
+        }
+
         public void DeleteMap(int id)
         {
             MapInfos.RemoveAll(mi => mi.Id == id);

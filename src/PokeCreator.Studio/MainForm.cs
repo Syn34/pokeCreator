@@ -474,6 +474,14 @@ namespace PokeCreator.Studio
                     menu.Items.Add("Rename…", null, (s, e) => RenameMap(mi));
                     menu.Items.Add("Change Icon…", null, (s, e) => ChangeMapIcon(mi));
                     menu.Items.Add("Map Properties…", null, (s, e) => { var ed = OpenMap(mi.Id); if (ed != null) ed.ShowProperties(); });
+                    menu.Items.Add("Duplicate Map", null, (s, e) =>
+                    {
+                        var copy = Project.DuplicateMap(mi.Id);
+                        if (copy == null) return;
+                        Json.Json.ToFile(Project.DataFile("mapinfos.json"), Project.MapInfos);
+                        RebuildTree();
+                        OpenMap(copy.Id);
+                    });
                     menu.Items.Add("Playtest from Here", null, (s, e) => { var m = Project.LoadMap(mi.Id); Playtest(new[] { "--map", mi.Id.ToString(), "--x", (m.Width / 2).ToString(), "--y", (m.Height / 2).ToString() }); });
                     menu.Items.Add(new ToolStripSeparator());
                     var siblings = Project.MapInfos.Where(x => x.ParentId == mi.ParentId).OrderBy(x => x.Order).ToList();
