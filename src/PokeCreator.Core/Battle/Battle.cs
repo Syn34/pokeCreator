@@ -603,6 +603,9 @@ namespace PokeCreator.Battles
 
         /// <summary>Inverse Battle (setBattleRule("inverseBattle")): weaknesses and resistances swap, immunities become weaknesses.</summary>
         public bool Inverse;
+        /// <summary>Species the player has caught (critical captures) and whether they have the Catching Charm.</summary>
+        public int CaughtCount;
+        public bool CatchingCharm;
         /// <summary>
         /// Where the battle happens (Essentials' environments: Grass, TallGrass, MovingWater, StillWater, Puddle,
         /// Underwater, Cave, Rock, Sand, Forest, ForestGrass, Snow, Ice, Volcano, Graveyard, Sky, Space, UltraSpace).
@@ -1930,17 +1933,28 @@ namespace PokeCreator.Battles
             string st = (foe.Status ?? "").ToUpperInvariant();
             double statusMod = st == "SLEEP" || st == "FROZEN" ? 2.5 : st.Length > 0 ? 1.5 : 1;
             double a = (3.0 * max - 2.0 * foe.HP) * rate * mod / (3.0 * max) * statusMod;
+            // Gen 8: low-level Pokémon are easier to catch
+            if (foe.Level <= 20) a *= (30 - foe.Level) / 10.0;
             int shakes;
-            bool caught;
+            bool caught, critical = false;
             if (mod >= 255 || a >= 255) { shakes = 4; caught = true; }
             else
             {
                 double bv = 65536 / Math.Pow(255 / Math.Max(1, a), 0.1875);
+                // Critical capture (Gen 5+): more likely the more species have been caught; one shake decides it
+                double cm = CaughtCount > 600 ? 2.5 : CaughtCount > 450 ? 2 : CaughtCount > 300 ? 1.5 : CaughtCount > 150 ? 1 : CaughtCount > 30 ? 0.5 : 0;
+                if (CatchingCharm) cm *= 2;
+                if (cm > 0 && Rng.Next(256) < (int)(Math.Min(255, a) * cm / 6)) critical = true;
                 shakes = 0;
-                while (shakes < 4 && Rng.Next(65536) < bv) shakes++;
-                caught = shakes == 4;
+                if (critical) { caught = Rng.Next(65536) < bv; shakes = caught ? 4 : 0; }
+                else
+                {
+                    while (shakes < 4 && Rng.Next(65536) < bv) shakes++;
+                    caught = shakes == 4;
+                }
             }
-            _ev.Add(new BattleEvent { Kind = BattleEventKind.Catch, Value = Math.Min(3, shakes), Flag = caught, Text = ball });
+            if (critical) Say("A critical catch!");
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.Catch, Value = critical ? (caught ? 1 : 0) : Math.Min(3, shakes), Flag = caught, Text = ball });
             if (caught && !IsWild)
             {
                 // Snagging a trainer's Shadow Pokémon: it's the player's now, and the trainer sends out the next one

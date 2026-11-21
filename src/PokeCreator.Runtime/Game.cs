@@ -681,6 +681,8 @@ namespace PokeCreator.Runtime
             var rules = NextBattleRules; NextBattleRules = null;
             var end = setup.OnEnd;
             b.Environment = BattleEnvironment();
+            b.CaughtCount = State.Caught.Count;
+            b.CatchingCharm = State.Bag.ContainsKey("CATCHINGCHARM");
             // Exp. All: Game Settings, the EXPALL key item or $player.has_exp_all
             b.ExpAll = Project.Settings.ExpAll || State.Bag.ContainsKey("EXPALL") || State.Flags.Contains("has_exp_all");
             // Safari Zone: wild battles are Safari battles
