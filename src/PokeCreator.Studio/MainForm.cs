@@ -147,6 +147,20 @@ namespace PokeCreator.Studio
                 db.DropDownItems.Add(new ToolStripSeparator());
                 db.DropDownItems.Add("Add Missing Pokémon && Data…", null, (a, b) => MergeBaseData());
                 db.DropDownItems.Add("Import PBS Files…", null, (a, b) => ImportPbsFiles());
+                db.DropDownItems.Add("Import Map Animations (Animations.rxdata)…", null, (a, b) =>
+                {
+                    using (var od = new OpenFileDialog { Filter = "RPG Maker XP animations|Animations.rxdata|All files|*.*", Title = "Choose an Essentials project's Data/Animations.rxdata" })
+                    {
+                        if (od.ShowDialog(this) != DialogResult.OK) return;
+                        try
+                        {
+                            Project.MapAnimations = PokeCreator.Import.EssentialsImporter.ReadMapAnimations(od.FileName);
+                            Json.Json.ToFile(Project.DataFile("map_animations.json"), Project.MapAnimations);
+                            MessageBox.Show(this, Project.MapAnimations.Count + " map animations imported. Show Animation in events can use them (their pictures go in Graphics/Animations).", "Map animations");
+                        }
+                        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Map animations", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                    }
+                });
                 db.DropDownItems.Add("Sprite Positions…", null, (a, b) =>
                 {
                     SaveAll();
