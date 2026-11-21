@@ -921,7 +921,11 @@ namespace PokeCreator.Battles
             if (selfTarget)
             {
                 MoveAnim(user, md.Target == "FoeSide" ? (Live(1 - user.Side).FirstOrDefault() ?? user) : user, md);
-                if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
+                // Moves aimed at the user's own side work on the user (or the chosen ally), not on the foe picked in the menu
+                if (md.Target == "UserOrNearAlly" && (target == null || target.Side != user.Side || target.Pk.Fainted)) target = user;
+                if (md.Category == "Status" && md.Target == "UserAndAllies" && code.StartsWith("RaiseTarget"))
+                    foreach (var al in Live(user.Side).ToList()) StatusMove(user, al, md, code);   // Howl
+                else if (md.Category == "Status") StatusMove(user, target, md, code); else DamagingMove(user, target, md, code);
                 if (!user.LastMoveFailed) DancerAfter(user, target, md);
                 return;
             }
@@ -1566,12 +1570,36 @@ namespace PokeCreator.Battles
             if (st != null && !target.Pk.Fainted && !shield) Inflict(target, st, false, user);
             if (code.Contains("Flinch") && !target.Pk.Fainted && !shield && !TargetHas(user, target, "INNERFOCUS")) target.Flinched = true;
             if (code.Contains("ConfuseTarget") && !target.Pk.Fainted && !shield) Confuse(target, false);
-            var m = StatCode.Match(code);
-            if (m.Success)
+            foreach (var part in StatParts(code))
             {
-                var b = m.Groups[2].Value == "User" ? user : target;
-                if (!b.Pk.Fainted && !(b == target && shield)) foreach (int s in ParseStats(m.Groups[3].Value)) ChangeStat(b, s, (m.Groups[1].Value == "Raise" ? 1 : -1) * int.Parse(m.Groups[4].Value), user);
+                var b = part.Item1 ? user : target;
+                if (!b.Pk.Fainted && !(b == target && shield)) foreach (int s in part.Item2) ChangeStat(b, s, part.Item3, user);
             }
+        }
+
+        /// <summary>
+        /// The stat changes a function code names, in order: "LowerUserDefSpDef1RaiseUserAtkSpAtkSpd2" (Shell Smash) gives
+        /// (user, Def+SpDef, -1) then (user, Atk+SpAtk+Spd, +2); "RaiseUserAtk1Spd2" (Shift Gear) gives Atk+1 then Spd+2.
+        /// </summary>
+        static List<Tuple<bool, List<int>, int>> StatParts(string code)
+        {
+            var list = new List<Tuple<bool, List<int>, int>>();
+            var m = StatCode.Match(code);
+            if (!m.Success) return list;
+            bool user = m.Groups[2].Value == "User"; int sign = m.Groups[1].Value == "Raise" ? 1 : -1;
+            list.Add(Tuple.Create(user, ParseStats(m.Groups[3].Value), sign * int.Parse(m.Groups[4].Value)));
+            int pos = m.Length;
+            var more = new Regex(@"\G(Raise|Lower)?(User|Target)?((?:MainStats|Attack|Defense|SpAtk|SpDef|Speed|Accuracy|Evasion|Atk|Def|Spd|Acc|Eva)+)(\d)");
+            while (true)
+            {
+                var n = more.Match(code, pos);
+                if (!n.Success || n.Length == 0) break;
+                if (n.Groups[1].Success) sign = n.Groups[1].Value == "Raise" ? 1 : -1;
+                if (n.Groups[2].Success) user = n.Groups[2].Value == "User";
+                list.Add(Tuple.Create(user, ParseStats(n.Groups[3].Value), sign * int.Parse(n.Groups[4].Value)));
+                pos += n.Length;
+            }
+            return list;
         }
 
         void StatusMove(Battler user, Battler target, MoveData md, string code)
@@ -1579,11 +1607,14 @@ namespace PokeCreator.Battles
             if (ExtraStatusMoves(user, target, md, code)) return;
             if (SpecialStatusMove(user, target, md, code)) return;
             bool did = false;
-            var m = StatCode.Match(code);
-            if (m.Success)
+            var parts = StatParts(code);
+            if (parts.Count > 0)
             {
-                var b = m.Groups[2].Value == "User" ? user : target;
-                foreach (int s in ParseStats(m.Groups[3].Value)) did |= ChangeStat(b, s, (m.Groups[1].Value == "Raise" ? 1 : -1) * int.Parse(m.Groups[4].Value), user);
+                foreach (var part in parts)
+                {
+                    var b = part.Item1 ? user : target;
+                    foreach (int s in part.Item2) did |= ChangeStat(b, s, part.Item3, user);
+                }
                 if (code.EndsWith("ConfuseTarget")) did |= Confuse(target, true);
                 return;
             }

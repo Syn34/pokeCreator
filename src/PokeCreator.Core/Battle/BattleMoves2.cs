@@ -709,7 +709,7 @@ namespace PokeCreator.Battles
                         else SecretPowerByEnvironment(user, target);
                     }
                     break;
-                case "NormalMovesBecomeElectric": _ionDeluge = true; break;
+                case "NormalMovesBecomeElectric": if (!_ionDeluge) { _ionDeluge = true; Say("A deluge of ions showers the battlefield!"); } break;
                 case "HitTwoToFiveTimesRaiseUserSpd1LowerUserDef1":   // Scale Shot
                     if (!user.Pk.Fainted) { ChangeStat(user, S.Defense, -1, user); ChangeStat(user, S.Speed, 1, user); }
                     break;
