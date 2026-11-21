@@ -1328,3 +1328,69 @@ namespace PokeCreator.Runtime.UI
         }
     }
 }
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>
+    /// Before a battle: the map flashes twice, then is wiped to black (bars sliding in for wild Pokémon, squares
+    /// closing in for trainers). Then the battle scene takes over.
+    /// </summary>
+    public class BattleTransitionScene : Scene
+    {
+        readonly int _style;
+        readonly Action _done;
+        int _t;
+        const int FlashEnd = 24, Length = 64;
+
+        public BattleTransitionScene(Game g, int style, Action done) : base(g) { Opaque = false; _style = style; _done = done; }
+
+        protected override void Update()
+        {
+            if (++_t < Length + 4) return;
+            Close();
+            if (_done != null) _done();
+        }
+
+        public override void Draw(Gfx g)
+        {
+            if (_t < FlashEnd)
+            {
+                // Two white flashes
+                int k = _t % 12;
+                int a = k < 6 ? k * 40 : (12 - k) * 40;
+                g.FillRect(0, 0, g.Width, g.Height, new Color(255, 255, 255, (byte)Math.Min(240, a)));
+                return;
+            }
+            double p = Math.Min(1.0, (_t - FlashEnd) / (double)(Length - FlashEnd));
+            var black = new Color(0, 0, 0);
+            if (_style == 0)
+            {
+                // Bars sliding in from alternate sides
+                const int bars = 8;
+                int bh = (g.Height + bars - 1) / bars;
+                for (int i = 0; i < bars; i++)
+                {
+                    int w = (int)(g.Width * Math.Min(1.0, p * 1.15 - (i % 2) * 0.05));
+                    if (w <= 0) continue;
+                    if (i % 2 == 0) g.FillRect(0, i * bh, w, bh, black);
+                    else g.FillRect(g.Width - w, i * bh, w, bh, black);
+                }
+            }
+            else
+            {
+                // Squares closing in from the edges toward the centre
+                const int size = 32;
+                int cols = (g.Width + size - 1) / size, rows = (g.Height + size - 1) / size;
+                double maxD = Math.Max(cols, rows) / 2.0;
+                for (int y = 0; y < rows; y++)
+                    for (int x = 0; x < cols; x++)
+                    {
+                        double d = Math.Max(Math.Abs(x + 0.5 - cols / 2.0), Math.Abs(y + 0.5 - rows / 2.0)) / maxD; // 1 at the edges
+                        double f = Math.Max(0, Math.Min(1, (p - (1 - d) * 0.6) / 0.4));
+                        int s = (int)(size * f);
+                        if (s > 0) g.FillRect(x * size + (size - s) / 2, y * size + (size - s) / 2, s, s, black);
+                    }
+            }
+        }
+    }
+}

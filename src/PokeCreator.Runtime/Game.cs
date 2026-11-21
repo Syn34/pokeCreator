@@ -718,8 +718,11 @@ namespace PokeCreator.Runtime
             };
             BattleJustStarted = true;
             Audio.PlaySe("Encounter");
-            Flash(20);
-            PushScene(new BattleScene(this, b, setup));
+            var scene = new BattleScene(this, b, setup);
+            // The map flashes and is wiped to black before the battle (none in autotests or when turned off)
+            bool instant = Project.Settings.NoBattleTransitions || setup.Link || (_opt.AutotestScript != null && Environment.GetEnvironmentVariable("POKECREATOR_TRANSITIONS") != "1");
+            if (instant || Map == null) { Flash(20); PushScene(scene); }
+            else PushScene(new BattleTransitionScene(this, setup.Wild ? 0 : 1, () => PushScene(scene)));
         }
 
         /// <summary>pbRegisterPartner: a trainer from trainers.json joins the player's battles.</summary>
