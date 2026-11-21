@@ -24,6 +24,208 @@ namespace PokeCreator.Battles
         readonly bool[] _faintedLastTurn = new bool[2], _faintedThisTurn = new bool[2];
         int _echoedVoice; bool _echoedThisTurn;
         bool _roundUsedThisTurn, _ionDeluge;
+        // Healing Wish (1) / Lunar Dance (2) waiting for the next Pokémon sent to that position
+        readonly int[,] _healingWish = new int[2, 3];
+
+        /// <summary>Status moves not covered by the general code patterns.</summary>
+        // Wide Guard / Quick Guard / Crafty Shield / Mat Block, for the rest of the turn
+        public readonly bool[] WideGuard = new bool[2], QuickGuard = new bool[2], CraftyShield = new bool[2], MatBlock = new bool[2];
+        /// <summary>Money from Pay Day, picked up after the battle.</summary>
+        public int PayDayMoney;
+
+        void SideGuard(Battler user, string code)
+        {
+            int s = user.Side;
+            string team = s == 0 ? "your team" : (IsWild ? "the wild Pokémon" : "the opposing team");
+            switch (code)
+            {
+                case "ProtectUserSideFromMultiTargetDamagingMoves":
+                    if (WideGuard[s]) break;
+                    WideGuard[s] = true; Say("Wide Guard protected " + team + "!"); return;
+                case "ProtectUserSideFromPriorityMoves":
+                    if (QuickGuard[s]) break;
+                    QuickGuard[s] = true; Say("Quick Guard protected " + team + "!"); return;
+                case "ProtectUserSideFromStatusMoves":
+                    if (CraftyShield[s]) break;
+                    CraftyShield[s] = true; Say("Crafty Shield protected " + team + "!"); return;
+                case "ProtectUserSideFromDamagingMovesIfUserFirstTurn":
+                    if (MatBlock[s] || user.TurnsOut > 0) break;
+                    MatBlock[s] = true; Say(Name(user) + " intends to flip up a mat and block incoming attacks!"); return;
+            }
+            user.LastMoveFailed = true; Say("But it failed!");
+        }
+
+        bool SideGuardBlocks(Battler user, Battler t, MoveData md, string code)
+        {
+            int s = t.Side;
+            string tg = md.Target ?? "";
+            bool multi = tg == "AllNearFoes" || tg == "AllFoes" || tg == "AllNearOthers" || tg == "AllBattlers";
+            if (WideGuard[s] && multi) { Say("Wide Guard protected " + NameL(t) + "!"); return true; }
+            if (QuickGuard[s] && EffectivePriority(user, md) > 0 && md.Flags.Contains("CanProtect")) { Say("Quick Guard protected " + NameL(t) + "!"); return true; }
+            if (CraftyShield[s] && md.Category == "Status" && user.Side != s && tg != "AllBattlers") { Say("Crafty Shield protected " + NameL(t) + "!"); return true; }
+            if (MatBlock[s] && md.Category != "Status" && md.Flags.Contains("CanProtect")) { Say(Name(t) + " was blocked by the kicked-up mat!"); return true; }
+            return false;
+        }
+
+        /// <summary>A contact move stopped by King's Shield, Spiky Shield, Baneful Bunker or Obstruct.</summary>
+        void ProtectContact(Battler user, Battler t, MoveData md)
+        {
+            if (t.ProtectKind == null || user.Pk.Fainted) return;
+            if (!md.Flags.Contains("Contact") || md.Category == "Status" || HasAbility(user, "LONGREACH") || Holds(user, "PROTECTIVEPADS")) return;
+            switch (t.ProtectKind)
+            {
+                case "ProtectUserFromDamagingMovesKingsShield": ChangeStat(user, S.Attack, -1, t); break;
+                case "ProtectUserFromDamagingMovesObstruct": ChangeStat(user, S.Defense, -2, t); break;
+                case "ProtectUserFromTargetingMovesSpikyShield":
+                    if (!HasAbility(user, "MAGICGUARD")) Residual(user, Math.Max(1, user.Pk.TotalHP(P) / 8), Name(user) + " was hurt!");
+                    break;
+                case "ProtectUserBanefulBunker":
+                    if (CanStatus(user, "POISON", false, t)) Inflict(user, "POISON", false, t);
+                    break;
+            }
+        }
+
+        /// <summary>Damaging moves that work differently from the usual damage step.</summary>
+        bool ExtraDamagingMoves(Battler user, Battler target, MoveData md, string code)
+        {
+            string n = Name(user);
+            switch (code)
+            {
+                case "MultiTurnAttackBideThenReturnDoubleDamage":
+                {
+                    if (user.BideTurn == 0 || user.LockedMove != md.Id)
+                    {
+                        user.BideTurn = 1; user.BideDamage = 0; user.BideTarget = null;
+                        user.LockedMove = md.Id; user.LockTurns = 2;
+                        Say(n + " is storing energy!");
+                        return true;
+                    }
+                    user.BideTurn++;
+                    if (user.BideTurn < 3) { Say(n + " is storing energy!"); return true; }
+                    user.BideTurn = 0;
+                    Say(n + " unleashed its energy!");
+                    var bt = user.BideTarget != null && OnField.Contains(user.BideTarget) && !user.BideTarget.Pk.Fainted ? user.BideTarget : null;
+                    if (user.BideDamage <= 0 || bt == null) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    int from = bt.Pk.HP; bt.Pk.HP = Math.Max(0, bt.Pk.HP - user.BideDamage * 2); Hp(bt, from);
+                    if (bt.Pk.Fainted) _faintedThisTurn[bt.Side] = true;
+                    return true;
+                }
+                case "HealUserByHalfOfDamageDoneIfTargetAsleep":
+                    if ((target.Pk.Status ?? "").ToUpperInvariant() != "SLEEP" && !HasAbility(target, "COMATOSE"))
+                    { Say(Name(target) + " wasn't affected!"); user.LastMoveFailed = true; return true; }
+                    break;
+            }
+            return false;
+        }
+
+        bool ExtraStatusMoves(Battler user, Battler target, MoveData md, string code)
+        {
+            string n = Name(user), tn = Name(target);
+            switch (code)
+            {
+                case "SleepTargetNextTurn":   // Yawn
+                    if (target.YawnTurns > 0 || !string.IsNullOrEmpty(target.Pk.Status) || !CanStatus(target, "SLEEP", false, user)) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    target.YawnTurns = 2;
+                    Say(n + " made " + NameL(target) + " drowsy!");
+                    return true;
+                case "ParalyzeTargetIfNotTypeImmune":   // Thunder Wave
+                    if (EffectivenessOn(MoveType(user, md, code), target) == 0) { Say("It doesn't affect " + NameL(target) + "..."); user.LastMoveFailed = true; return true; }
+                    if (!Inflict(target, "PARALYSIS", true, user)) user.LastMoveFailed = true;
+                    return true;
+                case "LowerTargetSpAtk2IfCanAttract":   // Captivate
+                {
+                    string g1 = user.Pk.Gender, g2 = target.Pk.Gender;
+                    if (string.IsNullOrEmpty(g1) || string.IsNullOrEmpty(g2) || g1 == g2 || g1 == "Genderless" || g2 == "Genderless") { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    if (TargetHas(user, target, "OBLIVIOUS")) { Splash(target); Say(tn + "'s Sp. Atk was not lowered!"); return true; }
+                    ChangeStat(target, S.SpAtk, -2, user);
+                    return true;
+                }
+                case "RaiseUserMainStats1TrapUserInBattle":   // No Retreat
+                    if (user.NoRetreat) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    foreach (int s in new[] { S.Attack, S.Defense, S.SpAtk, S.SpDef, S.Speed }) ChangeStat(user, s, 1, user);
+                    user.NoRetreat = true; user.Trapped = true;
+                    Say(n + " can no longer escape because it used No Retreat!");
+                    return true;
+                case "RaiseUserMainStats1LoseThirdOfTotalHP":   // Clangorous Soul
+                {
+                    int max = user.Pk.TotalHP(P);
+                    if (user.Pk.HP <= max / 3) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    int f = user.Pk.HP; user.Pk.HP -= Math.Max(1, max / 3); Hp(user, f);
+                    foreach (int s in new[] { S.Attack, S.Defense, S.SpAtk, S.SpDef, S.Speed }) ChangeStat(user, s, 1, user);
+                    return true;
+                }
+                case "LowerTargetSpeed1MakeTargetWeakerToFire":   // Tar Shot
+                    if (target.TarShot && target.Stages[S.Speed] <= -6) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    ChangeStat(target, S.Speed, -1, user);
+                    if (!target.TarShot) { target.TarShot = true; Say(tn + " became weaker to fire!"); }
+                    return true;
+                case "UserFaintsLowerTargetAtkSpAtk2":   // Memento
+                {
+                    bool any = false;
+                    if (!target.Pk.Fainted && target != user) { any |= ChangeStat(target, S.Attack, -2, user); any |= ChangeStat(target, S.SpAtk, -2, user); }
+                    int f = user.Pk.HP; user.Pk.HP = 0; Hp(user, f);
+                    return true;
+                }
+                case "UserFaintsHealAndCureReplacement":
+                case "UserFaintsHealAndCureReplacementRestorePP":
+                {
+                    if (Bench(user.Side).Count == 0 || (user.Side == 1 && FoeBench(user.Slot).Count == 0)) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    _healingWish[user.Side, user.Slot] = code.EndsWith("RestorePP") ? 2 : 1;
+                    int f = user.Pk.HP; user.Pk.HP = 0; Hp(user, f);
+                    return true;
+                }
+                case "NormalMovesBecomeElectric":
+                    _ionDeluge = true; Say("A deluge of ions showers the battlefield!"); return true;
+                case "TrapTargetInBattleLowerTargetDefSpDef1EachTurn":   // Octolock
+                    if (target.Pk.Fainted || target.Octolocked || TypesOf(target).Contains("GHOST")) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    target.Octolocked = true; target.Trapped = true;
+                    Say(tn + " can no longer escape because of Octolock!");
+                    return true;
+                case "AddGhostTypeToTarget":
+                case "AddGrassTypeToTarget":
+                {
+                    string type = code == "AddGhostTypeToTarget" ? "GHOST" : "GRASS";
+                    if (target.Pk.Fainted || TypesOf(target).Contains(type)) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    target.ExtraType = type;
+                    Say(TypeName(type) + " type was added to " + NameL(target) + "!");
+                    return true;
+                }
+                case "HealUserByTargetAttackLowerTargetAttack1":   // Strength Sap
+                {
+                    if (target.Pk.Fainted || target.Stages[S.Attack] <= -6 && !HasAbility(target, "CONTRARY")) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    int heal = (int)(StatsOf(target)[S.Attack] * StageMult(target.Stages[S.Attack]));
+                    ChangeStat(target, S.Attack, -1, user);
+                    if (Holds(user, "BIGROOT")) heal = heal * 13 / 10;
+                    if (TargetHas(user, target, "LIQUIDOOZE")) { Splash(target); Residual(user, heal, n + " sucked up the liquid ooze!"); return true; }
+                    int max = user.Pk.TotalHP(P);
+                    if (user.Pk.HP < max) { int f = user.Pk.HP; user.Pk.HP = Math.Min(max, user.Pk.HP + heal); Hp(user, f); Say(tn + " had its energy drained!"); }
+                    return true;
+                }
+                case "PoisonTargetLowerTargetSpeed1":   // Toxic Thread
+                {
+                    bool canPoison = CanStatus(target, "POISON", false, user);
+                    if (!canPoison && target.Stages[S.Speed] <= -6) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
+                    if (canPoison) Inflict(target, "POISON", false, user);
+                    ChangeStat(target, S.Speed, -1, user);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void HealingWishArrives(Battler b)
+        {
+            int kind = b.Slot < 3 ? _healingWish[b.Side, b.Slot] : 0;
+            if (kind == 0 || b.Pk.Fainted) return;
+            int max = b.Pk.TotalHP(P);
+            bool ppLow = kind == 2 && b.Pk.Moves.Any(m => { var d = Move(m.Id); return d != null && m.PP < Pokemon.TotalPP(d, m.PPUps); });
+            if (b.Pk.HP >= max && string.IsNullOrEmpty(b.Pk.Status) && !ppLow) return;   // waits for a Pokémon that needs it
+            _healingWish[b.Side, b.Slot] = 0;
+            int f = b.Pk.HP; b.Pk.HP = max; Hp(b, f);
+            if (!string.IsNullOrEmpty(b.Pk.Status)) { b.Pk.Status = ""; b.ToxicCount = 0; b.SleepTurns = 0; StatusEvent(b); }
+            if (kind == 2) foreach (var m in b.Pk.Moves) { var d = Move(m.Id); if (d != null) m.PP = Pokemon.TotalPP(d, m.PPUps); }
+            Say(kind == 2 ? Name(b) + " became cloaked in mystical moonlight!" : "The healing wish came true for " + NameL(b) + "!");
+        }
         string _lastMoveThisTurn;
         readonly Dictionary<Pokemon, string> _itemBeforeBattle = new Dictionary<Pokemon, string>();
         List<KeyValuePair<Battler, BattleCommand>> _orders; int _orderIndex;
@@ -466,6 +668,9 @@ namespace PokeCreator.Battles
                     }
                     break;
                 case "NormalMovesBecomeElectric": _ionDeluge = true; break;
+                case "AddMoneyGainedFromBattle":
+                    if (user.Side == 0) { PayDayMoney += user.Pk.Level * 5; Say("Coins were scattered everywhere!"); }
+                    break;
                 case "TrapTargetInBattleLowerTargetDefSpDef1EachTurn": if (!target.Pk.Fainted && !target.Octolocked) { target.Octolocked = true; target.Trapped = true; Say(Name(target) + " can no longer escape!"); } break;
             }
             if (code == "UsedAfterAllyRoundWithDoublePower") _roundUsedThisTurn = true;
@@ -537,6 +742,7 @@ namespace PokeCreator.Battles
             foreach (var b in OnField.Where(x => !x.Pk.Fainted).ToList())
             {
                 if (b.Octolocked) { ChangeStat(b, S.Defense, -1); ChangeStat(b, S.SpDef, -1); }
+                if (b.YawnTurns > 0 && --b.YawnTurns == 0 && string.IsNullOrEmpty(b.Pk.Status) && CanStatus(b, "SLEEP", false)) Inflict(b, "SLEEP", false);
                 b.BeakBlast = false;
                 if (b.HealBlockTurns > 0 && --b.HealBlockTurns == 0) Say(Name(b) + "'s Heal Block wore off!");
                 if (b.EmbargoTurns > 0 && --b.EmbargoTurns == 0) Say(Name(b) + " can use items again!");

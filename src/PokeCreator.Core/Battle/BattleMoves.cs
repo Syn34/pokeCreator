@@ -186,7 +186,7 @@ namespace PokeCreator.Battles
         bool HitsInvulnerable(Battler target, string code)
         {
             string c = target.Charging ?? "";
-            if (c == "DIG") return code.Contains("TargetUnderground");
+            if (c == "DIG") return code.Contains("TargetUnderground") || code.Contains("UndergroundTarget");
             if (c == "DIVE") return code.Contains("TargetUnderwater");
             if (c == "FLY" || c == "BOUNCE" || c == "SKYDROP") return code.Contains("InSky") || code.Contains("TargetInSky");
             return false;
@@ -683,6 +683,7 @@ namespace PokeCreator.Battles
         void EntryHazards(Battler b)
         {
             int s = b.Side, max = b.Pk.TotalHP(P);
+            HealingWishArrives(b);
             if (b.Pk.Item == "HEAVYDUTYBOOTS") return;
             if (StealthRock[s] && !HasAbility(b, "MAGICGUARD"))
             {

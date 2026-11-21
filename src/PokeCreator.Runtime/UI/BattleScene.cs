@@ -783,6 +783,12 @@ namespace PokeCreator.Runtime.UI
                     Game.Message.Show(text + "\\n\\PN blacked out!", null, -1, _ => next());
                 });
             }
+            // Pay Day: coins picked up after a win or a capture (doubled by an Amulet Coin / Luck Incense)
+            if (_b.PayDayMoney > 0 && (o == BattleOutcome.Win || o == BattleOutcome.Caught))
+            {
+                int coins = _b.PayDayMoney * (AmuletCoin() ? 2 : 1);
+                steps.Add(next => { Game.State.Money += coins; Game.Message.Show("\\PN picked up $" + coins + "!", null, -1, _ => next()); });
+            }
             // Evolution for Pokémon that levelled up (and are still standing)
             foreach (int i in _b.LeveledUp.OrderBy(x => x))
             {
@@ -839,8 +845,10 @@ namespace PokeCreator.Runtime.UI
             int total = baseMoney * level;
             var tr2 = _setup.Trainer2;
             if (tr2 != null && tr2.Pokemon.Count > 0) total += (_setup.TrainerType2 != null ? _setup.TrainerType2.BaseMoney : 30) * tr2.Pokemon.Max(p => p.Level);
-            return total;
+            return total * (AmuletCoin() ? 2 : 1);
         }
+
+        bool AmuletCoin() { return _party.Any(p => p.Item == "AMULETCOIN" || p.Item == "LUCKINCENSE"); }
 
         int LossMoney()
         {

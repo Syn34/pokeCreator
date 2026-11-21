@@ -71,6 +71,8 @@ namespace PokeCreator.Battles
         public bool BoosterEnergy, TruantSkip, DisguiseBroken;
         /// <summary>Battle-only changes: types (Soak, Reflect Type, Burn Up...), stats (Transform, Power Trick, Power/Guard Split), moves (Transform, Mimic).</summary>
         public List<string> TypesOverride;
+        /// <summary>Trick-or-Treat / Forest's Curse: a third type until the battler leaves the field.</summary>
+        public string ExtraType;
         public int[] StatsOverride;
         public List<PokemonMove> OriginalMoves;
         public int HealBlockTurns, EmbargoTurns, ThroatChopTurns, LaserFocus;
@@ -87,6 +89,11 @@ namespace PokeCreator.Battles
         public bool TookDamageThisTurn, StatsLoweredThisTurn, ActedThisTurn, LastMoveFailed, SwitchOutPending;
         public int LastDamageTaken; public bool LastDamagePhysical;
         public Battler AttractedTo;
+        // King's Shield / Spiky Shield / Baneful Bunker / Obstruct: which Protect is up
+        public string ProtectKind;
+        public bool StatsRaisedThisTurn, NoRetreat, TarShot;
+        public int YawnTurns, BideTurn, BideDamage;
+        public Battler BideTarget;
         public Battler(Pokemon pk, int side, int idx) { Pk = pk; Side = side; PartyIndex = idx; }
         public void Reset() { Stages = new int[8]; Confusion = 0; ToxicCount = 0; BindTurns = 0; CritStage = 0; Flinched = false; MustRecharge = false; Protected = false; ProtectChain = 0; Charging = null; Invulnerable = false; TurnsOut = 0; }
     }
@@ -443,9 +450,10 @@ namespace PokeCreator.Battles
             foreach (var b in OnField)
             {
                 b.ProtectedLast = b.Protected; b.Protected = false; b.Flinched = false; b.TurnsOut++;
-                b.TookDamageThisTurn = false; b.StatsLoweredThisTurn = false; b.UsedItemThisTurn = null; b.ActedThisTurn = false; b.HelpingHand = false; b.Endure = false;
+                b.TookDamageThisTurn = false; b.StatsLoweredThisTurn = false; b.StatsRaisedThisTurn = false; b.ProtectKind = null; b.UsedItemThisTurn = null; b.ActedThisTurn = false; b.HelpingHand = false; b.Endure = false;
             }
             _centerOfAttention[0] = _centerOfAttention[1] = null;
+            for (int s = 0; s < 2; s++) WideGuard[s] = QuickGuard[s] = CraftyShield[s] = MatBlock[s] = false;
             return _ev;
         }
 
@@ -477,7 +485,12 @@ namespace PokeCreator.Battles
         static double AccMult(int s) { return s >= 0 ? (3.0 + s) / 3.0 : 3.0 / (3.0 - s); }
 
         /// <summary>A battler's types, after battle changes.</summary>
-        public List<string> TypesOf(Battler b) { return b.TypesOverride ?? b.Pk.Types(P); }
+        public List<string> TypesOf(Battler b)
+        {
+            var t = b.TypesOverride ?? b.Pk.Types(P);
+            if (b.ExtraType != null && !t.Contains(b.ExtraType)) t = t.Concat(new[] { b.ExtraType }).ToList();
+            return t;
+        }
         /// <summary>A battler's stats, after battle changes.</summary>
         int[] StatsOf(Battler b) { return b.StatsOverride ?? b.Pk.Stats(P); }
         /// <summary>Type effectiveness against a battler (its battle types).</summary>
@@ -604,6 +617,8 @@ namespace PokeCreator.Battles
         /// <summary>Inverse Battle (setBattleRule("inverseBattle")): weaknesses and resistances swap, immunities become weaknesses.</summary>
         public bool Inverse;
         /// <summary>Species the player has caught (critical captures) and whether they have the Catching Charm.</summary>
+        /// <summary>Called with a status move's function code when no effect is known for it (tests, tools).</summary>
+        public static Action<string> UnhandledCode;
         public int CaughtCount;
         public bool CatchingCharm;
         // Obedience (as Essentials): a Pokémon from another trainer above the badge level may ignore orders.
@@ -867,11 +882,13 @@ namespace PokeCreator.Battles
             _ev.Add(new BattleEvent { Kind = BattleEventKind.MoveUsed, Side = user.Side, Party = user.PartyIndex, Text = md.Id });
             bool selfTarget = md.Target == "User" || md.Target == "UserSide" || md.Target == "BothSides" || md.Target == "UserAndAllies" || md.Target == "UserOrNearAlly" || md.Target == "FoeSide" && md.Category == "Status" && code.StartsWith("Add");
 
+            if (code.StartsWith("ProtectUserSide")) { SideGuard(user, code); return; }
             if (code == "ProtectUser" || code.StartsWith("ProtectUser"))
             {
                 bool ok = Rng.NextDouble() < Math.Pow(1.0 / 3, user.ProtectedLast ? user.ProtectChain : 0);
                 if (!ok) { user.ProtectChain = 0; Say("But it failed!"); return; }
                 user.Protected = true; user.ProtectChain = user.ProtectedLast ? user.ProtectChain + 1 : 1;
+                user.ProtectKind = code;
                 Say(n + " protected itself!");
                 return;
             }
@@ -930,12 +947,15 @@ namespace PokeCreator.Battles
                 if (user.Pk.Fainted || Outcome != BattleOutcome.Ongoing) break;
                 if (t.Pk.Fainted) continue;
                 double pierce = 1;
-                if (t.Protected && md.Flags.Contains("CanProtect") && !code.StartsWith("RemoveProtections") && !code.StartsWith("HoopaRemoveProtections"))
+                bool lifts = code.StartsWith("RemoveProtections") || code.StartsWith("HoopaRemoveProtections");
+                if (t != user && !lifts && SideGuardBlocks(user, t, md, code)) continue;
+                bool statusThrough = md.Category == "Status" && t.ProtectKind != null && t.ProtectKind.StartsWith("ProtectUserFromDamagingMoves");
+                if (t.Protected && md.Flags.Contains("CanProtect") && !lifts && !statusThrough)
                 {
                     bool contactMove = md.Flags.Contains("Contact") && md.Category != "Status";
                     if (contactMove && HasAbility(user, "UNSEENFIST")) { }
                     else if (contactMove && HasAbility(user, "PIERCINGDRILL")) pierce = 0.25;
-                    else { Say(Name(t) + " protected itself!"); continue; }
+                    else { Say(Name(t) + " protected itself!"); ProtectContact(user, t, md); continue; }
                 }
                 if (t.Invulnerable && md.Accuracy > 0 && !HitsInvulnerable(t, code) && user.LockOnTurns == 0) { Say(Name(user) + "'s attack missed!"); user.LastMoveFailed = true; ArenaMissed(user); continue; }
                 if (t.SubstituteHP > 0 && md.Category == "Status" && t.Side != user.Side && !md.Flags.Contains("Sound") && !HasAbility(user, "INFILTRATOR")) { Say("But it failed!"); user.LastMoveFailed = true; continue; }
@@ -991,7 +1011,8 @@ namespace PokeCreator.Battles
             if (code == "OHKO" || code.StartsWith("OHKO"))
             {
                 if (target.Pk.Level > user.Pk.Level) return false;
-                return Rng.Next(100) < 30 + user.Pk.Level - target.Pk.Level;
+                int baseAcc = code == "OHKOIce" && !TypesOf(user).Contains("ICE") ? 20 : 30;
+                return Rng.Next(100) < baseAcc + user.Pk.Level - target.Pk.Level;
             }
             if (md.Accuracy <= 0 || user.LockOnTurns > 0) return true;
             bool always;
@@ -1036,6 +1057,7 @@ namespace PokeCreator.Battles
         {
             if (MoveFails(user, target, md, code)) { user.LastMoveFailed = true; Say("But it failed!"); return; }
             if (DampBlocks(user, code)) { user.LastMoveFailed = true; return; }
+            if (ExtraDamagingMoves(user, target, md, code)) return;
             if (PresentHeals(user, target, code)) return;
             if (code == "FirePledge" || code == "GrassPledge" || code == "WaterPledge") PledgeBefore(user, code);
             if (code == "HealAllyOrDamageFoe" && target.Side == user.Side && target != user)
@@ -1054,6 +1076,9 @@ namespace PokeCreator.Battles
             if (PrimalStopsMove(mtype)) { user.LastMoveFailed = true; return; }
             double typeMod = md.Id == "STRUGGLE" ? 1 : mtype == "SHADOW" ? (target.Pk.ShadowPokemon ? 0.5 : 2) : EffectivenessOn(mtype, target);
             if (code == "EffectivenessIncludesFlyingType" && typeMod > 0) typeMod *= EffectivenessOn("FLYING", target);
+            if (code == "FreezeTargetSuperEffectiveAgainstWater" && TypesOf(target).Contains("WATER") && TypeVs(mtype, "WATER") > 0) typeMod = typeMod / TypeVs(mtype, "WATER") * 2;
+            if (target.TarShot && mtype == "FIRE") typeMod *= 2;
+            if (code == "OHKOIce" && TypesOf(target).Contains("ICE")) typeMod = 0;
             if (typeMod == 0 && mtype == "GROUND" && TypesOf(target).Contains("FLYING") && (IsGrounded(target) || code == "HitsTargetInSkyGroundsTarget"))
                 typeMod = TypesOf(target).Where(t => t != "FLYING").Aggregate(1.0, (acc, t) => acc * TypeVs(mtype, t));
             if (typeMod > 0 && mtype == "GROUND" && target.AirborneTurns > 0 && Gravity == 0 && !target.Grounded) typeMod = 0;
@@ -1159,6 +1184,7 @@ namespace PokeCreator.Battles
                 _ev.Add(new BattleEvent { Kind = BattleEventKind.Hit, Side = target.Side, Party = target.PartyIndex, Flag = crit, Value = (int)(typeMod * 100) });
                 Hp(target, from);
                 total += from - target.Pk.HP; done++;
+                if (from > target.Pk.HP && target.BideTurn > 0) { target.BideDamage += from - target.Pk.HP; target.BideTarget = user; }
                 if (from > target.Pk.HP) { target.TookDamageThisTurn = true; target.LastDamageTaken = from - target.Pk.HP; target.LastDamagePhysical = md.Category == "Physical"; target.LastHitType = mtype; }
                 if (target.Pk.Fainted) _faintedThisTurn[target.Side] = true;
                 if (enduredMove) enduredBy = "ENDURE";
@@ -1401,6 +1427,7 @@ namespace PokeCreator.Battles
             if (nv == old) { Say(who + (amount > 0 ? " won't go any higher!" : " won't go any lower!")); return false; }
             b.Stages[stat] = nv;
             if (nv < old) b.StatsLoweredThisTurn = true;
+            if (nv > old) b.StatsRaisedThisTurn = true;
             if (nv > old) CopyBoosts(b, stat, nv - old);
             int d = Math.Abs(nv - old);
             _ev.Add(new BattleEvent { Kind = BattleEventKind.StatChange, Side = b.Side, Party = b.PartyIndex, Value = amount });
@@ -1495,6 +1522,7 @@ namespace PokeCreator.Battles
             bool shield = TargetHas(user, target, "SHIELDDUST") || target.Pk.Item == "COVERTCLOAK";
             if (code == "ParalyzeBurnOrFreezeTarget") { if (!target.Pk.Fainted && !shield) Inflict(target, new[] { "PARALYSIS", "BURN", "FROZEN" }[Rng.Next(3)], false, user); return; }
             string st = StatusFromCode(code);
+            if (code == "BurnTargetIfTargetStatsRaisedThisTurn" && !target.StatsRaisedThisTurn) st = null;
             if (st != null && !target.Pk.Fainted && !shield) Inflict(target, st, false, user);
             if (code.Contains("Flinch") && !target.Pk.Fainted && !shield && !TargetHas(user, target, "INNERFOCUS")) target.Flinched = true;
             if (code.Contains("ConfuseTarget") && !target.Pk.Fainted && !shield) Confuse(target, false);
@@ -1508,6 +1536,7 @@ namespace PokeCreator.Battles
 
         void StatusMove(Battler user, Battler target, MoveData md, string code)
         {
+            if (ExtraStatusMoves(user, target, md, code)) return;
             if (SpecialStatusMove(user, target, md, code)) return;
             bool did = false;
             var m = StatCode.Match(code);
@@ -1560,6 +1589,7 @@ namespace PokeCreator.Battles
                 return;
             }
             if (code == "DoesNothingUnusableInGravity" || code == "DoesNothingCongratulations") { Say("But nothing happened!"); return; }
+            if (UnhandledCode != null) UnhandledCode(code);
             Say("But it failed!");
         }
 
