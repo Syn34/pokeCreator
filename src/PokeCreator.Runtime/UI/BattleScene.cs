@@ -1206,6 +1206,19 @@ namespace PokeCreator.Runtime.UI
                 {
                     var t = Game.Project.Types.FirstOrDefault(x => x.Id == md.Type);
                     Ui.Text(g, 362, by + 50, "TYPE/" + (t != null && t.Name != null ? t.Name : md.Type));
+                    // Options → Move Hints: how well the move works on the (one) foe, once its species has been seen
+                    var foes = _b.Live(1);
+                    if (Game.Options.MoveHints && md.Category != "Status" && foes.Count == 1 && Game.State.Seen.Contains(foes[0].Pk.Species))
+                    {
+                        double eff = _b.Effectiveness(md.Type, foes[0].Pk);
+                        string hint = eff == 0 ? "No effect" : eff > 1 ? "Super effective" : eff < 1 ? "Not very effective" : "Effective";
+                        var col = eff == 0 ? new Color(120, 120, 128) : eff > 1 ? new Color(56, 168, 64) : eff < 1 ? new Color(216, 96, 48) : new Color(96, 88, 120);
+                        int hw = g.TextWidth(hint) + 20;
+                        bool megaShown = _b.CanMegaEvolve(Me) && !_pending.Any(x => x.Mega);
+                        int hx = megaShown ? 4 + g.TextWidth(_megaOn ? "MEGA EVOLVE: ON" : "Shift: Mega Evolve") + 28 : 4;
+                        Ui.Panel(g, hx, by - 34, hw, 30, new Color(248, 248, 248), col);
+                        g.DrawText(hx + 10, by - 32, hint, col, Ui.DarkShadow);
+                    }
                 }
             }
         }

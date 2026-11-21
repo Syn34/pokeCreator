@@ -28,6 +28,8 @@ namespace PokeCreator.Runtime.UI
         public bool BattleEffectsOff { get; set; }
         /// <summary>Caught Pokémon with a full party: false = sent to the PC, true = asked which party Pokémon to send instead (Essentials' "Send to Boxes").</summary>
         public bool SendToBoxesManual { get; set; }
+        /// <summary>Show "Super effective" / "Not very effective" in the battle move menu against Pokémon already seen.</summary>
+        public bool MoveHints { get; set; }
         /// <summary>Translation chosen by the player (a file in the project's Languages folder; "" = original).</summary>
         public string Language { get; set; }
         /// <summary>Window size: 0 = the game's default, 1-4 = times the game size, 5 = full screen.</summary>
@@ -763,8 +765,8 @@ namespace PokeCreator.Runtime.UI
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
             _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
             Labels = _langs.Count > 1
-                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
-                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" };
+                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" };
         }
 
         static string Cycle(List<string> list, string cur, int d)
@@ -785,6 +787,7 @@ namespace PokeCreator.Runtime.UI
                 case "Battle Effects": return _o.BattleEffects ? "On" : "Off";
                 case "Battle Style": return _o.BattleStyleSet ? "Set" : "Switch";
                 case "Send to Boxes": return _o.SendToBoxesManual ? "Manual" : "Automatic";
+                case "Move Hints": return _o.MoveHints ? "On" : "Off";
                 case "Speech Frame": return FrameLabel(_o.SpeechFrame);
                 case "Menu Frame": return FrameLabel(_o.MenuFrame);
                 case "Running Key": return _o.RunToggle ? "Toggle" : "Hold";
@@ -810,6 +813,7 @@ namespace PokeCreator.Runtime.UI
                     case "Battle Effects": _o.BattleEffects = !_o.BattleEffects; break;
                     case "Battle Style": _o.BattleStyleSet = !_o.BattleStyleSet; break;
                     case "Send to Boxes": _o.SendToBoxesManual = !_o.SendToBoxesManual; break;
+                    case "Move Hints": _o.MoveHints = !_o.MoveHints; break;
                     case "Speech Frame": _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d); break;
                     case "Menu Frame": _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d); break;
                     case "Running Key": _o.RunToggle = !_o.RunToggle; break;
@@ -829,14 +833,18 @@ namespace PokeCreator.Runtime.UI
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Options");
             Ui.Panel(g, 8, 60, g.Width - 16, 262, new Color(248, 248, 248), new Color(32, 48, 96));
-            int rowH = Math.Min(23, 254 / Labels.Length);
-            for (int i = 0; i < Labels.Length; i++)
+            // Ten rows at a time, scrolling with the cursor
+            const int rowH = 24, visible = 10;
+            int top = Math.Max(0, Math.Min(_row - visible / 2, Labels.Length - visible));
+            if (top > 0) Ui.TextRight(g, g.Width - 14, 62, "▲");
+            if (top + visible < Labels.Length) Ui.TextRight(g, g.Width - 14, 66 + (visible - 1) * rowH, "▼");
+            for (int i = top; i < Labels.Length && i < top + visible; i++)
             {
-                int y = 64 + i * rowH;
+                int y = 66 + (i - top) * rowH;
                 if (i == _row) Ui.Arrow(g, 22, y + 8);
                 Ui.Text(g, 44, y, Labels[i]);
                 string v = Value(Labels[i]);
-                if (v.Length > 0) Ui.TextRight(g, g.Width - 32, y, "◀ " + v + " ▶");
+                if (v.Length > 0) Ui.TextRight(g, g.Width - 40, y, "◀ " + v + " ▶");
             }
             Ui.Box(g, 4, g.Height - 56, g.Width - 8, 52);
             Ui.Text(g, 22, g.Height - 44, "◀ ▶ change a setting (kept for all saves).");
