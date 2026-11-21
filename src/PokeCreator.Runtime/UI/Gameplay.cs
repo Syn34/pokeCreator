@@ -195,11 +195,17 @@ namespace PokeCreator.Runtime.UI
             if (info.Consumed) g.State.AddItem(item.Id, -1);
             if (o.LevelsGained > 0) g.Audio.PlayMe("Pkmn level up");
             else if (info.Kind != ItemKind.Evolution) g.Audio.PlaySe("Use item in party");
-            Say(g, o.Message, () => LearnMoves(g, pk, new Queue<string>(o.MovesToLearn), () =>
+            Action afterMessage = () => LearnMoves(g, pk, new Queue<string>(o.MovesToLearn), () =>
             {
                 if (o.EvolveTo != null) g.PushScene(new EvolutionScene(g, pk, o.EvolveTo, info.Kind != ItemKind.Evolution, () => done(true)));
                 else done(true);
-            }));
+            });
+            Say(g, o.Message, () =>
+            {
+                // Rare Candy and the like: the stat increases, as in battle
+                if (o.LevelsGained == 1) { var st = new LevelUpStatsScene(g, pk); st.OnClosed = afterMessage; g.PushScene(st); }
+                else afterMessage();
+            });
         }
 
         /// <summary>Learns moves one after another, asking what to forget when it knows four.</summary>
