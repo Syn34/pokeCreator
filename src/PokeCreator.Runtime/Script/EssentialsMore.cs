@@ -209,6 +209,7 @@ namespace PokeCreator.Runtime.Script
             Register("pbFlyToNewLocation", (c, a) => false);
             Register("pbEncounter", (c, a) => FieldMoves.EncounterFrom(_game, new[] { Str(a, 0).TrimStart(':') }));
             Register("pbFadeOutInWithMusic", (c, a) => true);
+            Register("pbScrollMap", (c, a) => { _game.ScrollMap(ToInt(Arg(a, 0)), ToInt(Arg(a, 1)), a.Count > 2 ? ToInt(a[2]) : 4); if (c != null) c.WaitForScroll(); return true; });
             Register("pbEnterPokemonName", (c, a) =>
             {
                 object answer;

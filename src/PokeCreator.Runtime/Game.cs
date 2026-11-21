@@ -913,6 +913,7 @@ namespace PokeCreator.Runtime
 
         void CenterCamera()
         {
+            _camOffX = _camOffY = _scrollRest = 0;
             DisplayX = (int)(Player.RealX / 4) - (Gfx.Width / 2 - 16);
             DisplayY = (int)(Player.RealY / 4) - (Gfx.Height / 2 - 16);
             ClampCamera();
@@ -920,10 +921,23 @@ namespace PokeCreator.Runtime
 
         void UpdateCamera()
         {
-            DisplayX = (int)(Player.RealX / 4) - (Gfx.Width / 2 - 16);
-            DisplayY = (int)(Player.RealY / 4) - (Gfx.Height / 2 - 16);
+            // Scroll Map moves the camera away from the player until scrolled back (or the map changes)
+            if (_scrollRest > 0)
+            {
+                double step = Math.Min(_scrollRest, Math.Pow(2, _scrollSpeed) / 4.0 * 40.0 / 60.0);
+                if (_scrollDir == 2) _camOffY += step; else if (_scrollDir == 8) _camOffY -= step;
+                else if (_scrollDir == 4) _camOffX -= step; else if (_scrollDir == 6) _camOffX += step;
+                _scrollRest -= step;
+            }
+            DisplayX = (int)(Player.RealX / 4 + _camOffX) - (Gfx.Width / 2 - 16);
+            DisplayY = (int)(Player.RealY / 4 + _camOffY) - (Gfx.Height / 2 - 16);
             ClampCamera();
         }
+
+        double _camOffX, _camOffY, _scrollRest; int _scrollDir, _scrollSpeed = 4;
+        /// <summary>Scroll Map (RMXP command 203 / pbScrollMap): direction 2/4/6/8, distance in tiles, speed 1-6.</summary>
+        public void ScrollMap(int dir, int distance, int speed) { _scrollDir = dir; _scrollRest = Math.Max(0, distance) * 32; _scrollSpeed = Math.Max(1, Math.Min(6, speed)); }
+        public bool Scrolling { get { return _scrollRest > 0; } }
 
         void ClampCamera()
         {

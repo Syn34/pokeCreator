@@ -92,6 +92,9 @@ namespace PokeCreator.Runtime.Script
         }
 
         public void WaitForMoves() { _waitForMoves = true; }
+        bool _waitForScroll;
+        /// <summary>pbScrollMap waits until the camera has finished scrolling.</summary>
+        public void WaitForScroll() { _waitForScroll = true; }
 
         public void Update()
         {
@@ -113,6 +116,7 @@ namespace PokeCreator.Runtime.Script
                 if (_game.MessageBusy || _game.Transferring) return;
                 if (_game.SceneOpen) return; // a battle, name entry or other screen opened by the last command
                 if (_game.ScriptHolds > 0) return; // a multi-step script call (Battle Tower) is still going
+                if (_waitForScroll) { if (_game.Scrolling) return; _waitForScroll = false; }
                 if (_waitForMoves)
                 {
                     if (_game.Player.MoveRouteForcing || _game.Map.Events.Any(e => e.MoveRouteForcing)) return;
@@ -247,6 +251,15 @@ namespace PokeCreator.Runtime.Script
                         }
                         return true;
                     }
+                case 205:
+                    {
+                        // Change Fog Color Tone: [tone, duration]
+                        var tone = c.Params.Count > 0 ? c.Params[0] as JsonObject : null;
+                        var vals = tone != null ? tone["Values"] as List<object> : null;
+                        Func<int, double> v = i => vals != null && i < vals.Count ? Convert.ToDouble(vals[i]) : 0;
+                        _game.Planes.ToneFog(v(0), v(1), v(2), v(3), c.IntParam(1) * 3 / 2);
+                        return true;
+                    }
                 case 206: _game.Planes.FadeFog(c.IntParam(0), c.IntParam(1) * 3 / 2); return true; // Change Fog Opacity (duration in RMXP frames at 40 fps)
                 case 207:
                     {
@@ -256,7 +269,10 @@ namespace PokeCreator.Runtime.Script
                         if (ch != null && kind != null) { if (kind == "exclaim") _game.Exclaim(ch, 30); else _game.Effects.Play(kind, ch.X, ch.Y); }
                         return true;
                     }
-                case 203: case 205: case 221: case 222: return true;
+                case 203:
+                    if (_game.Scrolling) return false; // a scroll still going: wait for it first
+                    _game.ScrollMap(c.IntParam(0), c.IntParam(1), c.IntParam(2)); return true;
+                case 221: case 222: return true;
                 case 236: _game.Weather.Set(WeatherType(c.Params.Count > 0 ? c.Params[0] : null), c.IntParam(1), c.IntParam(2)); return true;
                 case 208: _game.Player.Transparent = c.IntParam(0) == 0; return true;
                 case 209:
