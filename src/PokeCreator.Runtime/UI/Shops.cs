@@ -229,7 +229,7 @@ namespace PokeCreator.Runtime.UI
         }
 
         /// <summary>The PC mailbox: read letters, move the Mail back to the Bag (the message is lost) or give it to a Pokémon.</summary>
-        static void Mailbox(Game g, Action back)
+        public static void Mailbox(Game g, Action back)
         {
             var box = g.State.Extras.Mailbox;
             if (box == null || box.Count == 0) { back(); return; }
@@ -267,7 +267,7 @@ namespace PokeCreator.Runtime.UI
             });
         }
 
-        static void PlayerPc(Game g, Action back)
+        public static void PlayerPc(Game g, Action back)
         {
             g.Audio.PlaySe("PC access");
             bool mail = g.State.Extras.Mailbox != null && g.State.Extras.Mailbox.Count > 0;

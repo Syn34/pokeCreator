@@ -209,6 +209,41 @@ namespace PokeCreator.Runtime.Script
             Register("pbFlyToNewLocation", (c, a) => false);
             Register("pbEncounter", (c, a) => FieldMoves.EncounterFrom(_game, new[] { Str(a, 0).TrimStart(':') }));
             Register("pbFadeOutInWithMusic", (c, a) => true);
+            Register("pbEnterPokemonName", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                int max = a.Count > 2 ? Math.Max(1, ToInt(a[2])) : 12;
+                _game.AskName(Str(a, 0), a.Count > 3 ? Str(a, 3) : "", max, n => _game.SetPrompt(c, n ?? ""), null);
+                return "";
+            });
+            Register("pbEnterBoxName", (c, a) =>
+            {
+                object answer;
+                if (_game.TakePrompt(c, out answer)) return answer;
+                _game.PromptPending = true;
+                _game.AskName(Str(a, 0), a.Count > 3 ? Str(a, 3) : "", 12, n => _game.SetPrompt(c, n ?? ""), null);
+                return "";
+            });
+            Register("pbPCItemStorage", (c, a) => { UI.PcMenu.PlayerPc(_game, null); return true; });
+            Register("pbPCMailbox", (c, a) => { UI.PcMenu.Mailbox(_game, () => { }); return true; });
+            Register("pbDive", (c, a) => FieldMoves.TryDive(_game));
+            Register("pbSurfacing", (c, a) => FieldMoves.TryDive(_game));
+            Register("pbAscendWaterfall", (c, a) => { FieldMoves.OfferWaterfall(_game); return true; });
+            Register("pbDescendWaterfall", (c, a) => { FieldMoves.OfferWaterfall(_game); return true; });
+            Register("pbBikeCheck", (c, a) => FieldMoves.CanBike(_game));
+            Register("pbSweetScent", (c, a) => { FieldMoves.SweetScent(_game, _game.State.Party.FirstOrDefault(p => !p.IsEgg)); return true; });
+            Register("pbGetPlayerTrainerType", (c, a) => _game.Player.Look != null ? _game.Player.Look.TrainerType : "");
+            Register("pbLoadTrainer", (c, a) => _game.Project.Trainers.FirstOrDefault(t => t.TrainerType == Str(a, 0) && t.Name == Str(a, 1) && t.Version == (a.Count > 2 ? ToInt(a[2]) : 0)));
+            Register("pbUseItemOnPokemon", (c, a) =>
+            {
+                var pk = Arg(a, 1) as Pokemon; string item = Str(a, 0);
+                if (pk == null || string.IsNullOrEmpty(item)) return false;
+                var it = _game.Project.Items.FirstOrDefault(x => x.Id == item); if (it == null) return false;
+                UI.ItemFlow.UseOn(_game, pk, it, ItemEffects.Info(_game.Project, it), ok => { });
+                return true;
+            });
             Register("pbStoreMail", (c, a) =>
             {
                 var pk = Arg(a, 0) as Pokemon; if (pk == null) return false;
