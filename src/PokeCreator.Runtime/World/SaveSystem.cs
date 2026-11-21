@@ -115,6 +115,7 @@ namespace PokeCreator.Runtime.World
         public static void Save(Game g)
         {
             var s = g.State;
+            GameStats.Inc(g, "save_count");
             if (s.Extras.MovedEvents != null && g.Map != null)
                 foreach (var ev in g.Map.Events)
                 {

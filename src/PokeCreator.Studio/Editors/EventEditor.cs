@@ -53,6 +53,7 @@ namespace PokeCreator.Studio.Editors
                         return "◆ Control Variables: " + target + " " + ops[Math.Min(5, c.IntParam(2))] + " " + val;
                     }
                 case 123: return "◆ Control Self Switch: " + c.StrParam(0) + " = " + (c.IntParam(1) == 0 ? "ON" : "OFF");
+                case 124: return c.IntParam(0) == 0 ? "◆ Control Timer: Start (" + (c.IntParam(1) / 60) + " min " + (c.IntParam(1) % 60) + " sec)" : "◆ Control Timer: Stop";
                 case 125: return "◆ Change Money: " + (c.IntParam(0) == 0 ? "+" : "-") + (c.IntParam(1) == 1 ? "Variable [" + c.IntParam(2).ToString("0000") + ": " + p.VariableName(c.IntParam(2)) + "]" : c.IntParam(2).ToString());
                 case 201:
                     {
@@ -188,6 +189,7 @@ namespace PokeCreator.Studio.Editors
                 case 2: return "Self Switch " + c.StrParam(1) + " is " + (c.IntParam(2) == 0 ? "ON" : "OFF");
                 case 6: return Who(c.IntParam(1)) + " is facing " + c.IntParam(2);
                 case 7: return "Money " + (c.IntParam(2) == 0 ? ">=" : "<=") + " " + c.IntParam(1);
+                case 3: return "Timer " + (c.IntParam(2) == 0 ? ">=" : "<=") + " " + (c.IntParam(1) / 60) + " min " + (c.IntParam(1) % 60) + " sec";
                 case 12:
                     {
                         string sc = c.StrParam(1).Trim();

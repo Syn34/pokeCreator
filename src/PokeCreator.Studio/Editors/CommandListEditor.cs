@@ -416,6 +416,8 @@ namespace PokeCreator.Studio.Editors
             cmd(sys, "Allow / Forbid Saving", () => { int k = ChoiceDialog.Ask(FindForm(), "Saving", new[] { "Forbid", "Allow" }, false); if (k >= 0) Insert(new EventCommand(134, 0, k)); });
             cmd(sys, "Allow / Forbid the Pause Menu", () => { int k = ChoiceDialog.Ask(FindForm(), "Pause menu", new[] { "Forbid", "Allow" }, false); if (k >= 0) Insert(new EventCommand(135, 0, k)); });
             cmd(sys, "Turn Wild Encounters Off / On", () => { int k = ChoiceDialog.Ask(FindForm(), "Wild encounters", new[] { "Off", "On" }, false); if (k >= 0) Insert(new EventCommand(136, 0, k)); });
+            cmd(sys, "Start Timer (shown on screen)…", () => { int s = NumberDialog.Ask(FindForm(), "Timer length in seconds", 60, 1); if (s > 0) Insert(new EventCommand(124, 0, 0, s)); });
+            cmd(sys, "Stop Timer", () => Insert(new EventCommand(124, 0, 1, 0)));
             cmd(sys, "Wait for a Button Press (into variable)", () => { int v = NumberDialog.Ask(FindForm(), "Variable to store the button in (2/4/6/8 directions, 13 Action, 12 Cancel, 14 Menu)", 1); if (v > 0) Insert(new EventCommand(105, 0, v)); });
             cmd(sys, "Name Entry (player's name)", () => Insert(new EventCommand(303, 0, 1, 10)));
 

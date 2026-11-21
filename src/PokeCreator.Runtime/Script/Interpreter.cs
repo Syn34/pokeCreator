@@ -221,7 +221,10 @@ namespace PokeCreator.Runtime.Script
                 case 123:
                     if (EventId > 0) { _game.State.SetSelf(MapId, EventId, c.StrParam(0), c.IntParam(1) == 0); _game.Map.RefreshEvents(); }
                     return true;
-                case 124: Warn(124, "Timer"); return true;
+                case 124: // Control Timer: start (seconds) / stop
+                    if (c.IntParam(0) == 0) { _game.State.Extras.TimerOn = true; _game.State.Extras.TimerFrames = c.IntParam(1) * 60; }
+                    else _game.State.Extras.TimerOn = false;
+                    return true;
                 case 125:
                     {
                         int v = Operand(c.IntParam(1), c.IntParam(2));
@@ -440,6 +443,12 @@ namespace PokeCreator.Runtime.Script
                 case 2: return EventId > 0 && s.GetSelf(MapId, EventId, c.StrParam(1)) == (c.IntParam(2) == 0);
                 case 6: { var ch = GetCharacter(c.IntParam(1)); return ch != null && ch.Direction == c.IntParam(2); }
                 case 7: return c.IntParam(2) == 0 ? s.Money >= c.IntParam(1) : s.Money <= c.IntParam(1);
+                case 3: // Timer: seconds left >= / <= value
+                    {
+                        if (!s.Extras.TimerOn) return false;
+                        int secs = s.Extras.TimerFrames / 60;
+                        return c.IntParam(2) == 0 ? secs >= c.IntParam(1) : secs <= c.IntParam(1);
+                    }
                 case 11:
                     {
                         int b = c.IntParam(1);
@@ -467,7 +476,17 @@ namespace PokeCreator.Runtime.Script
                         break;
                     }
                 case 7:
-                    switch (c.IntParam(4)) { case 0: value = _game.Map.Id; break; case 2: value = _game.State.Money; break; case 3: value = _game.State.Steps; break; default: value = 0; break; }
+                    switch (c.IntParam(4))
+                    {
+                        case 0: value = _game.Map.Id; break;
+                        case 1: value = _game.State.Party.Count; break;
+                        case 2: value = _game.State.Money; break;
+                        case 3: value = _game.State.Steps; break;
+                        case 4: value = (int)(_game.State.PlayFrames / 60); break;
+                        case 5: value = _game.State.Extras.TimerOn ? _game.State.Extras.TimerFrames / 60 : 0; break;
+                        case 6: value = World.GameStats.Int(_game, "save_count"); break;
+                        default: value = 0; break;
+                    }
                     break;
                 default: value = 0; break;
             }

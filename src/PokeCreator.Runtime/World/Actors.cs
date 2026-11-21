@@ -403,7 +403,7 @@ namespace PokeCreator.Runtime.World
         }
     }
 
-    /// <summary>Wild encounters from the project's encounter tables (battles are a placeholder for now).</summary>
+    /// <summary>Wild encounters from the project's encounter tables.</summary>
     public class EncounterSystem
     {
         readonly Game _game;

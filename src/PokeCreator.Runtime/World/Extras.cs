@@ -18,6 +18,9 @@ namespace PokeCreator.Runtime.World
     /// <summary>Saved state for the optional Essentials systems: partner, roamers, Safari Zone, Bug-Catching Contest, Mystery Gift...</summary>
     public class GameExtras
     {
+        /// <summary>RPG Maker's Timer command: frames left (counts down while TimerOn).</summary>
+        public int TimerFrames { get; set; }
+        public bool TimerOn { get; set; }
         public PartnerInfo Partner { get; set; }
         public List<RoamerState> Roamers { get; set; }
         public SafariState Safari { get; set; }

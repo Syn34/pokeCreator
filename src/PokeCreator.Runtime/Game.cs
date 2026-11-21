@@ -431,7 +431,7 @@ namespace PokeCreator.Runtime
             }
         }
 
-        // ------------------------------------------------------------------ battles (placeholders until the battle system lands)
+        // ------------------------------------------------------------------ battles
         // ------------------------------------------------------------------ battles
         /// <summary>
         /// The result of the last battle, for the event that started it: a Conditional Branch with
@@ -799,6 +799,17 @@ namespace PokeCreator.Runtime
             Audio.PlaySe("Exclaim");
         }
 
+        /// <summary>RPG Maker's timer in the top-right corner while it runs.</summary>
+        void DrawTimer()
+        {
+            if (State == null || !State.Extras.TimerOn) return;
+            int secs = Math.Max(0, (State.Extras.TimerFrames + 59) / 60);
+            string t = (secs / 60).ToString("00") + ":" + (secs % 60).ToString("00");
+            int w = Gfx.TextWidth(t) + 24;
+            UI.Ui.Box(Gfx, Gfx.Width - w - 8, 8, w, 48);
+            UI.Ui.Text(Gfx, Gfx.Width - w + 4, 18, t);
+        }
+
         void DrawExclaim()
         {
             if (_exclaimTimer <= 0 || _exclaimOn == null) return;
@@ -867,6 +878,7 @@ namespace PokeCreator.Runtime
             }
             if (Map == null) return;
             State.PlayFrames++;
+            if (State.Extras.TimerOn && State.Extras.TimerFrames > 0) State.Extras.TimerFrames--;
             if (_transfer == null && _fadeAlpha > 0) _fadeAlpha = Math.Max(0, _fadeAlpha - 16);
             if (_transfer != null) { UpdateTransfer(); if (_transfer != null && _transfer.Phase < 2) return; }
 
@@ -990,6 +1002,7 @@ namespace PokeCreator.Runtime
                 Pictures.Draw(Gfx, this);
                 World.PokeRadar.Draw(this, Gfx, DisplayX - (int)_shake, DisplayY, FrameCount);
                 DrawExclaim();
+                DrawTimer();
                 DrawLocationSign();
             }
             for (int i = Math.Max(0, firstOpaque); i < _scenes.Count; i++) _scenes[i].Draw(Gfx);
