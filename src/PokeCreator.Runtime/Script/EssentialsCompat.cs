@@ -827,18 +827,25 @@ namespace PokeCreator.Runtime.Script
             Register("pbChooseMove", (c, a) =>
             {
                 // pbChooseMove(pkmn, variable, nameVariable): variable = move index (-1 = cancelled)
+                object answer;
+                if (c != null && _game.TakePrompt(c, out answer)) return true;
                 var pk = Arg(a, 0) as PokeCreator.Pkmn.Pokemon;
                 int v = a.Count > 1 ? ToInt(a[1]) : 1, nv = a.Count > 2 ? ToInt(a[2]) : 0;
                 _game.State.SetVar(v, -1);
                 if (pk == null) return true;
                 var names = pk.Moves.Select(m => PokeCreator.Pkmn.ItemEffects.MoveName(_game.Project, m.Id)).ToList();
                 names.Add("Cancel");
+                if (c != null) _game.PromptPending = true;
                 _game.Message.Show("Which move?", names, names.Count - 1, k =>
                 {
-                    if (k < 0 || k >= pk.Moves.Count) { _game.State.SetVar(v, -1); return; }
-                    _game.State.SetVar(v, k);
-                    if (nv > 0) _game.State.SetStr(nv, names[k]);
-                    if (_game.Map != null) _game.Map.RefreshEvents();
+                    if (k < 0 || k >= pk.Moves.Count) _game.State.SetVar(v, -1);
+                    else
+                    {
+                        _game.State.SetVar(v, k);
+                        if (nv > 0) _game.State.SetStr(nv, names[k]);
+                        if (_game.Map != null) _game.Map.RefreshEvents();
+                    }
+                    if (c != null) _game.SetPrompt(c, true);
                 });
                 return true;
             });
@@ -1114,9 +1121,9 @@ namespace PokeCreator.Runtime.Script
 
             Register("pbGetPokemon", (c, a) => { int i = _game.State.GetVar(ToInt(Arg(a, 0))); return i >= 0 && i < _game.State.Party.Count ? _game.State.Party[i] : null; });
             Register("pbPartyCount", (c, a) => _game.Party.Count);
-            Register("pbChooseNonEggPokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg); return true; });
-            Register("pbChoosePokemon", (c, a) => { ChoosePokemon(a, pk => true); return true; });
-            Register("pbChooseAblePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.Fainted); return true; });
+            Register("pbChooseNonEggPokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg, c); return true; });
+            Register("pbChoosePokemon", (c, a) => { ChoosePokemon(a, pk => true, c); return true; });
+            Register("pbChooseAblePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.Fainted, c); return true; });
             Register("$player.has_other_able_pokemon?", (c, a) => { int i = ToInt(Arg(a, 0)); return _game.State.Party.Where((pk, k) => k != i).Any(pk => !pk.IsEgg && !pk.Fainted); });
             Register("cannot_store", (c, a) => false);
             // Day Care (Essentials v21 DayCare class)
@@ -1761,8 +1768,16 @@ namespace PokeCreator.Runtime.Script
         }
 
         /// <summary>pbChoosePokemon(var, nameVar): the party screen; var = index (-1 if cancelled), nameVar = name.</summary>
-        void ChoosePokemon(List<object> a, Func<PokeCreator.Pkmn.Pokemon, bool> allowed)
+        /// <summary>
+        /// pbChoosePokemon and friends: the party screen; the variable gets the index (-1 = cancelled). With an event
+        /// running, the script waits for the choice (so lines after it in the same script see the result).
+        /// </summary>
+        void ChoosePokemon(List<object> a, Func<PokeCreator.Pkmn.Pokemon, bool> allowed, Interpreter ctx = null)
         {
+            object answer;
+            if (ctx != null && _game.TakePrompt(ctx, out answer)) return;
+            if (ctx != null) _game.PromptPending = true;
+            Action answered = () => { if (ctx != null) _game.SetPrompt(ctx, true); };
             int v = a.Count > 0 ? ToInt(a[0]) : 1, nameVar = a.Count > 1 ? ToInt(a[1]) : 0;
             var proc = a.Count > 2 ? a[2] as ScriptProc : null;
             if (proc != null) { var basic = allowed; allowed = pk => basic(pk) && CallProc(proc, pk); }
@@ -1775,7 +1790,8 @@ namespace PokeCreator.Runtime.Script
                 if (nameVar > 0) _game.State.SetStr(nameVar, pk.Name(_game.Project));
                 close();
                 if (_game.Map != null) _game.Map.RefreshEvents();
-            }, () => { _game.State.SetVar(v, -1); }));
+                answered();
+            }, () => { _game.State.SetVar(v, -1); answered(); }));
         }
         static string Str(List<object> a, int i) { return i < a.Count && a[i] != null ? Convert.ToString(a[i], CultureInfo.InvariantCulture) : ""; }
         static int ToInt(object o)

@@ -340,10 +340,10 @@ namespace PokeCreator.Runtime.Script
             Register("pbChoosePokemonForTrade", (c, a) =>
             {
                 string sp = Str(a, 2);
-                ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && (sp.Length == 0 || pk.Species == sp));
+                ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && (sp.Length == 0 || pk.Species == sp), c);
                 return true;
             });
-            Register("pbChooseTradablePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon); return true; });
+            Register("pbChooseTradablePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon, c); return true; });
 
             // pbEnterNPCName(prompt, min, max, default, charset): asks, then the script runs again with the name
             Register("pbEnterNPCName", (c, a) =>
