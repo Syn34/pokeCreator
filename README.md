@@ -94,7 +94,7 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Service NPCs in one click** (Gift Pokémon, legendary encounter, in-game trade, Move Relearner / Deleter, Name Rater), Duplicate Map, shift map contents, Database → Import PBS Files
 - Event scripts behave like Essentials: they wait for messages, questions (pbConfirmMessage), party / move choices, waits and battles before the next line; Ruby string interpolation; keyboard typing in name entry
 - **Obedience**: traded Pokémon above the badge level (10 per badge) may nap, loaf around or use another move, as in Essentials (Game Settings can turn it off or apply it to every Pokémon)
-- Grass rustle, landing dust, jump shadows, tall-grass bush depth, water reflections; BGS ambient sounds and music effects that pause the BGM; game controllers, key rebinding, screen size / full screen (Alt+Enter); F5 Ready menu; F9 debug menu in playtests
+- Grass rustle, landing dust, jump shadows, tall-grass bush depth, water reflections; BGS ambient sounds and music effects that pause the BGM; game controllers, key rebinding, screen size / full screen (Alt+Enter); F5 Ready menu; F9 debug menu in playtests; F12 soft reset to the title screen
 
 **Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
 

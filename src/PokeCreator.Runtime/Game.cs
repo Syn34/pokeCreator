@@ -340,6 +340,17 @@ namespace PokeCreator.Runtime
             else if (Player.Cycling && !World.FieldMoves.CanBike(this)) Player.Cycling = false;
         }
 
+        /// <summary>F12 (as Essentials): drop the current game without saving and go back to the title screen.</summary>
+        public void SoftReset()
+        {
+            Message = new UI.MessageWindow(this);
+            PromptPending = false; ResumeOutcome = null; ResumeOwner = null; _transfer = null;
+            Weather.Set(World.WeatherSystem.None, 0, 0);
+            Array.Clear(_toneTarget, 0, 4); Array.Clear(_tone, 0, 4); _toneFrames = 0; _flash = 0;
+            Audio.StopBgs();
+            ReturnToTitle();
+        }
+
         public void ReturnToTitle()
         {
             _scenes.Clear();
@@ -913,6 +924,7 @@ namespace PokeCreator.Runtime
                 else { _windowedSize = Options.ScreenSize > 0 ? Options.ScreenSize : Math.Max(1, Project.Settings.WindowScale); Options.ScreenSize = 5; }
                 Options.Apply(this); Options.Save(this);
             }
+            if (Input.KeyTrigger(Scancode.F12) && !(_scenes.Count == 1 && _scenes[0] is TitleScene)) { SoftReset(); return; }
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
             if (_scenes.Count > 0)
             {
