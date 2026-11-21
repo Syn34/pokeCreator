@@ -155,6 +155,8 @@ namespace PokeCreator.Pkmn
         /// <summary>Shadow Pokémon (see Shadow): heart gauge 0-4000, EXP saved until purified.</summary>
         public bool ShadowPokemon { get; set; }
         public int HeartGauge { get; set; }
+        /// <summary>Size of this Shadow Pokémon's heart gauge (0 = the usual 4000).</summary>
+        public int HeartGaugeMax { get; set; }
         public int SavedExp { get; set; }
         /// <summary>Pokérus as in the games: strain in the high 4 bits, days left in the low 4 (0 = never had it).</summary>
         public int Pokerus { get; set; }

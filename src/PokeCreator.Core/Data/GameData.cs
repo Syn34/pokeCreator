@@ -200,6 +200,8 @@ namespace PokeCreator.Data
         [Field("Wild item (rare)", Ref = "items", Group = "Wild")] public List<string> WildItemRare { get; set; }
 
         [Field("Mega stone", Ref = "items", Group = "Forms")] public string MegaStone { get; set; }
+        [Field("Shadow heart gauge", Group = "Shadow", Help = "Heart gauge size when this species is a Shadow Pokémon (0 = 4000). PBS shadow_pokemon.txt.")] public int ShadowGaugeSize { get; set; }
+        [Field("Shadow moves", Group = "Shadow", Help = "Shadow moves it knows as a Shadow Pokémon (empty = Shadow Rush).")] public List<string> ShadowMoves { get; set; }
         [Field("Mega move", Ref = "moves", Group = "Forms")] public string MegaMove { get; set; }
         [Field("Mega message", Group = "Forms")] public int MegaMessage { get; set; }
         [Field("Flags")] public List<string> Flags { get; set; }

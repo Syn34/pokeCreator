@@ -60,6 +60,7 @@ namespace PokeCreator.Import
             Step("map_connections", ImportConnections);
             Step("berry_plants", ImportBerryPlants);
             Step("ribbons", ImportRibbons);
+            Step("shadow_pokemon", ImportShadow);
 
             ImportSystem();
             ImportCommonEvents();
@@ -93,7 +94,7 @@ namespace PokeCreator.Import
         }
 
         /// <summary>The PBS files ImportPbsInto can read, in the order they're read.</summary>
-        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections", "berry_plants", "ribbons" };
+        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections", "berry_plants", "ribbons", "shadow_pokemon" };
 
         /// <summary>
         /// Reads chosen PBS files into an existing project (Database → Import PBS Files): records with the same ID are
@@ -125,8 +126,10 @@ namespace PokeCreator.Import
             if (want("map_connections")) Step("map_connections", ImportConnections);
             if (want("berry_plants")) Step("berry_plants", ImportBerryPlants);
             if (want("ribbons")) Step("ribbons", ImportRibbons);
+            if (want("shadow_pokemon")) Step("shadow_pokemon", ImportShadow);
             var report = new List<string>();
             if (want("berry_plants")) report.Add("berry plants");
+            if (want("shadow_pokemon")) report.Add("Shadow Pokémon");
             if (want("ribbons")) report.Add("ribbons " + MergeRecords(target.Ribbons, _p.Ribbons, x => x.Id));
             if (want("types")) report.Add("types " + MergeRecords(target.Types, _p.Types, x => x.Id));
             if (want("abilities")) report.Add("abilities " + MergeRecords(target.Abilities, _p.Abilities, x => x.Id));
@@ -491,6 +494,25 @@ namespace PokeCreator.Import
                 WarnUnknown(this, "berry_plants", s.Header, Apply(it, s.Lines)); n++;
             }
             Log("  " + n + " berry plants");
+        }
+
+        // PBS/shadow_pokemon.txt: heart gauge size and Shadow moves per species
+        void ImportShadow(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            int n = 0;
+            foreach (var s in secs)
+            {
+                var d = _p.Species.FirstOrDefault(x => x.Id == s.Header && x.Form == 0) ?? _p.Species.FirstOrDefault(x => x.Id == s.Header);
+                if (d == null) { Warn("shadow_pokemon.txt: unknown species " + s.Header); continue; }
+                foreach (var l in s.Lines)
+                {
+                    if (l.Key == null) continue;
+                    if (l.Key.Equals("GaugeSize", StringComparison.OrdinalIgnoreCase)) d.ShadowGaugeSize = int.Parse(l.Value.Trim(), Inv);
+                    else if (l.Key.Equals("Moves", StringComparison.OrdinalIgnoreCase)) d.ShadowMoves = l.Value.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                }
+                n++;
+            }
+            Log("  " + n + " Shadow Pokémon");
         }
 
         // PBS/ribbons.txt: ribbon names and descriptions

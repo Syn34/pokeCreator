@@ -55,8 +55,22 @@ namespace PokeCreator.Pkmn
             if (pk.ShadowPokemon) return;
             EnsureData(p);
             pk.ShadowPokemon = true;
-            pk.HeartGauge = HeartGaugeSize;
+            var d = pk.Data(p) ?? p.Species.FirstOrDefault(s => s.Id == pk.Species);
+            pk.HeartGaugeMax = d != null && d.ShadowGaugeSize > 0 ? d.ShadowGaugeSize : 0;
+            pk.HeartGauge = GaugeSize(pk);
             pk.SavedExp = 0;
+            // Species with Shadow moves set (PBS shadow_pokemon.txt): they take the first move slots
+            var list = d != null && d.ShadowMoves != null ? d.ShadowMoves.Where(id => p.Moves.Any(m => m.Id == id)).Take(4).ToList() : new List<string>();
+            if (list.Count > 0)
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var smd = p.Moves.First(m => m.Id == list[i]);
+                    var spm = new PokemonMove { Id = smd.Id, PP = Math.Max(1, smd.TotalPP) };
+                    if (i < pk.Moves.Count) pk.Moves[i] = spm; else pk.Moves.Add(spm);
+                }
+                return;
+            }
             var rush = p.Moves.First(m => m.Id == "SHADOWRUSH");
             var pm = new PokemonMove { Id = rush.Id, PP = Math.Max(1, rush.TotalPP) };
             if (pk.Moves.Count == 0) pk.Moves.Add(pm);
@@ -64,7 +78,8 @@ namespace PokeCreator.Pkmn
         }
 
         /// <summary>Heart gauge stage 0-5 (5 = completely closed).</summary>
-        public static int Stage(Pokemon pk) { return !pk.ShadowPokemon || pk.HeartGauge <= 0 ? 0 : (pk.HeartGauge - 1) * 5 / HeartGaugeSize + 1; }
+        public static int GaugeSize(Pokemon pk) { return pk.HeartGaugeMax > 0 ? pk.HeartGaugeMax : HeartGaugeSize; }
+        public static int Stage(Pokemon pk) { return !pk.ShadowPokemon || pk.HeartGauge <= 0 ? 0 : Math.Min(5, (pk.HeartGauge - 1) * 5 / GaugeSize(pk) + 1); }
 
         public static bool Purifiable(Pokemon pk) { return pk.ShadowPokemon && pk.HeartGauge <= 0 && !pk.IsEgg; }
 
@@ -73,7 +88,7 @@ namespace PokeCreator.Pkmn
         {
             if (!pk.ShadowPokemon) return false;
             int before = pk.HeartGauge;
-            pk.HeartGauge = Math.Max(0, Math.Min(HeartGaugeSize, pk.HeartGauge + amount));
+            pk.HeartGauge = Math.Max(0, Math.Min(GaugeSize(pk), pk.HeartGauge + amount));
             return pk.HeartGauge != before;
         }
 
