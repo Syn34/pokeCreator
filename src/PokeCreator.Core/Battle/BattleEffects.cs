@@ -125,6 +125,26 @@ namespace PokeCreator.Battles
             if (b == null || b.Pk.Fainted) return;
             EntryHazards(b);
             if (b.Pk.Fainted) return;
+            PrimalReversion(b);
+            EntryAbility(b);
+        }
+
+        /// <summary>Kyogre holding the Blue Orb / Groudon holding the Red Orb return to their primal forms on entering.</summary>
+        void PrimalReversion(Battler b)
+        {
+            if (b.Pk.Form != 0 || !ItemWorks(b)) return;
+            if (!(b.Pk.Species == "KYOGRE" && b.Pk.Item == "BLUEORB") && !(b.Pk.Species == "GROUDON" && b.Pk.Item == "REDORB")) return;
+            if (P.Species.FirstOrDefault(s => s.Id == b.Pk.Species + "_1") == null) return;
+            if (!_formBeforeMega.ContainsKey(b.Pk)) _formBeforeMega[b.Pk] = b.Pk.Form;
+            b.Pk.Form = 1; b.AbilityOverride = null;
+            _ev.Add(new BattleEvent { Kind = BattleEventKind.FormChange, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Text = "Mega" });
+            Say(Name(b) + "'s Primal Reversion! It reverted to its primal form!");
+        }
+
+        /// <summary>Abilities that act when a Pokémon enters (also after Trace or Mega Evolution, without entry hazards).</summary>
+        void EntryAbility(Battler b)
+        {
+            if (b == null || b.Pk.Fainted) return;
             var foe = Live(1 - b.Side).FirstOrDefault();
             switch (AbilityOf(b))
             {

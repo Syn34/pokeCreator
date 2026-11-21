@@ -472,6 +472,18 @@ namespace PokeCreator.Battles
             return slot >= 0 && slot < b.Pk.Moves.Count ? Move(b.Pk.Moves[slot].Id) : null;
         }
 
+        /// <summary>Power Weight / Bracer / Belt / Lens / Band / Anklet: the stat they add EVs to.</summary>
+        public static int PowerItemStat(string item)
+        {
+            switch (item)
+            {
+                case "POWERWEIGHT": return PokeCreator.Pkmn.Stat.HP; case "POWERBRACER": return PokeCreator.Pkmn.Stat.Attack;
+                case "POWERBELT": return PokeCreator.Pkmn.Stat.Defense; case "POWERLENS": return PokeCreator.Pkmn.Stat.SpAtk;
+                case "POWERBAND": return PokeCreator.Pkmn.Stat.SpDef; case "POWERANKLET": return PokeCreator.Pkmn.Stat.Speed;
+            }
+            return -1;
+        }
+
         int Speed(Battler b)
         {
             int s = Stat(b, PokeCreator.Pkmn.Stat.Speed);
@@ -1806,14 +1818,20 @@ namespace PokeCreator.Battles
                 int amount = (int)exp;
                 // EVs
                 if (fd != null)
-                    foreach (var ev in fd.EVs)
+                {
+                    // EV yield, then Macho Brace (doubles) / Power items (+8 to one stat), then Pokérus (doubles)
+                    var yield = new int[6];
+                    foreach (var ev in fd.EVs) { int s = PokeCreator.Pkmn.Stat.IndexOf(ev.Stat); if (s >= 0) yield[s] += ev.Value; }
+                    int power = PowerItemStat(pk.Item);
+                    if (pk.Item == "MACHOBRACE") for (int s = 0; s < 6; s++) yield[s] *= 2;
+                    else if (power >= 0) yield[power] += 8;
+                    if (pk.Pokerus != 0) for (int s = 0; s < 6; s++) yield[s] *= 2;
+                    for (int s = 0; s < 6; s++)
                     {
-                        int s = PokeCreator.Pkmn.Stat.IndexOf(ev.Stat);
-                        if (s < 0) continue;
-                        int gain = ev.Value * (pk.Pokerus != 0 ? 2 : 1);
-                        int add = Math.Min(gain, Math.Min(ItemEffects.MaxEV - pk.EV[s], ItemEffects.MaxTotalEV - pk.EV.Sum()));
+                        int add = Math.Min(yield[s], Math.Min(ItemEffects.MaxEV - pk.EV[s], ItemEffects.MaxTotalEV - pk.EV.Sum()));
                         if (add > 0) pk.EV[s] += add;
                     }
+                }
                 if (pk.ShadowPokemon) { pk.SavedExp += amount; continue; } // Shadow Pokémon store their EXP until purified
                 Say(pk.Name(P) + " gained " + amount + " Exp. Points!");
                 int expBefore = pk.Exp;
@@ -1914,10 +1932,10 @@ namespace PokeCreator.Battles
         public static bool IsBattlerItem(string id)
         {
             return XItemStat(id) >= 0 || id == "DIREHIT" || id == "DIREHIT2" || id == "DIREHIT3" || id == "GUARDSPEC" || id == "YELLOWFLUTE" || id == "REDFLUTE"
-                || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY";
+                || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY" || id == "POKEFLUTE";
         }
         /// <summary>Items used on the whole side or the battle, not on a chosen Pokémon.</summary>
-        public static bool IsDirectBattleItem(string id) { return id == "GUARDSPEC" || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY"; }
+        public static bool IsDirectBattleItem(string id) { return id == "GUARDSPEC" || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY" || id == "POKEFLUTE"; }
 
         static int XItemStat(string id)
         {
@@ -1956,6 +1974,15 @@ namespace PokeCreator.Battles
                 Outcome = BattleOutcome.Escaped;
                 Say("You got away safely!");
                 _ev.Add(new BattleEvent { Kind = BattleEventKind.Flee });
+                return;
+            }
+            if (id == "POKEFLUTE")
+            {
+                // Wakes every Pokémon in battle (not those with Soundproof)
+                bool any = false;
+                foreach (var w in OnField.Where(x => !x.Pk.Fainted && (x.Pk.Status ?? "").ToUpperInvariant() == "SLEEP" && !HasAbility(x, "SOUNDPROOF")).ToList())
+                { w.Pk.Status = ""; w.SleepTurns = 0; StatusEvent(w); any = true; }
+                Say(any ? "All Pokémon were roused by the tune!" : "The Poké Flute's tune echoed... but nothing happened.");
                 return;
             }
             if (id == "GUARDSPEC")

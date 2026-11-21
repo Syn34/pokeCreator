@@ -21,6 +21,8 @@ namespace PokeCreator.Runtime.World
         public int LastWateredStage { get; set; }
         /// <summary>How many times the plant has dropped its berries and grown again.</summary>
         public int Replants { get; set; }
+        /// <summary>Mulch put in the soil before planting (GROWTHMULCH, DAMPMULCH, STABLEMULCH, GOOEYMULCH) or null.</summary>
+        public string Mulch { get; set; }
     }
 
     /// <summary>
@@ -73,10 +75,12 @@ namespace PokeCreator.Runtime.World
         {
             if (p == null) return -1;
             double hours = (DateTime.UtcNow.Ticks - p.PlantedAt) / (double)TimeSpan.TicksPerHour;
-            int hps = HoursPerStage(p.Berry);
-            // Ripe berries stay for 4 stages' time, then drop and the plant starts again
-            double cycle = hps * 8.0;
-            while (hours >= cycle && p.Replants < MaxReplants)
+            // Growth Mulch: grows faster; Damp Mulch: slower
+            double hps = HoursPerStage(p.Berry) * (p.Mulch == "GROWTHMULCH" ? 0.75 : p.Mulch == "DAMPMULCH" ? 1.5 : 1);
+            // Ripe berries stay for 4 stages' time (longer with Stable Mulch), then drop and the plant starts again
+            double cycle = hps * 4 + hps * 4 * (p.Mulch == "STABLEMULCH" ? 1.5 : 1);
+            int maxReplants = p.Mulch == "GOOEYMULCH" ? MaxReplants + 5 : MaxReplants;
+            while (hours >= cycle && p.Replants < maxReplants)
             {
                 p.PlantedAt += (long)(cycle * TimeSpan.TicksPerHour);
                 p.Replants++; p.WateredStages = 0; p.LastWateredStage = -1;
@@ -89,7 +93,9 @@ namespace PokeCreator.Runtime.World
         public static int Moisture(BerryPlantState p)
         {
             double hours = (DateTime.UtcNow.Ticks - p.MoistureAt) / (double)TimeSpan.TicksPerHour;
-            return Math.Max(0, p.Moisture - (int)(hours * 15)); // dries 15% an hour
+            // dries 15% an hour; twice as fast with Growth Mulch, half as fast with Damp Mulch
+            double rate = p.Mulch == "GROWTHMULCH" ? 30 : p.Mulch == "DAMPMULCH" ? 7.5 : 15;
+            return Math.Max(0, p.Moisture - (int)(hours * rate));
         }
 
         public static int Yield(BerryPlantState p)
@@ -167,19 +173,41 @@ namespace PokeCreator.Runtime.World
                 }));
         }
 
+        public static readonly string[] Mulches = { "GROWTHMULCH", "DAMPMULCH", "STABLEMULCH", "GOOEYMULCH" };
+
         static void AskPlant(Game g, int mapId, int eventId)
         {
             bool anyBerry = g.State.Bag.Any(kv => kv.Value > 0 && IsBerry(g, kv.Key));
             if (!anyBerry) { g.Message.Show("It's soft, loamy soil."); return; }
-            g.Message.Show("It's soft, loamy soil.\\nWant to plant a Berry?", new List<string> { "Yes", "No" }, 1, c =>
+            // Mulch first (as Essentials), if the player has any
+            if (Mulches.Any(m => g.State.ItemCount(m) > 0))
+            {
+                g.Message.Show("It's soft, loamy soil.\\nWant to fertilize the soil?", new List<string> { "Yes", "No" }, 1, c =>
+                {
+                    if (c != 0) { AskBerry(g, mapId, eventId, null); return; }
+                    g.PushScene(new BagScene(g, mulch =>
+                    {
+                        if (mulch == null || !Mulches.Contains(mulch) || g.State.ItemCount(mulch) <= 0) { AskBerry(g, mapId, eventId, null); return; }
+                        g.Message.Show("The " + BerryName(g, mulch) + " was scattered on the soil.", null, -1, _ => AskBerry(g, mapId, eventId, mulch));
+                    }, it => Mulches.Contains(it.Id), null));
+                });
+                return;
+            }
+            AskBerry(g, mapId, eventId, null);
+        }
+
+        static void AskBerry(Game g, int mapId, int eventId, string mulch)
+        {
+            g.Message.Show(mulch == null ? "It's soft, loamy soil.\\nWant to plant a Berry?" : "Want to plant a Berry?", new List<string> { "Yes", "No" }, 1, c =>
             {
                 if (c != 0) return;
                 g.PushScene(new BagScene(g, berry =>
                 {
                     if (berry == null || !IsBerry(g, berry) || g.State.ItemCount(berry) <= 0) return;
                     g.State.RemoveItem(berry, 1);
+                    if (mulch != null) g.State.RemoveItem(mulch, 1);
                     long now = DateTime.UtcNow.Ticks;
-                    g.State.BerryPlants[Key(mapId, eventId)] = new BerryPlantState { Berry = berry, PlantedAt = now, Moisture = 100, MoistureAt = now, LastWateredStage = -1 };
+                    g.State.BerryPlants[Key(mapId, eventId)] = new BerryPlantState { Berry = berry, PlantedAt = now, Moisture = 100, MoistureAt = now, LastWateredStage = -1, Mulch = mulch };
                     Refresh(g);
                     g.Message.Show("\\PN planted a " + BerryName(g, berry) + " in the soft, loamy soil.");
                 }, it => IsBerry(g, it.Id), null));

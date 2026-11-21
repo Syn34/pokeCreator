@@ -52,7 +52,7 @@ namespace PokeCreator.Pkmn
         static readonly Dictionary<string, string> StatusItems = new Dictionary<string, string>
         {
             { "ANTIDOTE", "POISON" }, { "PECHABERRY", "POISON" }, { "BURNHEAL", "BURN" }, { "RAWSTBERRY", "BURN" }, { "ICEHEAL", "FROZEN" },
-            { "ASPEARBERRY", "FROZEN" }, { "AWAKENING", "SLEEP" }, { "CHESTOBERRY", "SLEEP" }, { "BLUEFLUTE", "SLEEP" }, { "PARALYZEHEAL", "PARALYSIS" },
+            { "ASPEARBERRY", "FROZEN" }, { "AWAKENING", "SLEEP" }, { "CHESTOBERRY", "SLEEP" }, { "BLUEFLUTE", "SLEEP" }, { "POKEFLUTE", "SLEEP" }, { "PARALYZEHEAL", "PARALYSIS" },
             { "CHERIBERRY", "PARALYSIS" }, { "FULLHEAL", "ALL" }, { "HEALPOWDER", "ALL" }, { "LAVACOOKIE", "ALL" }, { "OLDGATEAU", "ALL" },
             { "CASTELIACONE", "ALL" }, { "LUMIOSEGALETTE", "ALL" }, { "SHALOURSABLE", "ALL" }, { "BIGMALASADA", "ALL" }, { "PEWTERCRUNCHIES", "ALL" },
             { "LUMBERRY", "ALL" },
@@ -102,7 +102,7 @@ namespace PokeCreator.Pkmn
             else if ((item.FieldUse == "TM" || item.FieldUse == "HM" || item.FieldUse == "TR") && !string.IsNullOrEmpty(item.Move))
             { info.Kind = ItemKind.TeachMove; info.Move = item.Move; info.Consumed = item.FieldUse == "TR"; }
             else if (p.Species.Any(sp => sp.Evolutions.Any(e => e.Method != null && e.Method.StartsWith("Item") && e.Parameter == id))) info.Kind = ItemKind.Evolution;
-            if (item.Consumable == false) info.Consumed = false;
+            if (item.Consumable == false || id == "POKEFLUTE") info.Consumed = false;
             return info;
         }
 

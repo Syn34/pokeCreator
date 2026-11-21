@@ -315,7 +315,7 @@ namespace PokeCreator.Battles
         {
             if (!ItemWorks(b)) return 1;
             if (b.Pk.Item == "QUICKPOWDER" && b.Pk.Species == "DITTO" && b.StatsOverride == null) return 2;
-            if (b.Pk.Item == "IRONBALL") return 0.5;
+            if (b.Pk.Item == "IRONBALL" || b.Pk.Item == "MACHOBRACE" || PowerItemStat(b.Pk.Item) >= 0) return 0.5;
             return 1;
         }
 

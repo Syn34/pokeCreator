@@ -50,7 +50,7 @@ namespace PokeCreator.Battles
             _ev.Add(new BattleEvent { Kind = BattleEventKind.FormChange, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Text = "Mega" });
             Say(Name(b) + " has Mega Evolved into " + (string.IsNullOrEmpty(form.FormName) ? "Mega " + oldName : form.FormName) + "!");
             b.AbilityOverride = null;
-            SwitchInAbility(b);
+            EntryAbility(b);
         }
 
         string MegaRingName()

@@ -111,6 +111,8 @@ namespace PokeCreator.Runtime.UI
             {
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
+                case "COINCASE": g.Message.Show("Coins: " + g.State.Coins.ToString("N0")); return;
+                case "POKEMONBOXLINK": g.PushScene(new StorageScene(g, StorageScene.Mode.Organize)); return;
                 case "GRACIDEA": case "REVEALGLASS": case "PRISONBOTTLE": case "ROTOMCATALOG": case "DNASPLICERS": case "NSOLARIZER": case "NLUNARIZER": case "REINSOFUNITY":
                 case "REDNECTAR": case "YELLOWNECTAR": case "PINKNECTAR": case "PURPLENECTAR":
                     g.PushScene(new PartyScene(g, "Use on which Pokémon?", null, (i, close) => { close(); FormItems.Use(g, itemId, g.State.Party[i], refresh); }, null));

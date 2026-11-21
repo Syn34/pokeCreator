@@ -42,7 +42,7 @@ namespace PokeCreator.Battles
                         Splash(b);
                         b.AbilityOverride = AbilityOf(f2);
                         Say(Name(b) + " traced " + NameL(f2) + "'s " + AbilityName(f2) + "!");
-                        SwitchInAbility(b);
+                        EntryAbility(b);
                         break;
                     }
                 case "FRISK":

@@ -602,7 +602,7 @@ namespace PokeCreator.Runtime.UI
                 // Poké Doll, Guard Spec.: no Pokémon to choose
                 if (PokeCreator.Battles.Battle.IsDirectBattleItem(id))
                 {
-                    Game.State.AddItem(id, -1);
+                    if (id != "POKEFLUTE") Game.State.AddItem(id, -1);   // the Poké Flute is a key item
                     var c = BattleCommand.UseItem(id, Me != null ? Me.PartyIndex : 0);
                     Commit(c);
                     return;
