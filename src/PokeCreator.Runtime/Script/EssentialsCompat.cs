@@ -1324,17 +1324,25 @@ namespace PokeCreator.Runtime.Script
             if (string.IsNullOrEmpty(pk.OTName)) { pk.OTName = _game.State.PlayerName; pk.OTId = _game.State.TrainerId; }
             pk.MetMap = _game.Map.Id;
             bool toParty = _game.State.Party.Count < GameState.MaxParty;
+            bool newEntry = !pk.IsEgg && !_game.State.Caught.Contains(pk.Species);
             if (toParty) _game.State.Party.Add(pk); else _game.State.Storage.Add(pk);
             _game.State.Register(pk);
             if (announce)
             {
                 _game.Audio.PlayMe("Pkmn get");
                 string name = pk.Name(_game.Project);
+                Action nickname = () => _game.Message.Show("Would you like to give a nickname to " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
+                {
+                    if (c == 0) _game.AskName(name + "'s nickname?", "", 12, n => pk.Nickname = n, null);
+                });
+                // A species new to the Pokédex: its entry is shown first (as Essentials)
+                var entry = newEntry && _game.State.HasPokedex ? _game.Project.Species.FirstOrDefault(s => s.Id == pk.Species && s.Form == 0) : null;
                 _game.Message.Show("\\PN obtained " + name + "!" + (toParty ? "" : "\\n" + name + " was sent to the PC."), null, -1, _ =>
-                    _game.Message.Show("Would you like to give a nickname to " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
-                    {
-                        if (c == 0) _game.AskName(name + "'s nickname?", "", 12, n => pk.Nickname = n, null);
-                    }));
+                {
+                    if (entry == null) { nickname(); return; }
+                    _game.Message.Show(name + "'s data was added to the Pokédex.", null, -1, __ =>
+                        _game.PushScene(new UI.PokedexEntryScene(_game, new List<PokeCreator.Data.SpeciesData> { entry }, 0, ___ => nickname()) { Registration = true }));
+                });
             }
             return true;
         }
