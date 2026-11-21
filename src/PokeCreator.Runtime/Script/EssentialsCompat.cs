@@ -58,8 +58,19 @@ namespace PokeCreator.Runtime.Script
         {
             if (_rec == null || !_recActive) return h(ctx, args);
             if (_recPos < _rec.Count) return _rec[_recPos++];
+            bool busyBefore = _game.Message.Busy || _game.SceneOpen;
+            bool battleBefore = _game.BattleJustStarted;
+            _game.BattleJustStarted = false;
             var r = h(ctx, args);
-            if (!_game.PromptPending) { _rec.Add(r); _recPos++; }
+            bool startedBattle = _game.BattleJustStarted;
+            _game.BattleJustStarted = battleBefore || startedBattle;
+            if (!_game.PromptPending)
+            {
+                _rec.Add(r); _recPos++;
+                // The call opened a message or a screen (pbReceiveItem, pbAddPokemon...): the rest of the script waits
+                // until it's closed, as in Essentials (battles keep their own resume handling)
+                if (ctx != null && !busyBefore && !startedBattle && (_game.Message.Busy || _game.SceneOpen)) _game.PromptPending = true;
+            }
             return r;
         }
 
