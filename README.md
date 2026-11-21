@@ -12,7 +12,7 @@ PokeCreator does what Pokémon Essentials does, built to be easier to use:
 | Files scattered across `PBS/`, `Data/`, `Graphics/` with no overview | One project tree: Database, Maps, Scripts, Graphics & Audio, and **All Project Files** |
 | Playtest through RMXP | **F5** to playtest, **Shift+F5** to start on the map you're editing |
 
-Already have an Essentials game? **File → Import Pokémon Essentials Project** converts it: PBS data, maps, events, tilesets, switch/variable names, graphics and audio. Your Essentials folder isn't changed.
+Already have an Essentials game? **File → Import Pokémon Essentials Project** converts it: PBS data (including berry_plants, ribbons, shadow_pokemon and phone when present), maps, events, tilesets, switch/variable names, graphics and audio. Your Essentials folder isn't changed.
 
 ## What works today (v0.3)
 
