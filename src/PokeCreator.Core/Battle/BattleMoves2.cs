@@ -127,6 +127,22 @@ namespace PokeCreator.Battles
             string n = Name(user), tn = Name(target);
             switch (code)
             {
+                case "RaiseUserEvasion2MinimizeUser":
+                    if (!ChangeStat(user, 7, 2, user)) { user.LastMoveFailed = true; return true; }
+                    user.Minimized = true; return true;
+                case "RaiseUserDefense1CurlUpUser":
+                    if (!ChangeStat(user, S.Defense, 1, user) && user.DefenseCurl) user.LastMoveFailed = true;
+                    user.DefenseCurl = true; return true;
+                case "RaiseUserSpeed2LowerUserWeight":   // Autotomize
+                    if (!ChangeStat(user, S.Speed, 2, user)) { user.LastMoveFailed = true; return true; }
+                    user.WeightLoss += 100; Say(n + " became nimble!"); return true;
+                case "RaiseUserAtkSpAtk1Or2InSun":   // Growth
+                {
+                    int amt = EffWeather == Sun ? 2 : 1;
+                    bool a1 = ChangeStat(user, S.Attack, amt, user), a2 = ChangeStat(user, S.SpAtk, amt, user);
+                    if (!a1 && !a2) user.LastMoveFailed = true;
+                    return true;
+                }
                 case "TwoTurnAttackRaiseUserSpAtkSpDefSpd2":   // Geomancy, after charging
                 {
                     bool any = false;
@@ -223,6 +239,17 @@ namespace PokeCreator.Battles
                     ChangeStat(target, S.Speed, -1, user);
                     return true;
                 }
+            }
+            return false;
+        }
+
+        bool UproarActive()
+        {
+            foreach (var b in OnField)
+            {
+                if (b.Pk.Fainted || b.LockedMove == null) continue;
+                var md = Move(b.LockedMove);
+                if (md != null && md.FunctionCode == "MultiTurnAttackPreventSleeping") return true;
             }
             return false;
         }
@@ -643,6 +670,7 @@ namespace PokeCreator.Battles
         /// <summary>After a damaging move hits: Burn Up, Incinerate, Flame Burst, Throat Chop, Core Enforcer, Fling and Natural Gift using up the item...</summary>
         void MoreDamagingAfter(Battler user, Battler target, MoveData md, string code, int total)
         {
+            string n = Name(user);
             switch (code)
             {
                 case "UserLosesFireType":
@@ -682,6 +710,28 @@ namespace PokeCreator.Battles
                     }
                     break;
                 case "NormalMovesBecomeElectric": _ionDeluge = true; break;
+                case "HitTwoToFiveTimesRaiseUserSpd1LowerUserDef1":   // Scale Shot
+                    if (!user.Pk.Fainted) { ChangeStat(user, S.Defense, -1, user); ChangeStat(user, S.Speed, 1, user); }
+                    break;
+                case "SleepTargetChangeUserMeloettaForm":   // Relic Song
+                    if (!user.Pk.Fainted && user.Pk.Species == "MELOETTA" && P.Species.Any(s => s.Id == "MELOETTA_1"))
+                    {
+                        if (!_formBeforeMega.ContainsKey(user.Pk)) _formBeforeMega[user.Pk] = user.Pk.Form;
+                        user.Pk.Form = user.Pk.Form == 0 ? 1 : 0;
+                        _ev.Add(new BattleEvent { Kind = BattleEventKind.FormChange, Side = user.Side, Party = user.PartyIndex, Slot = user.Slot, Text = "Form" });
+                        Say(n + " transformed!");
+                    }
+                    break;
+                case "MultiTurnAttackPreventSleeping":   // Uproar
+                    if (user.LockedMove == null && !user.Pk.Fainted)
+                    {
+                        user.LockedMove = md.Id; user.LockTurns = 2;
+                        Say(n + " caused an uproar!");
+                        foreach (var w in OnField.Where(x => !x.Pk.Fainted && (x.Pk.Status ?? "").ToUpperInvariant() == "SLEEP" && !HasAbility(x, "SOUNDPROOF")).ToList())
+                        { w.Pk.Status = ""; w.SleepTurns = 0; StatusEvent(w); Say("The uproar woke up " + NameL(w) + "!"); }
+                    }
+                    else if (!user.Pk.Fainted) Say(n + " is making an uproar!");
+                    break;
                 case "AddMoneyGainedFromBattle":
                     if (user.Side == 0) { PayDayMoney += user.Pk.Level * 5; Say("Coins were scattered everywhere!"); }
                     break;

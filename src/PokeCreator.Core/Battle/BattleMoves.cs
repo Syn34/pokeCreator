@@ -73,7 +73,7 @@ namespace PokeCreator.Battles
             if (Terrain == "Misty" && type == "DRAGON" && IsGrounded(target)) m *= 0.5;
             if (MudSport > 0 && type == "ELECTRIC") m /= 3;
             if (WaterSport > 0 && type == "FIRE") m /= 3;
-            if (Terrain == "Grassy" && (md.Id == "EARTHQUAKE" || md.Id == "BULLDOZE" || md.Id == "MAGNITUDE")) m *= 0.5;
+            if (Terrain == "Grassy" && (md.Id == "EARTHQUAKE" || md.Id == "BULLDOZE" || md.Id == "MAGNITUDE") && IsGrounded(target)) m *= 0.5;
             return m;
         }
 
@@ -86,6 +86,7 @@ namespace PokeCreator.Battles
             if (HasAbility(target, "HEAVYMETAL")) tWeight *= 2; if (HasAbility(target, "LIGHTMETAL")) tWeight /= 2;
             if (HasAbility(user, "HEAVYMETAL")) uWeight *= 2; if (HasAbility(user, "LIGHTMETAL")) uWeight /= 2;
             if (Holds(target, "FLOATSTONE")) tWeight /= 2; if (Holds(user, "FLOATSTONE")) uWeight /= 2;
+            tWeight = Math.Max(0.1, tWeight - target.WeightLoss); uWeight = Math.Max(0.1, uWeight - user.WeightLoss);
             switch (code)
             {
                 case "PowerHigherWithUserHappiness": return Math.Max(1, user.Pk.Happiness * 2 / 5);
@@ -120,7 +121,7 @@ namespace PokeCreator.Battles
                         return pp >= 4 ? 40 : pp == 3 ? 50 : pp == 2 ? 60 : pp == 1 ? 80 : 200;
                     }
                 case "PowerDependsOnUserStockpile": return Math.Max(1, user.StockpileCount * 100);
-                case "MultiTurnAttackPowersUpEachTurn": return md.Power * (1 << Math.Min(4, user.RolloutCount));
+                case "MultiTurnAttackPowersUpEachTurn": return md.Power * (1 << Math.Min(4, user.RolloutCount)) * (user.DefenseCurl ? 2 : 1);
                 case "PowerHigherWithConsecutiveUse": return Math.Min(160, md.Power * (1 << Math.Min(3, user.FuryCutterCount)));
             }
             return MoreSpecialPower(user, target, md, code);

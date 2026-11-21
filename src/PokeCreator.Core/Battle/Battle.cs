@@ -93,6 +93,8 @@ namespace PokeCreator.Battles
         public string ProtectKind;
         public bool StatsRaisedThisTurn, NoRetreat, TarShot;
         public int YawnTurns, BideTurn, BideDamage;
+        public bool Minimized, DefenseCurl;
+        public double WeightLoss;
         public Battler BideTarget;
         public Battler(Pokemon pk, int side, int idx) { Pk = pk; Side = side; PartyIndex = idx; }
         public void Reset() { Stages = new int[8]; Confusion = 0; ToxicCount = 0; BindTurns = 0; CritStage = 0; Flinched = false; MustRecharge = false; Protected = false; ProtectChain = 0; Charging = null; Invulnerable = false; TurnsOut = 0; }
@@ -937,6 +939,7 @@ namespace PokeCreator.Battles
             {
                 bool confuse = code == "MultiTurnAttackConfuseUserAtEnd" && !user.LastMoveFailed;
                 EndLock(user);
+                if (code == "MultiTurnAttackPreventSleeping") Say(n + " calmed down.");
                 if (confuse && user.Confusion == 0 && !HasAbility(user, "OWNTEMPO")) { Say(n + " became confused due to fatigue!"); user.Confusion = 2 + Rng.Next(4); }
             }
         }
@@ -1042,6 +1045,7 @@ namespace PokeCreator.Battles
                 return Rng.Next(100) < baseAcc + user.Pk.Level - target.Pk.Level;
             }
             if (md.Accuracy <= 0 || user.LockOnTurns > 0) return true;
+            if (target.Minimized && md.Flags.Contains("TramplesMinimize")) return true;
             bool always;
             double mod = AccuracyMod(user, target, md, code, out always);
             if (always) return true;
@@ -1484,6 +1488,7 @@ namespace PokeCreator.Battles
             var types = TypesOf(b);
             string have = (b.Pk.Status ?? "").ToUpperInvariant();
             if (have.Length > 0) { if (showFail) Say(have == status ? Name(b) + AlreadyText(status) : "But it failed!"); return false; }
+            if (status == "SLEEP" && UproarActive() && !HasAbility(b, "SOUNDPROOF")) { if (showFail) Say("But the uproar kept " + NameL(b) + " awake!"); return false; }
             bool immune = (status == "POISON" || status == "TOXIC") && (types.Contains("POISON") || types.Contains("STEEL")) && !(source != null && HasAbility(source, "CORROSION"))
                        || status == "BURN" && types.Contains("FIRE")
                        || status == "PARALYSIS" && types.Contains("ELECTRIC")
@@ -1603,7 +1608,7 @@ namespace PokeCreator.Battles
             if (code == "HealUserFullyAndFallAsleep")
             {
                 int max = user.Pk.TotalHP(P);
-                if (user.Pk.HP >= max) { Say("But it failed!"); return; }
+                if (user.Pk.HP >= max || UproarActive() && !HasAbility(user, "SOUNDPROOF") || HasAbility(user, "INSOMNIA") || HasAbility(user, "VITALSPIRIT")) { Say("But it failed!"); return; }
                 int f = user.Pk.HP; user.Pk.HP = max; user.Pk.Status = "SLEEP"; user.SleepTurns = 3; StatusEvent(user); Hp(user, f);
                 Say(Name(user) + " slept and became healthy!");
                 return;

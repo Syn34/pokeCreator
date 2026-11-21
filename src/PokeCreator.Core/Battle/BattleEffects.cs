@@ -274,6 +274,9 @@ namespace PokeCreator.Battles
         {
             double m = 1;
             if (HasAbility(user, "TECHNICIAN") && power <= 60) m *= 1.5;
+            if (code == "LowerTargetDefense1PowersUpInGravity" && Gravity > 0) m *= 1.5;
+            if (code == "UserFaintsPowersUpInMistyTerrainExplosive" && Terrain == "Misty" && IsGrounded(user)) m *= 1.5;
+            if (target.Minimized && md.Flags.Contains("TramplesMinimize")) m *= 2;
             if (HasAbility(user, "IRONFIST") && md.Flags.Contains("Punching")) m *= 1.2;
             if (HasAbility(user, "RECKLESS") && (code.StartsWith("Recoil") || code.Contains("CrashDamage"))) m *= 1.2;
             if (HasAbility(user, "STRONGJAW") && md.Flags.Contains("Biting")) m *= 1.5;
