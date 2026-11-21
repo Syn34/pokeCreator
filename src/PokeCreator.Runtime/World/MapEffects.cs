@@ -63,6 +63,23 @@ namespace PokeCreator.Runtime.World
 
         public bool AnimationRunning(Character target) { return _anims.Any(r => r.Target == target); }
 
+        /// <summary>Draws one frame of an imported map animation centred at (x, y), looping; false if there's no such animation.</summary>
+        public bool DrawLooping(Gfx g, int id, double x, double y, int tick)
+        {
+            var a = _g.Project.MapAnimations.FirstOrDefault(m => m.Id == id);
+            if (a == null || a.Frames.Count == 0) return false;
+            var sheet = g.Load(_g.Project.FindAsset("Graphics/Animations", a.Graphic));
+            if (sheet == null) return false;
+            foreach (var cell in a.Frames[(tick / 3) % a.Frames.Count])
+            {
+                int pat = cell[0];
+                int sx = (pat % 5) * 192, sy = (pat / 5) * 192;
+                if (pat < 0 || sx + 192 > sheet.Width || sy + 192 > sheet.Height) continue;
+                g.DrawEx(sheet, sx, sy, 192, 192, x + cell[1], y + cell[2], cell[3] / 100.0, cell[3] / 100.0, cell[4], cell[5] != 0, cell[6], cell[7]);
+            }
+            return true;
+        }
+
         void DrawAnimations(Gfx g, int displayX, int displayY)
         {
             foreach (var r in _anims)

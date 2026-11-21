@@ -130,6 +130,8 @@ namespace PokeCreator.Runtime.World
             foreach (var p in _patches)
             {
                 int sx = p.X * 32 - displayX, sy = p.Y * 32 - displayY;
+                // Essentials' rustle animations (5 vigorous, 6 shiny, 1 normal) when the project has them
+                if (g.Effects != null && g.Effects.DrawLooping(gfx, p.Kind == 2 ? 6 : p.Kind == 1 ? 5 : 1, sx + 16, sy + 16, frame)) continue;
                 int wob = (frame / (p.Kind == 1 ? 3 : 6)) % 2 == 0 ? -3 : 3;
                 var edge = new Color(24, 64, 24);
                 var col = p.Kind == 2 ? new Color(255, 236, 110) : p.Kind == 1 ? new Color(176, 240, 120) : new Color(136, 216, 96);
