@@ -150,7 +150,7 @@ namespace PokeCreator.Studio.Editors
                         int cont = ContinuationOf(c.Code);
                         string full = c.StrParam(0); int k = i + 1;
                         while (k < L.Count && L[k].Code == cont) { full += "\n" + L[k].StrParam(0); k++; }
-                        string t = TextDialog.Ask(FindForm(), c.Code == 108 ? "Edit comment" : "Edit script", full, true);
+                        string t = c.Code == 355 ? ScriptDialog.Ask(FindForm(), "Edit script", full) : TextDialog.Ask(FindForm(), "Edit comment", full, true);
                         if (t == null) return;
                         L.RemoveRange(i + 1, k - i - 1);
                         var lines = t.Replace("\r", "").Split('\n');
@@ -722,7 +722,7 @@ namespace PokeCreator.Studio.Editors
 
         void AddScript()
         {
-            string s = TextDialog.Ask(FindForm(), "Script", "", true, "Calls a script command, e.g. pbReceiveItem(:POTION) or one defined in your Scripts folder.");
+            string s = ScriptDialog.Ask(FindForm(), "Script (e.g. pbReceiveItem(:POTION) or a call from your Scripts folder)", "");
             if (string.IsNullOrEmpty(s)) return;
             var lines = s.Replace("\r", "").Split('\n');
             var cmds = new List<EventCommand> { new EventCommand(355, 0, lines[0]) };

@@ -123,7 +123,7 @@ namespace PokeCreator.Studio.Controls
         }
 
         /// <summary>Asks Game.exe which script calls it understands, once, so event scripts can be checked.</summary>
-        static void LoadKnownCalls()
+        public static void LoadKnownCalls()
         {
             if (ProjectCheck.KnownScriptCalls != null) return;
             try

@@ -299,7 +299,22 @@ namespace PokeCreator.Projects
         static readonly Regex CallName = new Regex(@"(?<![\w.$:@])(\$[A-Za-z_]\w*(?:\.[A-Za-z_]\w*[?!]?)*|pb[A-Z]\w*[?!]?(?:\.[A-Za-z_]\w*[?!]?)*|[A-Z][A-Za-z]+(?:::[A-Z]\w*)*\.[a-z_]\w*[?!]?)", RegexOptions.Compiled);
         static readonly HashSet<string> RubyBuiltins = new HashSet<string> { "Math.sqrt", "Math.max", "Math.min", "Time.now", "Kernel.rand", "Integer.new", "Array.new", "Hash.new", "String.new", "Pokemon.new", "Color.new", "Tone.new", "Rect.new" };
 
-        bool CallKnown(string name)
+        /// <summary>The script calls in a script that the game doesn't understand (empty when unknown calls aren't checked).</summary>
+        public static List<string> UnknownCalls(string script)
+        {
+            var result = new List<string>();
+            if (KnownScriptCalls == null || string.IsNullOrEmpty(script)) return result;
+            var globalsSet = new HashSet<string>(Regex.Matches(script, @"(\$[A-Za-z_]\w*)\s*=[^=]").Cast<Match>().Select(m => m.Groups[1].Value));
+            foreach (Match m in CallName.Matches(Regex.Replace(script, "\"(?:[^\"\\\\]|\\\\.)*\"|'[^']*'|#.*", "\"\"")))
+            {
+                string name = m.Groups[1].Value;
+                if (globalsSet.Contains(name.Split('.')[0]) || CallKnown(name) || result.Contains(name)) continue;
+                result.Add(name);
+            }
+            return result;
+        }
+
+        static bool CallKnown(string name)
         {
             var known = KnownScriptCalls;
             if (known.Contains(name) || RubyBuiltins.Contains(name)) return true;
