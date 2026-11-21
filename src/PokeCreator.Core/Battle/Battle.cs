@@ -598,6 +598,8 @@ namespace PokeCreator.Battles
 
         /// <summary>Inverse Battle (setBattleRule("inverseBattle")): weaknesses and resistances swap, immunities become weaknesses.</summary>
         public bool Inverse;
+        /// <summary>Exp. All (key item EXPALL or Game Settings): Pokémon that didn't fight still get half the EXP.</summary>
+        public bool ExpAll;
         static double InverseMod(TypeData td, string moveType)
         {
             if (td.Immunities.Contains(moveType) || td.Resistances.Contains(moveType)) return 2;
@@ -1586,18 +1588,33 @@ namespace PokeCreator.Battles
         void GiveExp(Battler foe)
         {
             HashSet<int> set;
-            if (NoExp || !_participants.TryGetValue(foe.PartyIndex, out set)) return;
+            if (NoExp) return;
+            if (!_participants.TryGetValue(foe.PartyIndex, out set)) set = new HashSet<int>();
             var who = set.Where(i => i < Parties[0].Count && Able(Parties[0][i]) && !IsPartnerIndex(i)).ToList();
-            if (who.Count == 0) return;
+            // Exp. Share holders split half of the EXP (Essentials' rules); Exp. All gives everyone else half
+            var share = Enumerable.Range(0, Parties[0].Count).Where(i => Able(Parties[0][i]) && !IsPartnerIndex(i) && Parties[0][i].Item == "EXPSHARE").ToList();
+            var gainers = who.Union(share).ToList();
+            if (ExpAll) gainers = gainers.Union(Enumerable.Range(0, Parties[0].Count).Where(i => Able(Parties[0][i]) && !IsPartnerIndex(i))).ToList();
+            if (gainers.Count == 0) return;
             var fd = foe.Pk.Data(P);
             int baseExp = fd != null && fd.BaseExp > 0 ? fd.BaseExp : 50;
             int lf = foe.Pk.Level;
-            foreach (int i in who)
+            foreach (int i in gainers.OrderBy(x => x))
             {
                 var pk = Parties[0][i];
                 if (pk.Level >= GrowthRates.MaxLevel) continue;
                 int lp = pk.Level;
-                double exp = baseExp * lf / 5.0 / who.Count;
+                bool fought = who.Contains(i), holds = share.Contains(i);
+                double part;
+                if (share.Count > 0 && (fought || holds))
+                {
+                    if (who.Count == 0) part = 1.0 / share.Count;
+                    else if (fought) part = 0.5 / who.Count + (holds ? 0.5 / share.Count : 0);
+                    else part = 0.5 / share.Count;
+                }
+                else if (fought) part = 1.0 / who.Count;
+                else part = 0.5; // Exp. All
+                double exp = baseExp * lf / 5.0 * part;
                 exp *= Math.Pow((2.0 * lf + 10) / (lf + lp + 10), 2.5);
                 exp = Math.Floor(exp) + 1;
                 if (!IsWild) exp = Math.Floor(exp * 1.5);
