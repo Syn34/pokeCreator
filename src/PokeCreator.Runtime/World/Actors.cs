@@ -188,6 +188,7 @@ namespace PokeCreator.Runtime.World
         public bool Diving;
         public string DiveCharset { get { return Look != null && !string.IsNullOrEmpty(Look.DiveCharset) ? Look.DiveCharset : SurfCharset; } }
         bool _sliding;
+        int _faceHold; // frames to keep facing the following Pokémon before walking into it
         bool _runOn;
 
         /// <summary>Climbs (up = true) or slides down a waterfall while surfing.</summary>
@@ -245,7 +246,12 @@ namespace PokeCreator.Runtime.World
                 bool run = runKey && !Cycling && (!Game.Project.Settings.RunningShoesRequired || Game.State.Flags.Contains("has_running_shoes"));
                 MoveSpeed = run || Cycling ? 5 : 4;
                 SpeedScale = Cycling ? 1.5 : 1;
-                if (d != 0) Move(d);
+                // Walking toward the following Pokémon first turns to face it (so it can be talked to); again, and you swap places
+                bool atPokemon = d != 0 && Followers.PokemonAt(X + Dx(d), Y + Dy(d));
+                if (atPokemon && d != Direction) { Turn(d); _faceHold = 8; }
+                else if (atPokemon && _faceHold > 0) _faceHold--;
+                else if (d != 0) Move(d);
+                if (d == 0) _faceHold = 0;
             }
             bool running = MoveSpeed >= 5 && !Cycling && (Moving || Input.Dir4 != 0);
             if (Diving) { SpeedScale = 1; MoveSpeed = 4; CharacterName = Game.Project.FindAsset("Graphics/Characters", DiveCharset) != null ? DiveCharset : WalkCharset; }

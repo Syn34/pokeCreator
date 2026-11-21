@@ -252,6 +252,18 @@ namespace PokeCreator.Runtime.Script
             Register("pbRemoveDependency2", (c, a) => { Followers.Remove(_game, Str(a, 0)); return true; });
             Register("Followers.clear", (c, a) => { Followers.Clear(_game); return true; });
             Register("pbRemoveDependencies", (c, a) => { Followers.Clear(_game); return true; });
+            // Following Pokémon (as the FollowingPkmn EX plugin)
+            Register("FollowingPkmn.toggle", (c, a) =>
+            {
+                bool on = a.Count > 0 && a[0] != null ? Truthy(a[0]) : _game.State.Flags.Contains("following_pokemon_off");
+                if (on) _game.State.Flags.Remove("following_pokemon_off"); else _game.State.Flags.Add("following_pokemon_off");
+                return true;
+            });
+            Register("FollowingPkmn.toggle_on", (c, a) => { _game.State.Flags.Remove("following_pokemon_off"); return true; });
+            Register("FollowingPkmn.toggle_off", (c, a) => { _game.State.Flags.Add("following_pokemon_off"); return true; });
+            Register("FollowingPkmn.active?", (c, a) => Followers.PokemonEnabled(_game) && _game.State.Party.Any(p => !p.IsEgg && !p.Fainted && Followers.PokemonSprite(_game, p) != null));
+            Register("FollowingPkmn.can_check?", (c, a) => Followers.PokemonEnabled(_game));
+            Register("FollowingPkmn.get_pokemon", (c, a) => _game.State.Party.FirstOrDefault(p => !p.IsEgg && !p.Fainted));
             Register("Followers.get", (c, a) => Followers.Characters.Any(f => f.Info.Name == Str(a, 0)));
             Register("Followers.follow_into_door", (c, a) => { Followers.IntoDoor(_game); if (c != null && Followers.Characters.Count > 0) c.Wait(8); return true; });
             Register("Followers.hide_followers", (c, a) => { Followers.Hide(); return true; });

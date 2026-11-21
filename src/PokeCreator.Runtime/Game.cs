@@ -889,6 +889,7 @@ namespace PokeCreator.Runtime
 
             foreach (var e in Map.Events) e.Update();
             Player.Update();
+            World.Followers.SyncPokemon(this);
             World.Followers.Update();
 
             if (!Interpreter.Running && !Transferring)

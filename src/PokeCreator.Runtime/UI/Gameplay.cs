@@ -764,9 +764,11 @@ namespace PokeCreator.Runtime.UI
             _speech = PlayerOptions.Frames(g, "speech"); _speech.Insert(0, "");
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
             _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
-            Labels = _langs.Count > 1
+            var labels = (_langs.Count > 1
                 ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
-                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" };
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" }).ToList();
+            if (g.Project.Settings.FollowingPokemon) labels.Insert(labels.IndexOf("Speech Frame"), "Following Pokémon");
+            Labels = labels.ToArray();
         }
 
         static string Cycle(List<string> list, string cur, int d)
@@ -788,6 +790,7 @@ namespace PokeCreator.Runtime.UI
                 case "Battle Style": return _o.BattleStyleSet ? "Set" : "Switch";
                 case "Send to Boxes": return _o.SendToBoxesManual ? "Manual" : "Automatic";
                 case "Move Hints": return _o.MoveHints ? "On" : "Off";
+                case "Following Pokémon": return Game.State.Flags.Contains("following_pokemon_off") ? "Off" : "On";
                 case "Speech Frame": return FrameLabel(_o.SpeechFrame);
                 case "Menu Frame": return FrameLabel(_o.MenuFrame);
                 case "Running Key": return _o.RunToggle ? "Toggle" : "Hold";
@@ -814,6 +817,7 @@ namespace PokeCreator.Runtime.UI
                     case "Battle Style": _o.BattleStyleSet = !_o.BattleStyleSet; break;
                     case "Send to Boxes": _o.SendToBoxesManual = !_o.SendToBoxesManual; break;
                     case "Move Hints": _o.MoveHints = !_o.MoveHints; break;
+                    case "Following Pokémon": if (Game.State.Flags.Contains("following_pokemon_off")) Game.State.Flags.Remove("following_pokemon_off"); else Game.State.Flags.Add("following_pokemon_off"); break;
                     case "Speech Frame": _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d); break;
                     case "Menu Frame": _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d); break;
                     case "Running Key": _o.RunToggle = !_o.RunToggle; break;

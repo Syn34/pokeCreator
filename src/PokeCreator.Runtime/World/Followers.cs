@@ -50,7 +50,7 @@ namespace PokeCreator.Runtime.World
         /// <summary>Rebuilds the follower characters on the player's tile (new map, loaded game).</summary>
         public static void Rebuild(Game g)
         {
-            Characters.Clear();
+            Characters.Clear(); _pokemon = null; _pokemonKey = null;
             if (g.State == null || g.Player == null) return;
             foreach (var info in Infos(g))
             {
@@ -80,7 +80,68 @@ namespace PokeCreator.Runtime.World
             Characters.RemoveAll(c => c.Info.Name == name);
         }
 
-        public static void Clear(Game g) { Infos(g).Clear(); Characters.Clear(); }
+        public static void Clear(Game g) { Infos(g).Clear(); Characters.RemoveAll(c => c != _pokemon); }
+
+        // ------------------------------------------------------------------ following Pokémon
+        static FollowerCharacter _pokemon;
+        static string _pokemonKey;
+
+        /// <summary>Game Settings → Following Pokémon, unless the player or a script turned it off.</summary>
+        public static bool PokemonEnabled(Game g) { return g.Project.Settings.FollowingPokemon && !g.State.Flags.Contains("following_pokemon_off"); }
+
+        /// <summary>The overworld sprite of a Pokémon: Graphics/Characters/Followers (shiny) / SPECIES[_form].</summary>
+        public static string PokemonSprite(Game g, PokeCreator.Pkmn.Pokemon pk)
+        {
+            string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
+            foreach (var folder in pk.Shiny ? new[] { "Followers shiny", "Followers" } : new[] { "Followers" })
+            {
+                if (g.Project.FindAsset("Graphics/Characters/" + folder, id) != null) return folder + "/" + id;
+                if (pk.Form > 0 && g.Project.FindAsset("Graphics/Characters/" + folder, pk.Species) != null) return folder + "/" + pk.Species;
+            }
+            return null;
+        }
+
+        /// <summary>Keeps the first healthy party Pokémon walking right behind the player (when it has an overworld sprite).</summary>
+        public static void SyncPokemon(Game g)
+        {
+            if (g.State == null || g.Player == null || g.Project == null) return;
+            var lead = PokemonEnabled(g) ? g.State.Party.FirstOrDefault(p => !p.IsEgg && !p.Fainted) : null;
+            string sprite = lead != null ? PokemonSprite(g, lead) : null;
+            if (sprite == null)
+            {
+                if (_pokemon != null) { Characters.Remove(_pokemon); _pokemon = null; _pokemonKey = null; }
+                return;
+            }
+            if (_pokemon == null || !Characters.Contains(_pokemon))
+            {
+                _pokemon = new FollowerCharacter(g, new FollowerInfo { Name = "\u0001pokemon", CharacterName = sprite });
+                _pokemon.MoveTo(g.Player.X, g.Player.Y); _pokemon.Direction = g.Player.Direction; _pokemon.Hidden = true;
+                Characters.Insert(0, _pokemon);
+            }
+            if (_pokemonKey != sprite) { _pokemon.CharacterName = sprite; _pokemonKey = sprite; }
+            // Not while surfing, diving or cycling
+            if (g.Player.Surfing || g.Player.Diving || g.Player.Cycling) _pokemon.Hidden = true;
+            _pokemon.StepAnime = true;
+        }
+
+        public static bool PokemonAt(int x, int y) { return _pokemon != null && !_pokemon.Hidden && Characters.Contains(_pokemon) && _pokemon.X == x && _pokemon.Y == y; }
+
+        /// <summary>Talking to the following Pokémon: its cry and how it feels.</summary>
+        static bool TalkToPokemon(Game g)
+        {
+            var lead = g.State.Party.FirstOrDefault(p => !p.IsEgg && !p.Fainted);
+            if (lead == null) return false;
+            _pokemon.TurnToward(g.Player);
+            g.Audio.PlayCry(lead);
+            string n = lead.Name(g.Project);
+            int h = lead.Happiness;
+            string text = h >= 250 ? n + " is very happy to be with you!" : h >= 200 ? n + " seems happy." : h >= 150 ? n + " is feeling fine."
+                        : h >= 100 ? n + " is looking at you." : h >= 60 ? n + " is following along." : h >= 30 ? n + " doesn't seem to care much." : n + " is ignoring you...";
+            if (lead.Status == "POISON" || lead.Status == "TOXIC") text = n + " is shivering with the effects of being poisoned.";
+            else if (lead.HP < lead.TotalHP(g.Project) / 4) text = n + " looks tired.";
+            g.Message.Show(text);
+            return true;
+        }
 
         /// <summary>The player stepped away from (fromX, fromY): the line moves up one place.</summary>
         public static void PlayerMoved(Game g, int fromX, int fromY)
@@ -103,6 +164,7 @@ namespace PokeCreator.Runtime.World
         /// <summary>Talking to a follower: its common event.</summary>
         public static bool TalkAt(Game g, int x, int y)
         {
+            if (_pokemon != null && !_pokemon.Hidden && _pokemon.X == x && _pokemon.Y == y && Characters.Contains(_pokemon)) return TalkToPokemon(g);
             var f = Characters.FirstOrDefault(c => !c.Hidden && c.X == x && c.Y == y && c.Info.CommonEvent > 0);
             if (f == null) return false;
             var ce = g.Project.CommonEvents.FirstOrDefault(c => c.Id == f.Info.CommonEvent);
