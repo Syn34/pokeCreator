@@ -861,14 +861,26 @@ namespace PokeCreator.Battles
             user.LastMoveFailed = false;
 
             // Two-turn moves: charge first
-            if (user.Charging == null && code.StartsWith("TwoTurnAttack") && !(code == "TwoTurnAttackOneTurnInSun" && EffWeather == Sun) && user.Pk.Item != "POWERHERB")
+            if (user.Charging == null && code.StartsWith("TwoTurnAttack") && !(code == "TwoTurnAttackOneTurnInSun" && EffWeather == Sun))
             {
-                if (pm != null) pm.PP = Math.Max(0, pm.PP - 1);
-                user.Charging = md.Id; user.ChargingSlot = slot;
-                user.Invulnerable = code.Contains("Invulnerable");
-                MoveAnim(user, target, md, 1, true);
-                Say(n + ChargeText(md.Id));
-                return;
+                if (Holds(user, "POWERHERB"))
+                {
+                    // Power Herb: charges at once (and is used up)
+                    Say(n + ChargeText(md.Id));
+                    ChargeRaise(user, code);
+                    Say(n + " became fully charged due to its Power Herb!");
+                    UseUpItem(user);
+                }
+                else
+                {
+                    if (pm != null) pm.PP = Math.Max(0, pm.PP - 1);
+                    user.Charging = md.Id; user.ChargingSlot = slot;
+                    user.Invulnerable = code.Contains("Invulnerable");
+                    MoveAnim(user, target, md, 1, true);
+                    Say(n + ChargeText(md.Id));
+                    ChargeRaise(user, code);
+                    return;
+                }
             }
             bool wasCharging = user.Charging != null;
             user.Charging = null; user.Invulnerable = false;
@@ -900,6 +912,7 @@ namespace PokeCreator.Battles
                 return;
             }
             _missedThisMove = false;
+            if (code == "SleepTargetIfUserDarkrai" && user.Pk.Species != "DARKRAI" && !user.TransformedMoves) { Say("But " + NameL(user) + " can't use the move!"); user.LastMoveFailed = true; return; }
             if (HasAbility(user, "MYCELIUMMIGHT") && md.Category == "Status") _ignoreAbilityMove = true;
             ActOnTargets(user, target, md, code);
             if (!user.LastMoveFailed) DancerAfter(user, target, md);
@@ -999,6 +1012,8 @@ namespace PokeCreator.Battles
                 case "DIG": return " burrowed its way under the ground!";
                 case "DIVE": return " hid underwater!";
                 case "SKULLBASH": return " tucked in its head!";
+                case "GEOMANCY": return " is absorbing power!";
+                case "METEORBEAM": return " is overflowing with space power!";
                 case "SKYATTACK": return " became cloaked in a harsh light!";
                 case "RAZORWIND": return " whipped up a whirlwind!";
                 case "BOUNCE": return " sprang up!";
@@ -1372,6 +1387,14 @@ namespace PokeCreator.Battles
         static readonly string[] StatTokens = { "MainStats", "Attack", "Defense", "SpAtk", "SpDef", "Speed", "Accuracy", "Evasion", "Atk", "Def", "Spd", "Acc", "Eva" };
 
         /// <summary>Stat indexes named in a function code fragment like "AtkSpAtk" or "MainStats".</summary>
+        // Skull Bash / Meteor Beam raise a stat on the charging turn
+        void ChargeRaise(Battler user, string code)
+        {
+            var m = Regex.Match(code, @"^TwoTurnAttackChargeRaiseUser([A-Za-z]+?)(\d)$");
+            if (!m.Success) return;
+            foreach (int s in ParseStats(m.Groups[1].Value)) ChangeStat(user, s, int.Parse(m.Groups[2].Value), user);
+        }
+
         static List<int> ParseStats(string s)
         {
             var list = new List<int>();

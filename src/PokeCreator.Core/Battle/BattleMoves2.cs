@@ -110,6 +110,10 @@ namespace PokeCreator.Battles
                     if (bt.Pk.Fainted) _faintedThisTurn[bt.Side] = true;
                     return true;
                 }
+                case "HoopaRemoveProtectionsBypassSubstituteLowerUserDef1":   // Hyperspace Fury
+                    if (user.Pk.Species != "HOOPA") { Say("But " + NameL(user) + " can't use the move!"); user.LastMoveFailed = true; return true; }
+                    if (user.Pk.Form != 1) { Say("But " + NameL(user) + " can't use it the way it is now!"); user.LastMoveFailed = true; return true; }
+                    break;
                 case "HealUserByHalfOfDamageDoneIfTargetAsleep":
                     if ((target.Pk.Status ?? "").ToUpperInvariant() != "SLEEP" && !HasAbility(target, "COMATOSE"))
                     { Say(Name(target) + " wasn't affected!"); user.LastMoveFailed = true; return true; }
@@ -123,6 +127,16 @@ namespace PokeCreator.Battles
             string n = Name(user), tn = Name(target);
             switch (code)
             {
+                case "TwoTurnAttackRaiseUserSpAtkSpDefSpd2":   // Geomancy, after charging
+                {
+                    bool any = false;
+                    foreach (int s in new[] { S.SpAtk, S.SpDef, S.Speed }) any |= ChangeStat(user, s, 2, user);
+                    if (!any) user.LastMoveFailed = true;
+                    return true;
+                }
+                case "SleepTargetIfUserDarkrai":   // Dark Void
+                    if (user.Pk.Species != "DARKRAI" && !user.TransformedMoves) { Say("But " + NameL(user) + " can't use the move!"); user.LastMoveFailed = true; return true; }
+                    break;
                 case "SleepTargetNextTurn":   // Yawn
                     if (target.YawnTurns > 0 || !string.IsNullOrEmpty(target.Pk.Status) || !CanStatus(target, "SLEEP", false, user)) { Say("But it failed!"); user.LastMoveFailed = true; return true; }
                     target.YawnTurns = 2;

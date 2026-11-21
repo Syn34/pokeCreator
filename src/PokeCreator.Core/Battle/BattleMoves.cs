@@ -445,13 +445,17 @@ namespace PokeCreator.Battles
                     }
                 case "HealUserAndAlliesQuarterOfTotalHP":
                 case "HealUserAndAlliesQuarterOfTotalHPCureStatus":
+                {
+                    bool any = false;
                     foreach (var b in Live(side))
                     {
                         int max = b.Pk.TotalHP(P);
-                        if (b.Pk.HP < max) { int f = b.Pk.HP; b.Pk.HP = Math.Min(max, b.Pk.HP + max / 4); Hp(b, f); Say(Name(b) + "'s HP was restored."); }
-                        if (code.EndsWith("CureStatus") && !string.IsNullOrEmpty(b.Pk.Status)) { b.Pk.Status = ""; StatusEvent(b); }
+                        if (b.Pk.HP < max) { int f = b.Pk.HP; b.Pk.HP = Math.Min(max, b.Pk.HP + max / 4); Hp(b, f); Say(Name(b) + "'s HP was restored."); any = true; }
+                        if (code.EndsWith("CureStatus") && !string.IsNullOrEmpty(b.Pk.Status)) { b.Pk.Status = ""; StatusEvent(b); Say(Name(b) + "'s status returned to normal!"); any = true; }
                     }
+                    if (!any) { Say("But it failed!"); user.LastMoveFailed = true; }
                     return true;
+                }
                 case "CureTargetStatusHealUserHalfOfTotalHP":
                     {
                         if (string.IsNullOrEmpty(target.Pk.Status)) { Say("But it failed!"); return true; }
