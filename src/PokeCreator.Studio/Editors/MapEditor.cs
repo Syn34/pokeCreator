@@ -819,6 +819,13 @@ namespace PokeCreator.Studio.Editors
                 menu.Items.Add("New Trainer (battles when they see you)…", null, (s, a) => QuickTrainer(cell));
                 menu.Items.Add("New Nurse (heals the party)…", null, (s, a) => QuickNurse(cell));
                 menu.Items.Add("New Poké Mart Clerk…", null, (s, a) => QuickMart(cell));
+                menu.Items.Add("New PC (Pokémon Storage)", null, (s, a) => QuickSimple(cell, "PC", "", new List<EventCommand> { new EventCommand(355, 0, "pbPokeCenterPC"), new EventCommand(0, 0) }));
+                menu.Items.Add("New Sign…", null, (s, a) =>
+                {
+                    string text = TextDialog.Ask(FindForm(), "New Sign: what it says", "Route 1", true);
+                    if (text == null) return;
+                    QuickSimple(cell, "Sign", "", new List<EventCommand> { new EventCommand(101, 0, text), new EventCommand(0, 0) });
+                });
                 var fieldMenu = new ToolStripMenuItem("New Field Object");
                 fieldMenu.DropDownItems.Add("Cut Tree", null, (s, a) => QuickFieldObject(cell, "CutTree"));
                 fieldMenu.DropDownItems.Add("Rock Smash Rock", null, (s, a) => QuickFieldObject(cell, "SmashRock"));
@@ -1067,6 +1074,17 @@ namespace PokeCreator.Studio.Editors
         }
 
         /// <summary>A Pokémon Center nurse: heals the party and makes this the place to return to after blacking out.</summary>
+        /// <summary>An event with no picture that runs its commands when the player presses Action facing it.</summary>
+        void QuickSimple(Point cell, string name, string sprite, List<EventCommand> list)
+        {
+            var ev = NewEvent(cell); ev.Name = name;
+            var pg = ev.Pages[0];
+            pg.Graphic.CharacterName = sprite;
+            pg.Trigger = Triggers.Action;
+            pg.List = list;
+            _ed.EditEvent(ev);
+        }
+
         void QuickNurse(Point cell)
         {
             var ev = NewEvent(cell); ev.Name = "Nurse";
