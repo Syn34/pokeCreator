@@ -349,6 +349,7 @@ namespace PokeCreator.Runtime.World
             World.Phone.OnStep(Game);
             Safari.OnStep(Game);
             GameStats.OnStep(Game);
+            if (StepEffects.OnStep(Game)) return;
             foreach (var spk in Game.State.Party) if (spk.ShadowPokemon) PokeCreator.Pkmn.Shadow.AdjustHeart(spk, -1);
             if (Game.State.Extras.PurifyChamber != null) foreach (var cpk in Game.State.Extras.PurifyChamber) PokeCreator.Pkmn.Shadow.AdjustHeart(cpk, -2);
             if ((Game.State.Steps & 63) == 0) World.Pokerus.DailyCheck(Game);
@@ -408,7 +409,7 @@ namespace PokeCreator.Runtime.World
         {
             if (_game.State.RepelSteps > 0 && --_game.State.RepelSteps == 0)
             {
-                _game.Message.Show("The repelling effect wore off!");
+                StepEffects.RepelWoreOff(_game);
                 return;
             }
             if (!Enabled || _game.State.Flags.Contains("encounter_disabled")) return;

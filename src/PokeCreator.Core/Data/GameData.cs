@@ -331,6 +331,8 @@ namespace PokeCreator.Data
         [Field("Safari steps", Group = "Safari Zone", Help = "Steps allowed in a Safari game (0 = no limit).")] public int SafariSteps { get; set; }
         [Field("Hyper Training level", Group = "Battle", Help = "Level a Pokémon needs before Bottle Caps work (0 = the maximum level, as Essentials).")] public int HyperTrainingLevel { get; set; }
         [Field("Exp. All always on", Group = "Battle", Help = "Every party Pokémon that didn't fight gets half the EXP (as the Gen 6+ Exp. Share). Otherwise this happens only with the EXPALL key item or $player.has_exp_all = true. Pokémon holding an Exp. Share always share EXP.")] public bool ExpAll { get; set; }
+        [Field("Poison hurts in the field", Group = "Field", Help = "Poisoned party Pokémon lose 1 HP every 4 steps (Gen 1-4). They recover at 1 HP unless the next option is on.")] public bool PoisonInField { get; set; }
+        [Field("Poison can faint in the field", Group = "Field", Help = "With field poison on: Pokémon can faint from it (Gen 1-3).")] public bool PoisonFaintInField { get; set; }
         [Field("Fishing hooks by itself", Group = "Field", Help = "Off: after \"Oh! A bite!\" the player must press the Action button quickly or the Pokémon gets away.")] public bool FishingAutoHook { get; set; }
         [Field("PC boxes", Group = "Pokémon Storage", Help = "Number of Pokémon Storage boxes (30 Pokémon each).")] public int StorageBoxes { get; set; }
         [Field("Safari Balls", Group = "Safari Zone", Help = "Safari Balls given at the start of a Safari game.")] public int SafariBalls { get; set; }

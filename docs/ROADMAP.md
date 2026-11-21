@@ -109,6 +109,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Battle Bag: X items (+2, X Attack 2/3/6), Dire Hit, Guard Spec., Yellow / Red Flute, Poké Doll / Fluffy Tail / Poké Toy (escape), Ethers and Elixirs on a chosen move
 - [x] Field items: Ability Capsule, Ability Patch, Bottle Cap / Gold Bottle Cap (Hyper Training, level from Game Settings; add items with IDs BOTTLECAP / GOLDBOTTLECAP), Sacred Ash
 - [x] Two trainers who spot the player at once team up for a double battle (if the player has two Pokémon that can fight); both are marked beaten
+- [x] Walking raises friendship (every 128 steps; Soothe Bell, Luxury Ball); optional field poison (Game Settings, Gen 1-4 style); "use another Repel?" when one wears off
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing
