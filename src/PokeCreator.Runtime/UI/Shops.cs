@@ -213,12 +213,21 @@ namespace PokeCreator.Runtime.UI
             bool chamber = g.State.Flags.Contains("seen_purify_chamber");
             var options = new List<string> { "Someone's PC", g.State.PlayerName + "'s PC" };
             if (chamber) options.Add("Purify Chamber");
+            bool hof = g.State.HallOfFame.Count > 0;
+            if (hof) options.Add("Hall of Fame");
             options.Add("Log off");
             g.Message.Show("Which PC should be accessed?", options, options.Count - 1, c =>
             {
+                string pick = c >= 0 && c < options.Count ? options[c] : "Log off";
                 if (c == 0) StoragePc(g);
                 else if (c == 1) PlayerPc(g, () => ShowMain(g));
-                else if (chamber && c == 2) PurifyChamber(g, () => ShowMain(g));
+                else if (pick == "Purify Chamber") PurifyChamber(g, () => ShowMain(g));
+                else if (pick == "Hall of Fame")
+                {
+                    var s = new HallOfFameScene(g, true);
+                    s.OnClosed = () => ShowMain(g);
+                    g.PushScene(s);
+                }
                 else g.Audio.PlaySe("PC close");
             });
         }
