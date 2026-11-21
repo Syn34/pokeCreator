@@ -524,6 +524,7 @@ namespace PokeCreator.Runtime.Script
             var sm = Regex.Match(lhs, @"^\$stats\.(\w+)\[(.+)\]$");
             if (sm.Success) { World.GameStats.Set(_game, sm.Groups[1].Value + "_" + ToInt(Eval(sm.Groups[2].Value, ctx)), ToInt(val)); return; }
             if (lhs.StartsWith("$stats.")) { World.GameStats.Set(_game, lhs.Substring(7), ToInt(val)); return; }
+            if (lhs == "$player.soot" || lhs == "$Trainer.soot") { World.GameStats.Set(_game, "soot", Math.Max(0, ToInt(val))); return; }
             // Ruby globals made by scripts ($speeches = [], $DEBUG = true) live as long as the game runs
             if (Regex.IsMatch(lhs, @"^\$[A-Za-z_]\w*$")) { _globals[lhs] = val; return; }
             var cm = Regex.Match(lhs, @"^get_character\((.*)\)\.(\w+)$");
@@ -992,6 +993,7 @@ namespace PokeCreator.Runtime.Script
             Register("$player.pokemon_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg).ToList());
             Register("$player.able_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg && !p.Fainted).ToList());
             Register("$player.party", (c, a) => _game.State.Party);
+            Register("$player.soot", (c, a) => World.GameStats.Int(_game, "soot"));
             // $player passed as an argument (pkmn.foreign?($player), pkmn.owner = Owner.new_from_trainer($player))
             Register("$player", (c, a) => _game.State);
             Register("$Trainer", (c, a) => _game.State);

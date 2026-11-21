@@ -18,7 +18,7 @@ namespace PokeCreator.Runtime.World
         public MapEffects(Game g) { _g = g; }
 
         const int FramesPerCell = 4;
-        static int Length(string kind) { return (kind == "grass" ? 5 : kind == "dust" ? 3 : 8) * FramesPerCell; }
+        static int Length(string kind) { return (kind == "grass" ? 5 : kind == "dust" || kind == "splash" ? 3 : 8) * FramesPerCell; }
 
         /// <summary>kind: "grass", "dust" or "exclaim"; at a tile, or over a character.</summary>
         public void Play(string kind, int x, int y, Character follow = null)
@@ -52,6 +52,15 @@ namespace PokeCreator.Runtime.World
                 {
                     if (exSheet != null) { int cell = step % 4; g.Draw(exSheet, (cell % 5) * 192, (cell / 5) * 192, 192, 192, cx - 96, cy - 96 - 40); }
                     else { g.FillRect(cx - 4, cy - 70, 8, 18, new Color(232, 48, 48)); g.FillRect(cx - 4, cy - 48, 8, 8, new Color(232, 48, 48)); }
+                    continue;
+                }
+                if (e.Kind == "splash")
+                {
+                    // Water splashing out of a puddle: two drops either side and a widening ring
+                    var water = new Color(160, 200, 248, 220);
+                    int r = 6 + step * 5;
+                    g.FillRect(cx - r, cy + 10, r * 2, 2, water);
+                    g.FillRect(cx - r + 2, cy + 4 - step * 3, 4, 4, water); g.FillRect(cx + r - 6, cy + 4 - step * 3, 4, 4, water);
                     continue;
                 }
                 int first = e.Kind == "grass" ? 3 : 0;

@@ -20,6 +20,9 @@ namespace PokeCreator.Runtime.World
                     if (pk.IsEgg || pk.Fainted) continue;
                     pk.ChangeHappiness("walking");
                 }
+            // Soot Sack: walking through ashy grass collects soot ($player.soot)
+            if (g.Map != null && g.Player != null && g.Map.TerrainTag(g.Player.X, g.Player.Y) == GameMap.TagSootGrass && g.State.Bag.ContainsKey("SOOTSACK"))
+                GameStats.Inc(g, "soot");
             var s = g.Project.Settings;
             if (!s.PoisonInField || g.State.Steps % 4 != 0) return false;
             var poisoned = party.Where(pk => !pk.IsEgg && !pk.Fainted && (pk.Status == "POISON" || pk.Status == "TOXIC")).ToList();

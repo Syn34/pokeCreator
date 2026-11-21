@@ -64,8 +64,13 @@ namespace PokeCreator.Runtime.World
             bool moving = Moving && !Jumping, jumping = Jumping;
             if (Game != null && Game.Effects != null && Map == Game.Map && !Transparent && (!string.IsNullOrEmpty(CharacterName) || this is Player))
             {
-                if (_fxJumping && !jumping) { int tag = Map.TerrainTag(X, Y); if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) Game.Effects.Play("grass", X, Y); else Game.Effects.Play("dust", X, Y); }
-                else if (_fxMoving && !moving && !jumping) { int tag = Map.TerrainTag(X, Y); if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) Game.Effects.Play("grass", X, Y); }
+                if (_fxJumping && !jumping) { int tag = Map.TerrainTag(X, Y); if (GameMap.IsGrassTag(tag)) Game.Effects.Play("grass", X, Y); else Game.Effects.Play("dust", X, Y); }
+                else if (_fxMoving && !moving && !jumping)
+                {
+                    int tag = Map.TerrainTag(X, Y);
+                    if (GameMap.IsGrassTag(tag)) Game.Effects.Play("grass", X, Y);
+                    else if (tag == GameMap.TagPuddle) Game.Effects.Play("splash", X, Y);
+                }
             }
             _fxMoving = moving; _fxJumping = jumping;
 

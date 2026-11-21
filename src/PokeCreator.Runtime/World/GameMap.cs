@@ -108,7 +108,9 @@ namespace PokeCreator.Runtime.World
 
         public static readonly int[] WaterTags = { 5, 6, 7, 8, 9 };
         public const int TagLedge = 1, TagGrass = 2, TagTallGrass = 10;
-        public const int TagDeepWater = 5, TagWaterfall = 8, TagWaterfallCrest = 9, TagIce = 12;
+        public const int TagDeepWater = 5, TagWaterfall = 8, TagWaterfallCrest = 9, TagIce = 12, TagSootGrass = 14, TagPuddle = 16;
+        /// <summary>Grass-like tiles: rustle when walked through and have land encounters.</summary>
+        public static bool IsGrassTag(int tag) { return tag == TagGrass || tag == TagTallGrass || tag == TagSootGrass; }
 
         public GameMap(Project p, MapData data, Game game, bool withEvents)
         {

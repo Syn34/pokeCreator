@@ -424,7 +424,7 @@ namespace PokeCreator.Runtime.World
             int tag = map.TerrainTag(x, y);
             string method;
             if (_game.Player.Surfing && Array.IndexOf(GameMap.WaterTags, tag) >= 0) method = "Water";
-            else if (tag == GameMap.TagGrass || tag == GameMap.TagTallGrass) method = "Land";
+            else if (GameMap.IsGrassTag(tag)) method = "Land";
             else if (map.Tileset != null && _game.Project.Encounters.Any(en => en.Map == map.Id && en.Methods.Any(mt => mt.Type.StartsWith("Cave")))) method = "Cave";
             else return;
             var table = _game.EncounterTable(map.Id);
