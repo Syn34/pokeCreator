@@ -134,3 +134,12 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Plugin system (Plugins/<name>: plugin.json, scripts, assets and database records; requirements; install / export .zip / make from scripts in Game → Plugins…; [ScriptInit] and GameEvents hooks for scripts)
 - [x] Link battles and trades with another player over the network (pbLinkBattle / pbLinkTrade / pbLinkHost / pbLinkJoin: host or join by address, both games run the same battle in step, single or double, healed copies; trades with trade evolutions); battle hooks for outside control (ExternalCommand, Start/Turn overrides, FlipNames)
 - [x] Event editor: Battle Tower, link battle / trade, Mystery Gift, partner, Safari, Bug Contest and Relic Stone commands
+
+## ✅ v0.8: Essentials parity polish (done)
+- [x] Obedience (traded Pokémon above the badge level), F12 soft reset, Give Nicknames option, maximum level and shiny odds in Game Settings
+- [x] Battle moves: Protect variants (King's Shield, Spiky Shield, Baneful Bunker, Obstruct), Wide / Quick Guard, Crafty Shield, Mat Block, Yawn, Bide, Uproar, Pay Day, Healing Wish / Lunar Dance, Memento, Strength Sap, Trick-or-Treat, Forest's Curse, Tar Shot, Freeze-Dry, Sheer Cold, charge-turn boosts, Power Herb, multi-part stat codes (Shell Smash, Shift Gear), Minimize / Defense Curl follow-ups and more
+- [x] "Fainted!" and EXP right after the move; battles end as soon as a side is out of Pokémon; ability splash panel; party lineups in trainer battles
+- [x] Every special Poké Ball; Primal Reversion; Macho Brace / Power items; Amulet Coin; Poké Flute, Coin Case, Box Link, Honey, Scrolls, Linking Cord, Max Mushrooms; Soft-Boiled / Milk Drink in the field
+- [x] Forms by gender, size and time (Meowstic, Pumpkaboo, Lycanroc, Keldeo...); breeding with Power items, Masuda method, Volt Tackle Pichu; berry Mulch
+- [x] Extra PBS files: berry_plants, ribbons, shadow_pokemon, phone (Phone Messages table used by Pokégear calls); StillReflections and rippling reflections; regional dexes numbered from 0
+- [x] Event commands Call Menu / Save Screen / Game Over; Afternoon / Evening encounter tables; Studio Find in Events (Ctrl+Shift+F)
