@@ -100,6 +100,7 @@ namespace PokeCreator.Runtime
             if (pluginRecords > 0) Console.WriteLine("[plugins] Added " + pluginRecords + " database record(s)");
             if (SDL.SDL_Init(SDL.INIT_VIDEO | SDL.INIT_EVENTS) != 0) throw new Exception("SDL_Init failed: " + SDL.GetError());
             Input.InitControllers();
+            if (Project.Settings.StorageBoxes > 0) World.PokemonStorage.DefaultBoxes = Math.Min(100, Project.Settings.StorageBoxes);
             Effects = new World.MapEffects(this);
             SDL.SDL_InitSubSystem(SDL.INIT_AUDIO);
             SDL.IMG_Init(0x2 | 0x1); // PNG | JPG
