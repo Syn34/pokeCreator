@@ -258,15 +258,12 @@ namespace PokeCreator.Runtime.World
                 var got = offered;
                 g.State.Party[i] = got;
                 g.State.Register(got);
-                g.Audio.PlayMe("Evolution success");
-                string oldName = mineOffer.Name(g.Project), newName = got.Name(g.Project);
-                g.Message.Show("For " + them.Name + "'s " + newName + ", \\PN sent over " + oldName + ".", null, -1, _ =>
-                    g.Message.Show(them.Name + " sent over " + newName + ".\\nTake good care of " + newName + "!", null, -1, __ =>
-                    {
-                        var to = Growth.CheckTradeEvolution(g.Project, got, mineOffer);
-                        if (to != null) g.PushScene(new EvolutionScene(g, got, to, false, null));
-                        end();
-                    }));
+                g.PushScene(new TradeScene(g, mineOffer, got, them.Name, () =>
+                {
+                    var to = Growth.CheckTradeEvolution(g.Project, got, mineOffer);
+                    if (to != null) g.PushScene(new EvolutionScene(g, got, to, false, null));
+                    end();
+                }));
             };
             // A little scene that only listens to the link while the player chooses
             var listener = new LinkListenScene(g, () =>

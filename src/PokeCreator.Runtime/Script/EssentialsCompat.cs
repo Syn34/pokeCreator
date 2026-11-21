@@ -867,15 +867,12 @@ namespace PokeCreator.Runtime.Script
                 if (a.Count > 2 && Str(a, 2).Length > 0) pk.Nickname = Str(a, 2);
                 pk.MetMap = _game.Map.Id;
                 _game.State.Party[i] = pk; _game.State.Register(pk);
-                string oldName = old.Name(_game.Project), newName = pk.Name(_game.Project);
-                _game.Audio.PlayMe("Evolution success");
-                _game.Message.Show("For " + pk.OTName + "'s " + newName + ", \\PN sent over " + oldName + ".", null, -1, _ =>
-                    _game.Message.Show(pk.OTName + " sent over " + newName + ".\\nTake good care of " + newName + "!", null, -1, __ =>
-                    {
-                        // Trade evolutions
-                        var to = PokeCreator.Pkmn.Growth.CheckTradeEvolution(_game.Project, pk, old);
-                        if (to != null) _game.PushScene(new UI.EvolutionScene(_game, pk, to, false, null));
-                    }));
+                _game.PushScene(new UI.TradeScene(_game, old, pk, pk.OTName, () =>
+                {
+                    // Trade evolutions
+                    var to = PokeCreator.Pkmn.Growth.CheckTradeEvolution(_game.Project, pk, old);
+                    if (to != null) _game.PushScene(new UI.EvolutionScene(_game, pk, to, false, null));
+                }));
                 return true;
             });
             Register("pbMoveTutorChoose", (c, a) =>

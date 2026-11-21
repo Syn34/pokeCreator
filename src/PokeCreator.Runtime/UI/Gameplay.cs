@@ -1168,3 +1168,106 @@ namespace PokeCreator.Runtime.UI
         }
     }
 }
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>
+    /// The trade animation: the player's Pokémon goes into its ball and flies off, the other trainer's ball comes
+    /// down and opens. Calls back after the last message (trade evolutions run from there).
+    /// </summary>
+    public class TradeScene : Scene
+    {
+        readonly Pokemon _sent, _got;
+        readonly string _partner;
+        readonly Action _done;
+        int _phase, _t;
+
+        public TradeScene(Game g, Pokemon sent, Pokemon got, string partner, Action done) : base(g)
+        {
+            Opaque = true; _sent = sent; _got = got; _partner = partner ?? "Stranger"; _done = done;
+        }
+
+        protected override void Update()
+        {
+            var p = Game.Project;
+            switch (_phase)
+            {
+                case 0:
+                    _phase = 1; _t = 0;
+                    Game.Audio.PlayBgm("Evolution");
+                    Game.Audio.PlayCry(_sent);
+                    Game.Message.Show("For " + _partner + "'s " + _got.Name(p) + ", \\PN sent over " + _sent.Name(p) + ".", null, -1, _ => { _phase = 2; _t = 0; Game.Audio.PlaySe("Battle recall"); });
+                    return;
+                case 2:
+                    if (++_t >= 110) { _phase = 3; _t = 0; }
+                    return;
+                case 3:
+                    _t++;
+                    if (_t == 60) Game.Audio.PlaySe("Battle throw");
+                    if (_t == 110) Game.Audio.PlaySe("Battle recall");
+                    if (_t >= 150)
+                    {
+                        _phase = 4;
+                        Game.Audio.StopBgm();
+                        Game.Audio.PlayMe("Evolution success");
+                        Game.Audio.PlayCry(_got);
+                        Game.Message.Show(_partner + " sent over " + _got.Name(p) + ".", null, -1, _ =>
+                            Game.Message.Show("Take good care of " + _got.Name(p) + "!", null, -1, __ =>
+                            {
+                                Close();
+                                Game.RestoreMapBgm();
+                                if (_done != null) _done();
+                            }));
+                    }
+                    return;
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 152, 216), new Color(200, 232, 248));
+            // Moving stripes
+            for (int i = 0; i < 8; i++)
+                g.FillRect(0, (i * 64 + Frame) % (g.Height + 64) - 32, g.Width, 6, new Color(255, 255, 255, 40));
+            int cx = g.Width / 2, bottom = g.Height / 2 + 72, ballY = bottom - 70;
+            switch (_phase)
+            {
+                case 0:
+                case 1:
+                    Ui.PokemonFront(g, Game, _sent, cx, bottom, 192);
+                    break;
+                case 2:
+                    if (_t < 40)
+                    {
+                        // Shrinking into the ball in a white glow
+                        int size = 192 - _t * 192 / 40;
+                        if (size > 8) Ui.PokemonFront(g, Game, _sent, cx, bottom - (192 - size) / 3, size);
+                        g.FillRect(0, 0, g.Width, g.Height, new Color(255, 255, 255, (byte)(_t * 4)));
+                    }
+                    else
+                    {
+                        int y = ballY - (_t - 40) * (_t - 40) / 12;
+                        Ui.ItemIcon(g, Game, _sent.Ball ?? "POKEBALL", cx - 24, y - 24);
+                    }
+                    break;
+                case 3:
+                    if (_t >= 60 && _t < 110)
+                    {
+                        int k = 110 - _t;
+                        Ui.ItemIcon(g, Game, _got.Ball ?? "POKEBALL", cx - 24, ballY - k * k / 12 - 24);
+                    }
+                    else if (_t >= 110)
+                    {
+                        int size = Math.Min(192, (_t - 110) * 192 / 30);
+                        if (size > 8) Ui.PokemonFront(g, Game, _got, cx, bottom - (192 - size) / 3, size);
+                        int a = Math.Max(0, 200 - (_t - 110) * 8);
+                        if (a > 0) g.FillRect(0, 0, g.Width, g.Height, new Color(255, 255, 255, (byte)a));
+                    }
+                    break;
+                default:
+                    Ui.PokemonFront(g, Game, _got, cx, bottom, 192);
+                    break;
+            }
+        }
+    }
+}
