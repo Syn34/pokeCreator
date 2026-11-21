@@ -113,6 +113,7 @@ namespace PokeCreator.Runtime.UI
             {
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
+                case "HONEY": g.State.RemoveItem("HONEY", 1); FieldMoves.SweetScent(g, "\\PN used the " + item.Name + "."); return;
                 case "COINCASE": g.Message.Show("Coins: " + g.State.Coins.ToString("N0")); return;
                 case "POKEMONBOXLINK": g.PushScene(new StorageScene(g, StorageScene.Mode.Organize)); return;
                 case "GRACIDEA": case "REVEALGLASS": case "PRISONBOTTLE": case "ROTOMCATALOG": case "DNASPLICERS": case "NSOLARIZER": case "NLUNARIZER": case "REINSOFUNITY":

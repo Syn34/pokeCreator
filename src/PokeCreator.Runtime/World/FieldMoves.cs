@@ -162,7 +162,7 @@ namespace PokeCreator.Runtime.World
         public static readonly string[] Rods = { "OLDROD", "GOODROD", "SUPERROD" };
         /// <summary>Key items used straight from the Bag (besides rods).</summary>
         public static readonly string[] DirectKeyItems = { "BICYCLE", "MACHBIKE", "ACROBIKE", "TOWNMAP", "ESCAPEROPE", "ITEMFINDER", "POKERADAR", "DOWSINGMACHINE", "DOWSINGMCHN", "SPRAYDUCK", "SQUIRTBOTTLE", "WAILMERPAIL", "SPRINKLOTAD",
-            "GRACIDEA", "REVEALGLASS", "PRISONBOTTLE", "ROTOMCATALOG", "DNASPLICERS", "NSOLARIZER", "NLUNARIZER", "REINSOFUNITY", "REDNECTAR", "YELLOWNECTAR", "PINKNECTAR", "PURPLENECTAR", "COINCASE", "POKEMONBOXLINK" };
+            "GRACIDEA", "REVEALGLASS", "PRISONBOTTLE", "ROTOMCATALOG", "DNASPLICERS", "NSOLARIZER", "NLUNARIZER", "REINSOFUNITY", "REDNECTAR", "YELLOWNECTAR", "PINKNECTAR", "PURPLENECTAR", "COINCASE", "POKEMONBOXLINK", "HONEY" };
 
         /// <summary>
         /// Itemfinder / Dowsing Machine (as in Essentials): looks for the nearest event named "HiddenItem" that still has
@@ -294,10 +294,13 @@ namespace PokeCreator.Runtime.World
             return info != null ? info.Name : "map " + id;
         }
 
-        public static void SweetScent(Game g, Pokemon pk)
+        public static void SweetScent(Game g, Pokemon pk) { SweetScent(g, pk.Name(g.Project) + " used Sweet Scent!"); }
+
+        /// <summary>Sweet Scent / Honey: lures a wild Pokémon out at once.</summary>
+        public static void SweetScent(Game g, string message)
         {
             g.CloseAllScenes();
-            g.Message.Show(pk.Name(g.Project) + " used Sweet Scent!", null, -1, _ =>
+            g.Message.Show(message, null, -1, _ =>
             {
                 bool found = EncounterFrom(g, g.Player.Surfing ? new[] { "Water" } : new[] { "Land", "LandDay", "LandNight", "LandMorning", "Cave" });
                 if (!found) g.Message.Show("There appears to be nothing here...");
