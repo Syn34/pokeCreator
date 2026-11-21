@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Runtime.InteropServices;
 using PokeCreator.Projects;
@@ -11,7 +12,10 @@ namespace PokeCreator.Runtime.Platform
     /// <summary>Keyboard input mapped to game buttons, with press / trigger / repeat states.</summary>
     public static class Input
     {
-        static readonly int[][] Keys =
+        static int[][] _keys;
+        static int[][] Keys { get { return _keys ?? (_keys = DefaultKeys()); } set { _keys = value; } }
+        static int[][] DefaultKeys() { return Defaults.Select(k => k.ToArray()).ToArray(); }
+        static readonly int[][] Defaults =
         {
             new[] { Scancode.Down, Scancode.S },
             new[] { Scancode.Left, Scancode.A },
@@ -22,6 +26,27 @@ namespace PokeCreator.Runtime.Platform
             new[] { Scancode.LShift, Scancode.RShift },
             new[] { Scancode.Escape, Scancode.X },
         };
+
+        /// <summary>The keys for a button (Options → Controls can change them).</summary>
+        public static int[] KeysFor(Button b) { return Keys[(int)b]; }
+        public static void SetKeys(Button b, int[] keys) { if (keys != null && keys.Length > 0) Keys[(int)b] = keys; }
+        public static void ResetKeys() { Keys = DefaultKeys(); }
+        public static string KeyName(int sc) { try { var p = SDL.SDL_GetScancodeName(sc); var s = p == IntPtr.Zero ? "" : Marshal.PtrToStringAnsi(p); return string.IsNullOrEmpty(s) ? "#" + sc : s; } catch { return "#" + sc; } }
+        static int[] _lastState = new int[0];
+        /// <summary>The first key that went down this frame (for rebinding), or -1.</summary>
+        public static int AnyKeyTriggered()
+        {
+            int n; IntPtr state = SDL.SDL_GetKeyboardState(out n);
+            if (_lastState.Length != n) _lastState = new int[n];
+            int found = -1;
+            for (int i = 4; i < n; i++)
+            {
+                int down = Marshal.ReadByte(state, i);
+                if (down != 0 && _lastState[i] == 0 && found < 0) found = i;
+                _lastState[i] = down;
+            }
+            return found;
+        }
 
         static readonly int[] _held = new int[(int)Button.Count];
         static readonly bool[] _simulated = new bool[(int)Button.Count];

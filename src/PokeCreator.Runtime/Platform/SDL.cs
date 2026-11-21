@@ -91,6 +91,7 @@ namespace PokeCreator.Runtime.Platform
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_DestroyWindow(IntPtr window);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_SetWindowTitle(IntPtr window, byte[] title);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_SetWindowSize(IntPtr window, int w, int h);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_GetScancodeName(int scancode);
         [StructLayout(LayoutKind.Sequential)]
         public struct SDL_RendererInfo { public IntPtr name; public uint flags; public uint num_texture_formats; [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)] public uint[] texture_formats; public int max_texture_width, max_texture_height; }
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_GetRendererInfo(IntPtr renderer, out SDL_RendererInfo info);

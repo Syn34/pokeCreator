@@ -30,6 +30,8 @@ namespace PokeCreator.Runtime.UI
         public string Language { get; set; }
         /// <summary>Window size: 0 = the game's default, 1-4 = times the game size, 5 = full screen.</summary>
         public int ScreenSize { get; set; }
+        /// <summary>Changed key bindings: button name → SDL scancodes.</summary>
+        public Dictionary<string, List<int>> Keys { get; set; }
         [Json.JsonIgnore] public bool BattleEffects { get { return !BattleEffectsOff; } set { BattleEffectsOff = !value; } }
         public PlayerOptions() { TextSpeed = 1; BgmVolume = 100; SeVolume = 100; SpeechFrame = ""; MenuFrame = ""; }
 
@@ -53,6 +55,8 @@ namespace PokeCreator.Runtime.UI
             g.Audio.SeVolume = Math.Max(0, Math.Min(100, SeVolume));
             g.Audio.ApplyVolume();
             g.LoadFrames();
+            Input.ResetKeys();
+            if (Keys != null) foreach (var kv in Keys) { Button b; if (Enum.TryParse(kv.Key, out b) && kv.Value != null && kv.Value.Count > 0) Input.SetKeys(b, kv.Value.ToArray()); }
             if (ScreenSize > 0 && g.Gfx != null && ScreenSize != _appliedSize) { g.Gfx.SetScreenSize(ScreenSize >= 5 ? 0 : ScreenSize); _appliedSize = ScreenSize; }
         }
         int _appliedSize;
@@ -725,8 +729,8 @@ namespace PokeCreator.Runtime.UI
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
             _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
             Labels = _langs.Count > 1
-                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Close" }
-                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Close" };
+                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" };
         }
 
         static string Cycle(List<string> list, string cur, int d)
@@ -758,6 +762,7 @@ namespace PokeCreator.Runtime.UI
                 _o.Apply(Game);
                 if (_row != Labels.Length - 1) Cursor();
             }
+            if (Input.Trigger(Button.Action) && Labels[_row] == "Controls") { Decide(); Game.PushScene(new ControlsScene(Game)); return; }
             if (Input.Trigger(Button.Cancel) || (Input.Trigger(Button.Action) && _row == Labels.Length - 1)) { _o.Save(Game); Cancel(); Close(); }
         }
 
@@ -769,8 +774,8 @@ namespace PokeCreator.Runtime.UI
             Ui.Panel(g, 8, 60, g.Width - 16, 262, new Color(248, 248, 248), new Color(32, 48, 96));
             string[] values = { "◀ " + PlayerOptions.TextSpeeds[_o.TextSpeed] + " ▶", "◀ " + _o.BgmVolume + "% ▶", "◀ " + _o.SeVolume + "% ▶",
                                 "◀ " + (_o.BattleEffects ? "On" : "Off") + " ▶", "◀ " + (_o.BattleStyleSet ? "Set" : "Switch") + " ▶", "◀ " + FrameLabel(_o.SpeechFrame) + " ▶", "◀ " + FrameLabel(_o.MenuFrame) + " ▶", "◀ " + (_o.RunToggle ? "Toggle" : "Hold") + " ▶", "◀ " + ScreenLabel() + " ▶", "◀ " + (string.IsNullOrEmpty(_o.Language) ? "Original" : _o.Language) + " ▶", "" };
-            if (Labels.Length == 10) values = values.Take(9).Concat(new[] { "" }).ToArray();
-            int rowH = Labels.Length > 10 ? 23 : 25;
+            values = Labels.Length == 11 ? values.Take(9).Concat(new[] { "", "" }).ToArray() : values.Take(10).Concat(new[] { "", "" }).ToArray();
+            int rowH = Labels.Length > 11 ? 21 : 23;
             for (int i = 0; i < Labels.Length; i++)
             {
                 int y = 66 + i * rowH;
@@ -956,6 +961,68 @@ namespace PokeCreator.Runtime.UI
             }
             Ui.Text(g, 56, ly, line);
             if (!string.IsNullOrEmpty(_mail.Sender)) Ui.TextRight(g, g.Width - 56, g.Height - 76, "From " + _mail.Sender);
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>Options → Controls: choose a button, then press the key to use for it (it replaces the first key; Shift+Action adds one).</summary>
+    public class ControlsScene : Scene
+    {
+        static readonly Button[] Buttons = { Button.Up, Button.Down, Button.Left, Button.Right, Button.Action, Button.Cancel, Button.Menu, Button.Run };
+        static readonly string[] Names = { "Up", "Down", "Left", "Right", "Action (A)", "Cancel (B)", "Menu", "Run" };
+        int _row; int _waiting = -1, _waitFrames;
+        public ControlsScene(Game g) : base(g) { Opaque = true; }
+
+        protected override void Update()
+        {
+            if (_waiting >= 0)
+            {
+                if (++_waitFrames < 10) { Input.AnyKeyTriggered(); return; } // let go of the key that chose the row
+                int sc = Input.AnyKeyTriggered();
+                if (sc < 0) return;
+                var b = Buttons[_waiting];
+                var keys = Input.KeysFor(b).ToList();
+                if (keys.Count > 0) keys[0] = sc; else keys.Add(sc);
+                Input.SetKeys(b, keys.Distinct().ToArray());
+                var o = Game.Options;
+                if (o.Keys == null) o.Keys = new Dictionary<string, List<int>>();
+                o.Keys[b.ToString()] = Input.KeysFor(b).ToList();
+                _waiting = -1; Decide();
+                return;
+            }
+            int n = Buttons.Length + 2; // + Reset, Back
+            if (Input.Repeat(Button.Down)) { _row = (_row + 1) % n; Cursor(); }
+            if (Input.Repeat(Button.Up)) { _row = (_row + n - 1) % n; Cursor(); }
+            if (Input.Trigger(Button.Cancel)) { Cancel(); Game.Options.Save(Game); Close(); return; }
+            if (!Input.Trigger(Button.Action)) return;
+            Decide();
+            if (_row < Buttons.Length) { _waiting = _row; _waitFrames = 0; }
+            else if (_row == Buttons.Length) { Game.Options.Keys = null; Input.ResetKeys(); }
+            else { Game.Options.Save(Game); Close(); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
+            Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
+            Ui.Text(g, 22, 14, "Controls");
+            Ui.Panel(g, 8, 60, g.Width - 16, 270, new Color(248, 248, 248), new Color(32, 48, 96));
+            for (int i = 0; i < Buttons.Length + 2; i++)
+            {
+                int y = 66 + i * 26;
+                if (i == _row) Ui.Arrow(g, 22, y + 8);
+                if (i < Buttons.Length)
+                {
+                    Ui.Text(g, 44, y, Names[i]);
+                    string keys = _waiting == i ? "Press a key..." : string.Join(", ", Input.KeysFor(Buttons[i]).Take(3).Select(Input.KeyName));
+                    Ui.TextRight(g, g.Width - 28, y, keys);
+                }
+                else Ui.Text(g, 44, y, i == Buttons.Length ? "Reset to defaults" : "Back");
+            }
+            Ui.Box(g, 4, g.Height - 50, g.Width - 8, 46);
+            Ui.Text(g, 22, g.Height - 40, "A: change a key   B: back");
         }
     }
 }
