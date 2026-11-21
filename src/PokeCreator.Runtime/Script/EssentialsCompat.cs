@@ -311,7 +311,7 @@ namespace PokeCreator.Runtime.Script
             if (e == "$player.money" || e == "$Trainer.money") return _game.State.Money;
             if (e == "$player.name" || e == "$Trainer.name") return _game.State.PlayerName;
             if (Regex.IsMatch(e, @"^\$(player|Trainer)\.(party\.length|pokemon_count|party_count)$")) return _game.Party.Count;
-            m = Regex.Match(e, @"^\$(?:player|Trainer)\.(has_\w+|pokedex)\??$");
+            m = Regex.Match(e, @"^\$(?:player|Trainer)\.(has_\w+|pokedex|seen_purify_chamber)\??$");
             if (m.Success) return _game.State.Flags.Contains(m.Groups[1].Value == "pokedex" ? "has_pokedex" : m.Groups[1].Value);
             m = Regex.Match(e, @"^\$(?:player|Trainer)\.(?:pokedex\.)?(seen_count|owned_count|pokedexSeen|pokedexOwned)$");
             if (m.Success) return m.Groups[1].Value.StartsWith("seen") || m.Groups[1].Value == "pokedexSeen" ? _game.State.Seen.Count : _game.State.Caught.Count;
@@ -487,7 +487,7 @@ namespace PokeCreator.Runtime.Script
             if (lhs == "$player.money" || lhs == "$Trainer.money") { _game.State.Money = ToInt(val); return; }
             if (lhs == "$player.name" || lhs == "$Trainer.name") { _game.State.PlayerName = Convert.ToString(val); return; }
             if (lhs == "$player.character_ID" || lhs == "$Trainer.character_ID") { _game.ChangePlayer(ToInt(val) - 1); return; }
-            var fm = Regex.Match(lhs, @"^\$(?:player|Trainer)\.(has_\w+|pokedex)$");
+            var fm = Regex.Match(lhs, @"^\$(?:player|Trainer)\.(has_\w+|pokedex|seen_purify_chamber)$");
             if (fm.Success)
             {
                 string flag = fm.Groups[1].Value == "pokedex" ? "has_pokedex" : fm.Groups[1].Value;

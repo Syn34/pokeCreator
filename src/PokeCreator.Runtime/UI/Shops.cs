@@ -208,12 +208,62 @@ namespace PokeCreator.Runtime.UI
 
         static void ShowMain(Game g)
         {
-            var options = new List<string> { "Someone's PC", g.State.PlayerName + "'s PC", "Log off" };
-            g.Message.Show("Which PC should be accessed?", options, 2, c =>
+            bool chamber = g.State.Flags.Contains("seen_purify_chamber");
+            var options = new List<string> { "Someone's PC", g.State.PlayerName + "'s PC" };
+            if (chamber) options.Add("Purify Chamber");
+            options.Add("Log off");
+            g.Message.Show("Which PC should be accessed?", options, options.Count - 1, c =>
             {
                 if (c == 0) StoragePc(g);
                 else if (c == 1) PlayerPc(g, () => ShowMain(g));
+                else if (chamber && c == 2) PurifyChamber(g, () => ShowMain(g));
                 else g.Audio.PlaySe("PC close");
+            });
+        }
+
+        /// <summary>
+        /// The Purify Chamber (simplified from Essentials): up to 9 Shadow Pokémon kept here open their hearts twice as
+        /// fast as walking with them; one whose heart is fully open is purified when taken out.
+        /// </summary>
+        public static void PurifyChamber(Game g, Action back)
+        {
+            var ch = g.State.Extras.PurifyChamber ?? (g.State.Extras.PurifyChamber = new List<Pokemon>());
+            var opts = new List<string> { "Put in a Shadow Pokémon", "Take out a Pokémon", "Back" };
+            string status = ch.Count == 0 ? "The chamber is empty." : string.Join(", ", ch.Select(p => p.Name(g.Project) + " (" + (PokeCreator.Pkmn.Shadow.Purifiable(p) ? "ready" : "heart " + PokeCreator.Pkmn.Shadow.Stage(p) + "/5") + ")"));
+            g.Message.Show(status, opts, 2, c =>
+            {
+                Action again = () => PurifyChamber(g, back);
+                if (c == 0)
+                {
+                    if (ch.Count >= 9) { g.Message.Show("The chamber is full.", null, -1, _ => again()); return; }
+                    g.PushScene(new PartyScene(g, "Put in which Pokémon?", null, (i, close) =>
+                    {
+                        var pk = g.State.Party[i];
+                        if (!pk.ShadowPokemon) { g.Message.Show("Only Shadow Pokémon can go in the chamber."); return; }
+                        if (g.State.Party.Count(p => !p.IsEgg && !p.Fainted && p != pk) == 0) { g.Message.Show("That's your last Pokémon!"); return; }
+                        close(); g.State.Party.Remove(pk); ch.Add(pk);
+                        g.Message.Show(pk.Name(g.Project) + " was placed in the Purify Chamber.", null, -1, _ => again());
+                    }, again));
+                }
+                else if (c == 1)
+                {
+                    if (ch.Count == 0) { again(); return; }
+                    var names = ch.Select(p => p.Name(g.Project)).ToList(); names.Add("Cancel");
+                    g.Message.Show("Take out which Pokémon?", names, names.Count - 1, k =>
+                    {
+                        if (k < 0 || k >= ch.Count) { again(); return; }
+                        if (g.State.Party.Count >= GameState.MaxParty) { g.Message.Show("Your party is full!", null, -1, _ => again()); return; }
+                        var pk = ch[k]; ch.RemoveAt(k); g.State.Party.Add(pk);
+                        if (PokeCreator.Pkmn.Shadow.Purifiable(pk))
+                        {
+                            PokeCreator.Pkmn.Shadow.Purify(g.Project, pk);
+                            g.Audio.PlayMe("Evolution success");
+                            g.Message.Show(pk.Name(g.Project) + " opened the door to its heart!\n" + pk.Name(g.Project) + " became a normal Pokémon again!", null, -1, _ => again());
+                        }
+                        else g.Message.Show(pk.Name(g.Project) + " was taken out of the chamber.", null, -1, _ => again());
+                    });
+                }
+                else back();
             });
         }
 

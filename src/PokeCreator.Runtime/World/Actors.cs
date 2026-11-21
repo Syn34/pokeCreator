@@ -340,6 +340,7 @@ namespace PokeCreator.Runtime.World
             Safari.OnStep(Game);
             GameStats.OnStep(Game);
             foreach (var spk in Game.State.Party) if (spk.ShadowPokemon) PokeCreator.Pkmn.Shadow.AdjustHeart(spk, -1);
+            if (Game.State.Extras.PurifyChamber != null) foreach (var cpk in Game.State.Extras.PurifyChamber) PokeCreator.Pkmn.Shadow.AdjustHeart(cpk, -2);
             if ((Game.State.Steps & 63) == 0) World.Pokerus.DailyCheck(Game);
             Script.GameEvents.RaiseStep(Game);
             if (Game.Map.TerrainTag(X, Y) == GameMap.TagIce && !Surfing && !RouteForced) _sliding = true;
