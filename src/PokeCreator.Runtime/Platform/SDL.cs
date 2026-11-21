@@ -29,6 +29,10 @@ namespace PokeCreator.Runtime.Platform
     public struct SDL_Event
     {
         public uint type;
+        public uint timestamp;
+        public uint windowID;
+        /// <summary>SDL_TEXTINPUT: the typed text (UTF-8, zero-terminated).</summary>
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public byte[] text;
     }
 
     /// <summary>
@@ -83,6 +87,9 @@ namespace PokeCreator.Runtime.Platform
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern ulong SDL_GetPerformanceFrequency();
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_Delay(uint ms);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_PollEvent(out SDL_Event e);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_StartTextInput();
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern void SDL_StopTextInput();
+        public const uint TEXTINPUT = 0x303;
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr SDL_GetKeyboardState(out int numkeys);
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)] public static extern int SDL_ShowSimpleMessageBox(uint flags, byte[] title, byte[] message, IntPtr window);
 

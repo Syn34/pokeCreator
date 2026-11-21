@@ -149,7 +149,16 @@ namespace PokeCreator.Runtime
             while (!_quit)
             {
                 SDL_Event e;
-                while (SDL.SDL_PollEvent(out e) != 0) if (e.type == SDL.QUIT) _quit = true;
+                Input.Typed = "";
+                while (SDL.SDL_PollEvent(out e) != 0)
+                {
+                    if (e.type == SDL.QUIT) _quit = true;
+                    else if (e.type == SDL.TEXTINPUT && e.text != null)
+                    {
+                        int len = Array.IndexOf(e.text, (byte)0); if (len < 0) len = e.text.Length;
+                        Input.Typed += System.Text.Encoding.UTF8.GetString(e.text, 0, len);
+                    }
+                }
                 if (test != null) { if (!test.Step()) _quit = true; }
                 Input.Update();
                 Update();

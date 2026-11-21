@@ -107,6 +107,10 @@ namespace PokeCreator.Runtime.Platform
 
         static readonly Dictionary<int, int> _keyHeld = new Dictionary<int, int>();
         /// <summary>A raw key (SDL scancode) pressed this frame.</summary>
+        /// <summary>Text typed on the keyboard this frame (while text input is on, e.g. in name entry).</summary>
+        public static string Typed = "";
+        public static void TextInput(bool on) { try { if (on) SDL.SDL_StartTextInput(); else SDL.SDL_StopTextInput(); } catch { } }
+
         public static bool KeyTrigger(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h == 1; }
         public static bool KeyPress(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h > 0; }
         static readonly int[] WatchedKeys = { Scancode.F9, Scancode.F5, Scancode.LCtrl, 228 /* right Ctrl */, 226, 230 /* Alt */, Scancode.Return };

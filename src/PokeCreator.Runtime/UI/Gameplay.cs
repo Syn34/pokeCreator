@@ -890,8 +890,29 @@ namespace PokeCreator.Runtime.UI
 
         string Row(int r) { return Pages[_page][r].PadRight(10).Substring(0, 10); }
 
+        bool _keyboard, _textOn;
+
         protected override void Update()
         {
+            if (!_textOn) { Input.TextInput(true); _textOn = true; }
+            // Typing on the keyboard: letters go straight into the name (Enter = OK, Backspace = delete, arrows = back to the grid)
+            // (keys that are also game buttons, like the Action key, keep working the grid until typing has started)
+            if (!_keyboard && Input.Typed.Length > 0 && !(Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel) || Input.Trigger(Button.Menu) || Input.Trigger(Button.Run)
+                || Input.Trigger(Button.Up) || Input.Trigger(Button.Down) || Input.Trigger(Button.Left) || Input.Trigger(Button.Right))) _keyboard = true;
+            if (_keyboard)
+            {
+                foreach (char tc in Input.Typed)
+                {
+                    if (char.IsControl(tc)) continue;
+                    if (_name.Length >= _max) { Buzz(); break; }
+                    _name += tc;
+                }
+                if (Input.KeyTrigger(Scancode.Backspace)) { if (_name.Length > 0) { _name = _name.Substring(0, _name.Length - 1); Cancel(); } else Buzz(); }
+                if (Input.KeyTrigger(Scancode.Return) || Input.KeyTrigger(Scancode.KpEnter)) { Finish(); return; }
+                if (Input.KeyTrigger(Scancode.Escape)) { _keyboard = false; return; }
+                if (Input.KeyTrigger(Scancode.Up) || Input.KeyTrigger(Scancode.Down) || Input.KeyTrigger(Scancode.Left) || Input.KeyTrigger(Scancode.Right)) _keyboard = false;
+                else return;
+            }
             if (Input.Repeat(Button.Down)) { _row = (_row + 1) % 7; if (_row == 6) _col = Math.Min(2, _col / 4); Cursor(); }
             if (Input.Repeat(Button.Up)) { _row = (_row + 6) % 7; if (_row == 6) _col = Math.Min(2, _col / 4); Cursor(); }
             int cols = _row == 6 ? 3 : 10;
@@ -919,6 +940,8 @@ namespace PokeCreator.Runtime.UI
             _name += ch; Decide();
             if (_name.Length >= _max) { _row = 6; _col = 2; }
         }
+
+        protected override void OnClose() { if (_textOn) { Input.TextInput(false); _textOn = false; } }
 
         void Finish()
         {
