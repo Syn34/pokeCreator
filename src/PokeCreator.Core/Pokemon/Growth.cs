@@ -35,6 +35,7 @@ namespace PokeCreator.Pkmn
             var d = pk.Data(p);
             pk.Exp = Math.Max(pk.Exp, GrowthRates.ExpForLevel(d != null ? d.GrowthRate : "Medium", pk.Level));
             if (!pk.Fainted) pk.HP = Math.Min(pk.TotalHP(p), pk.HP + (pk.TotalHP(p) - oldMax));
+            pk.ChangeHappiness("levelup");
             return MovesAtLevel(p, pk, pk.Level);
         }
 

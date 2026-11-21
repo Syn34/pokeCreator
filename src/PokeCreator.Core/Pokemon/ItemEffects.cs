@@ -7,7 +7,7 @@ using PokeCreator.Projects;
 namespace PokeCreator.Pkmn
 {
     /// <summary>What using an item outside battle does.</summary>
-    public enum ItemKind { None, HealHP, FullRestore, CureStatus, Revive, RestorePP, PPUp, RareCandy, ExpCandy, EVBoost, Mint, Repel, Evolution, TeachMove, AbilityCapsule, AbilityPatch, BottleCap, GoldBottleCap }
+    public enum ItemKind { None, HealHP, FullRestore, CureStatus, Revive, RestorePP, PPUp, RareCandy, ExpCandy, EVBoost, Mint, Repel, Evolution, TeachMove, EVBerry, AbilityCapsule, AbilityPatch, BottleCap, GoldBottleCap }
 
     public class ItemInfo
     {
@@ -63,6 +63,8 @@ namespace PokeCreator.Pkmn
         { { "HPUP", Stat.HP }, { "PROTEIN", Stat.Attack }, { "IRON", Stat.Defense }, { "CALCIUM", Stat.SpAtk }, { "ZINC", Stat.SpDef }, { "CARBOS", Stat.Speed } };
         static readonly Dictionary<string, int> Feathers = new Dictionary<string, int>
         { { "HEALTHFEATHER", Stat.HP }, { "MUSCLEFEATHER", Stat.Attack }, { "RESISTFEATHER", Stat.Defense }, { "GENIUSFEATHER", Stat.SpAtk }, { "CLEVERFEATHER", Stat.SpDef }, { "SWIFTFEATHER", Stat.Speed } };
+        static readonly Dictionary<string, int> EvBerries = new Dictionary<string, int>
+        { { "POMEGBERRY", Stat.HP }, { "KELPSYBERRY", Stat.Attack }, { "QUALOTBERRY", Stat.Defense }, { "HONDEWBERRY", Stat.SpAtk }, { "GREPABERRY", Stat.SpDef }, { "TAMATOBERRY", Stat.Speed } };
         static readonly Dictionary<string, int> Repels = new Dictionary<string, int> { { "REPEL", 100 }, { "SUPERREPEL", 200 }, { "MAXREPEL", 250 } };
 
         public const int MaxEV = 252, MaxTotalEV = 510;
@@ -94,6 +96,7 @@ namespace PokeCreator.Pkmn
             else if (ExpCandies.TryGetValue(id, out n)) { info.Kind = ItemKind.ExpCandy; info.Amount = n; }
             else if (Vitamins.TryGetValue(id, out n)) { info.Kind = ItemKind.EVBoost; info.Stat = n; info.Amount = 10; }
             else if (Feathers.TryGetValue(id, out n)) { info.Kind = ItemKind.EVBoost; info.Stat = n; info.Amount = 1; }
+            else if (EvBerries.TryGetValue(id, out n)) { info.Kind = ItemKind.EVBerry; info.Stat = n; info.Amount = 10; }
             else if (Repels.TryGetValue(id, out n)) { info.Kind = ItemKind.Repel; info.Amount = n; }
             else if (id.EndsWith("MINT") && Natures.All.Contains(id.Substring(0, id.Length - 4))) { info.Kind = ItemKind.Mint; info.Nature = id.Substring(0, id.Length - 4); }
             else if ((item.FieldUse == "TM" || item.FieldUse == "HM" || item.FieldUse == "TR") && !string.IsNullOrEmpty(item.Move))
@@ -200,8 +203,24 @@ namespace PokeCreator.Pkmn
                         if (add <= 0) break;
                         pk.EV[s] += add;
                         if (s == Stat.HP && !pk.Fainted) pk.HP = Math.Min(pk.TotalHP(p), pk.HP + (pk.TotalHP(p) - max));
-                        pk.Happiness = Math.Min(255, pk.Happiness + (pk.Happiness < 100 ? 5 : pk.Happiness < 200 ? 3 : 2));
+                        pk.ChangeHappiness(info.Amount >= 10 ? "vitamin" : "wing");
                         o.Used = true; o.Message = name + "'s base " + Stat.Names[s] + " increased.";
+                        break;
+                    }
+                case ItemKind.EVBerry:
+                    {
+                        // Pomeg, Kelpsy...: lower an EV by 10 and raise friendship
+                        int s = info.Stat;
+                        if (pk.EV[s] <= 0 && pk.Happiness >= 255) break;
+                        bool lowered = pk.EV[s] > 0;
+                        pk.EV[s] = Math.Max(0, pk.EV[s] - info.Amount);
+                        if (s == Stat.HP && !pk.Fainted) pk.HP = Math.Max(1, Math.Min(pk.HP, pk.TotalHP(p)));
+                        bool friendlier = pk.Happiness < 255;
+                        pk.ChangeHappiness("evberry");
+                        o.Used = true;
+                        o.Message = lowered && friendlier ? name + " turned friendly. Its base " + Stat.Names[s] + " fell!"
+                                  : lowered ? name + " adores you! Its base " + Stat.Names[s] + " fell!"
+                                  : name + " turned friendly. Its base " + Stat.Names[s] + " can't fall any more!";
                         break;
                     }
                 case ItemKind.Mint:
@@ -264,6 +283,14 @@ namespace PokeCreator.Pkmn
                     }
             }
             if (!o.Used && o.Message == null) o.Message = "It won't have any effect.";
+            // Bitter medicine lowers friendship
+            if (o.Used && item != null)
+                switch (item.Id)
+                {
+                    case "ENERGYPOWDER": case "HEALPOWDER": pk.ChangeHappiness("powder"); break;
+                    case "ENERGYROOT": pk.ChangeHappiness("energyroot"); break;
+                    case "REVIVALHERB": pk.ChangeHappiness("revivalherb"); break;
+                }
             return o;
         }
 

@@ -18,10 +18,7 @@ namespace PokeCreator.Runtime.World
                 foreach (var pk in party)
                 {
                     if (pk.IsEgg || pk.Fainted) continue;
-                    int gain = pk.Happiness < 200 ? 2 : 1;
-                    if (pk.Item == "SOOTHEBELL") gain = (gain * 3 + 1) / 2;
-                    if (pk.Ball == "LUXURYBALL") gain++;
-                    pk.Happiness = Math.Min(255, pk.Happiness + gain);
+                    pk.ChangeHappiness("walking");
                 }
             var s = g.Project.Settings;
             if (!s.PoisonInField || g.State.Steps % 4 != 0) return false;

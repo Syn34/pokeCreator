@@ -1547,6 +1547,9 @@ namespace PokeCreator.Battles
                     var me = Field[0][slot];
                     if (me == null || !me.Pk.Fainted || me.FaintShown) continue;
                     me.FaintShown = true; anyFainted = true;
+                    // Friendship drops (a lot if the foe was 30+ levels higher)
+                    int foeLevel = Field[1].Where(f => f != null).Select(f => f.Pk.Level).DefaultIfEmpty(0).Max();
+                    me.Pk.ChangeHappiness(foeLevel >= me.Pk.Level + 30 ? "faintbad" : "faint");
                     Say(Name(me) + " fainted!");
                     _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = 0, Party = me.PartyIndex, Slot = slot });
                 }
@@ -1796,6 +1799,7 @@ namespace PokeCreator.Battles
                 int amount = last == '2' ? 2 : last == '3' ? 3 : last == '6' ? 6 : 2;
                 if (b.Stages[stat] >= 6) { Say("But it had no effect!"); return; }
                 ChangeStat(b, stat, amount, b);
+                b.Pk.ChangeHappiness("battleitem");
                 return;
             }
             if (id.StartsWith("DIREHIT"))

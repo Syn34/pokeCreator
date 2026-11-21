@@ -217,7 +217,7 @@ namespace PokeCreator.Runtime.UI
             {
                 // TMs/TRs: only spent if the move is actually learned
                 Say(g, "\\PN booted up the " + (item.Name ?? item.Id) + ".\\nIt contained " + ItemEffects.MoveName(g.Project, o.TeachMove) + ".", () =>
-                    LearnMove(g, pk, o.TeachMove, learned => { if (learned && info.Consumed) g.State.AddItem(item.Id, -1); done(learned); }));
+                    LearnMove(g, pk, o.TeachMove, learned => { if (learned) pk.ChangeHappiness("machine"); if (learned && info.Consumed) g.State.AddItem(item.Id, -1); done(learned); }));
                 return;
             }
             if (info.Consumed) g.State.AddItem(item.Id, -1);
