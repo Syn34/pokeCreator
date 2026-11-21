@@ -317,9 +317,13 @@ namespace PokeCreator.Runtime.Script
         public string Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        /// <summary>The game's project, for ribbon names from ribbons.json.</summary>
+        public static PokeCreator.Projects.Project Project;
         public RibbonInfo(string id)
         {
             Id = id ?? "";
+            var rd = Project != null ? Project.Ribbons.FirstOrDefault(r => r.Id == Id) : null;
+            if (rd != null && !string.IsNullOrEmpty(rd.Name)) { Name = rd.Name; Description = rd.Description ?? ""; return; }
             string words = string.Join(" ", Id.Split('_').Select(w => w.Length == 0 ? w : w.Substring(0, 1) + w.Substring(1).ToLowerInvariant()));
             Name = words.EndsWith("Ribbon") ? words : words + " Ribbon";
             Description = "";

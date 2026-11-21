@@ -58,6 +58,8 @@ namespace PokeCreator.Import
             Step("town_map", ImportTownMap);
             Step("regional_dexes", ImportDexes);
             Step("map_connections", ImportConnections);
+            Step("berry_plants", ImportBerryPlants);
+            Step("ribbons", ImportRibbons);
 
             ImportSystem();
             ImportCommonEvents();
@@ -91,7 +93,7 @@ namespace PokeCreator.Import
         }
 
         /// <summary>The PBS files ImportPbsInto can read, in the order they're read.</summary>
-        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections" };
+        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections", "berry_plants", "ribbons" };
 
         /// <summary>
         /// Reads chosen PBS files into an existing project (Database → Import PBS Files): records with the same ID are
@@ -109,6 +111,7 @@ namespace PokeCreator.Import
             if (!want("pokemon")) _p.Species.AddRange(target.Species);
             if (!want("trainer_types")) _p.TrainerTypes.AddRange(target.TrainerTypes);
             if (!want("types")) _p.Types.AddRange(target.Types);
+            if (!want("items")) _p.Items.AddRange(target.Items);   // berry_plants.txt changes the target's items in place
             if (want("types")) Step("types", ImportTypes);
             if (want("abilities")) Step("abilities", ImportAbilities);
             if (want("moves")) Step("moves", ImportMoves);
@@ -120,7 +123,11 @@ namespace PokeCreator.Import
             if (want("town_map")) Step("town_map", ImportTownMap);
             if (want("regional_dexes")) Step("regional_dexes", ImportDexes);
             if (want("map_connections")) Step("map_connections", ImportConnections);
+            if (want("berry_plants")) Step("berry_plants", ImportBerryPlants);
+            if (want("ribbons")) Step("ribbons", ImportRibbons);
             var report = new List<string>();
+            if (want("berry_plants")) report.Add("berry plants");
+            if (want("ribbons")) report.Add("ribbons " + MergeRecords(target.Ribbons, _p.Ribbons, x => x.Id));
             if (want("types")) report.Add("types " + MergeRecords(target.Types, _p.Types, x => x.Id));
             if (want("abilities")) report.Add("abilities " + MergeRecords(target.Abilities, _p.Abilities, x => x.Id));
             if (want("moves")) report.Add("moves " + MergeRecords(target.Moves, _p.Moves, x => x.Id));
@@ -471,6 +478,31 @@ namespace PokeCreator.Import
                 }
                 _p.TownMaps.Add(r);
             }
+        }
+
+        // PBS/berry_plants.txt: growth speed, drying and yield of each berry
+        void ImportBerryPlants(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            int n = 0;
+            foreach (var s in secs)
+            {
+                var it = _p.Items.FirstOrDefault(i => i.Id == s.Header);
+                if (it == null) { Warn("berry_plants.txt: unknown item " + s.Header); continue; }
+                WarnUnknown(this, "berry_plants", s.Header, Apply(it, s.Lines)); n++;
+            }
+            Log("  " + n + " berry plants");
+        }
+
+        // PBS/ribbons.txt: ribbon names and descriptions
+        void ImportRibbons(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                var r = _p.Ribbons.FirstOrDefault(x => x.Id == s.Header);
+                if (r == null) { r = new RibbonData { Id = s.Header }; _p.Ribbons.Add(r); }
+                WarnUnknown(this, "ribbons", s.Header, Apply(r, s.Lines));
+            }
+            Log("  " + _p.Ribbons.Count + " ribbons");
         }
 
         void ImportDexes(List<PbsSection> secs, List<PbsLine> loose)

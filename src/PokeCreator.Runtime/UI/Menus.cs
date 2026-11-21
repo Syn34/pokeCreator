@@ -524,7 +524,15 @@ namespace PokeCreator.Runtime.UI
             foreach (var r in pk.Ribbons.Take(10))
             {
                 var icon = g.Load(Game.Project.FindAsset("Graphics/UI/Summary", "ribbon_" + r.ToLowerInvariant()));
+                var rd = Game.Project.Ribbons.FirstOrDefault(x => x.Id == r);
+                var sheet = icon == null && rd != null ? g.Load(Game.Project.FindAsset("Graphics/UI/Summary", "ribbons")) : null;
                 if (icon != null) g.Draw(icon, 0, 0, Math.Min(28, icon.Width), Math.Min(28, icon.Height), rx + 12, y);
+                else if (sheet != null && sheet.Width >= 64)
+                {
+                    // Essentials' ribbon sheet: 64×64 icons in rows, picked by the ribbon's icon position
+                    int cols = sheet.Width / 64, ix = rd.IconPosition % cols * 64, iy = rd.IconPosition / cols * 64;
+                    g.DrawEx(sheet, ix, iy, 64, 64, rx + 26, y + 14, 28 / 64.0, 28 / 64.0, 0, false, 255, 0);
+                }
                 else g.FillRect(rx + 16, y + 6, 18, 18, new Color(232, 184, 40));
                 Ui.Text(g, rx + 46, y, new Script.RibbonInfo(r).Name);
                 y += 30;

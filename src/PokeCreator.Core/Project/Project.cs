@@ -73,6 +73,8 @@ namespace PokeCreator.Projects
         public List<MysteryGiftData> MysteryGifts = new List<MysteryGiftData>();
         /// <summary>RPG Maker map animations for Show Animation (map_animations.json).</summary>
         public List<MapAnimation> MapAnimations = new List<MapAnimation>();
+        /// <summary>Ribbon names and descriptions (ribbons.json, from PBS ribbons.txt).</summary>
+        public List<RibbonData> Ribbons = new List<RibbonData>();
 
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
@@ -96,6 +98,7 @@ namespace PokeCreator.Projects
             AddTable("regional_dexes", "Regional Dexes", typeof(RegionalDex), "regional_dexes.json", () => RegionalDexes);
             AddTable("animations", "Battle Animations", typeof(BattleAnimation), "animations.json", () => Animations);
             AddTable("mystery_gifts", "Mystery Gifts", typeof(MysteryGiftData), "mystery_gifts.json", () => MysteryGifts);
+            AddTable("ribbons", "Ribbons", typeof(RibbonData), "ribbons.json", () => Ribbons);
         }
 
         void AddTable(string key, string label, Type t, string file, Func<IList> get)
@@ -238,6 +241,7 @@ namespace PokeCreator.Projects
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);
             p.CommonEvents = LoadOr(p.DataFile("common_events.json"), p.CommonEvents);
             p.MapAnimations = LoadOr(p.DataFile("map_animations.json"), p.MapAnimations);
+            p.Ribbons = LoadOr(p.DataFile("ribbons.json"), p.Ribbons);
             PokeCreator.Pkmn.FormRules.EnsureGen9Forms(p);
             return p;
         }

@@ -36,8 +36,15 @@ namespace PokeCreator.Runtime.World
         const int MaxReplants = 9;
 
         /// <summary>Hours per growth stage (Essentials' berry_plants.txt defaults).</summary>
+        /// <summary>The project's berry plant data (Database → Items → Berry plant), when set.</summary>
+        static PokeCreator.Projects.Project _proj;
+        public static void Use(PokeCreator.Projects.Project p) { _proj = p; }
+        static PokeCreator.Data.ItemData ItemOf(string berry) { return _proj == null ? null : _proj.Items.FirstOrDefault(i => i.Id == berry); }
+
         public static int HoursPerStage(string berry)
         {
+            var it = ItemOf(berry);
+            if (it != null && it.HoursPerStage > 0) return it.HoursPerStage;
             switch (berry)
             {
                 case "CHERIBERRY": case "CHESTOBERRY": case "PECHABERRY": case "RAWSTBERRY": case "ASPEARBERRY": return 3;
@@ -59,8 +66,8 @@ namespace PokeCreator.Runtime.World
             return r.Any(x => b == x + "BERRY");
         }
 
-        static int MinYield(string berry) { return HoursPerStage(berry) >= 18 ? 1 : 2; }
-        static int MaxYield(string berry) { return HoursPerStage(berry) >= 18 ? 5 : 5; }
+        static int MinYield(string berry) { var it = ItemOf(berry); if (it != null && it.Yield != null && it.Yield.Count >= 1 && it.Yield[0] > 0) return it.Yield[0]; return HoursPerStage(berry) >= 18 ? 1 : 2; }
+        static int MaxYield(string berry) { var it = ItemOf(berry); if (it != null && it.Yield != null && it.Yield.Count >= 2) return Math.Max(MinYield(berry), it.Yield[1]); return 5; }
 
         static string Key(int mapId, int eventId) { return mapId + "," + eventId; }
 
@@ -94,7 +101,9 @@ namespace PokeCreator.Runtime.World
         {
             double hours = (DateTime.UtcNow.Ticks - p.MoistureAt) / (double)TimeSpan.TicksPerHour;
             // dries 15% an hour; twice as fast with Growth Mulch, half as fast with Damp Mulch
-            double rate = p.Mulch == "GROWTHMULCH" ? 30 : p.Mulch == "DAMPMULCH" ? 7.5 : 15;
+            var it = ItemOf(p.Berry);
+            double baseRate = it != null && it.DryingPerHour > 0 ? it.DryingPerHour : 15;
+            double rate = p.Mulch == "GROWTHMULCH" ? baseRate * 2 : p.Mulch == "DAMPMULCH" ? baseRate / 2 : baseRate;
             return Math.Max(0, p.Moisture - (int)(hours * rate));
         }
 

@@ -116,7 +116,21 @@ namespace PokeCreator.Data
         [Field("Teaches move", Ref = "moves", Group = "Usage")] public string Move { get; set; }
         [Field("Flags", Group = "Usage")] public List<string> Flags { get; set; }
         [Field("Description", Multiline = true)] public string Description { get; set; }
+        [Field("Hours per growth stage", Group = "Berry plant", Help = "Berries only (PBS berry_plants.txt). 0 = the usual value for this berry.")] public int HoursPerStage { get; set; }
+        [Field("Drying per hour", Group = "Berry plant", Help = "Soil moisture lost each hour (0 = 15).")] public int DryingPerHour { get; set; }
+        [Field("Yield (min,max)", Group = "Berry plant"), JsonCompact] public List<int> Yield { get; set; }
         public ItemData() { Flags = new List<string>(); Pocket = 1; }
+        public override string DisplayName { get { return Name ?? Id; } }
+    }
+
+    /// <summary>A ribbon (PBS ribbons.txt): its name, description and position in the ribbon icon sheet.</summary>
+    public class RibbonData : GameRecord
+    {
+        [Field("Name")] public string Name { get; set; }
+        [Field("Icon position")] public int IconPosition { get; set; }
+        [Field("Description", Multiline = true)] public string Description { get; set; }
+        [Field("Flags")] public List<string> Flags { get; set; }
+        public RibbonData() { Flags = new List<string>(); }
         public override string DisplayName { get { return Name ?? Id; } }
     }
 

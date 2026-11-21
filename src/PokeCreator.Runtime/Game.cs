@@ -94,6 +94,7 @@ namespace PokeCreator.Runtime
         public void Run()
         {
             Project = Project.Load(_opt.ProjectDir);
+            World.Berries.Use(Project); Script.RibbonInfo.Project = Project;
             // Plugins: their graphics / sounds and database records join the project's
             PokeCreator.Projects.Plugins.UseAssets(Project);
             int pluginRecords = PokeCreator.Projects.Plugins.MergeData(Project);
