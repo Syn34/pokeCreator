@@ -90,6 +90,9 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Smarter trainer AI** (damage estimates, immunities, status checks, healing, set-up, switching), `setBattleRule` options (weather, terrain, backdrop, no running, no EXP / money...)
 - **Random dungeons**, play statistics (`$stats`, Trainer Card back), seasons and time events, Shiny / Oval Charm, overworld ability effects (Stench, Synchronize, Static...), White / Black Flute, Pokégear Jukebox, form-changing items (Gracidea, Reveal Glass, Rotom Catalog, DNA Splicers...)
 - **Event scripts** run Ruby control flow (if / case / while / each / blocks / ternaries), and the Problems panel lists script calls the game doesn't understand
+- **Following Pokémon** (sprites in Graphics/Characters/Followers), two trainers who spot you at once team up, wild double battles in tall grass, battle transitions, trade / egg hatching scenes, Pokédex entries for new species, Exp. Share / Exp. All, X items and other battle items, Move Hints option, Send to Boxes option, friendship from walking / levelling / items, optional field poison
+- **Service NPCs in one click** (Gift Pokémon, legendary encounter, in-game trade, Move Relearner / Deleter, Name Rater), Duplicate Map, shift map contents, Database → Import PBS Files
+- Event scripts behave like Essentials: they wait for messages, questions (pbConfirmMessage), party / move choices, waits and battles before the next line; Ruby string interpolation; keyboard typing in name entry
 - Grass rustle, landing dust, jump shadows, tall-grass bush depth, water reflections; BGS ambient sounds and music effects that pause the BGM; game controllers, key rebinding, screen size / full screen (Alt+Enter); F5 Ready menu; F9 debug menu in playtests
 
 **Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
