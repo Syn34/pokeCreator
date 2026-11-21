@@ -124,6 +124,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Event scripts wait for pbMessage, pbChoosePokemon and pbChooseMove like Essentials (several messages in one script show one after another); a resumed script doesn't repeat the calls it already made
 - [x] Name entry accepts typing on the keyboard (Enter = OK, Backspace = delete, arrows go back to the letter grid)
 - [x] Studio script editor: monospace editing, searchable list of the script calls the game understands (double-click to insert), live warning for calls it won't understand
+- [x] Battle sprites placed with pokemon_metrics (front / back offsets, altitude, shadows) like Essentials; Database → Sprite Positions to adjust them on a battle scene; critical captures; wild held items
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

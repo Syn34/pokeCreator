@@ -147,6 +147,12 @@ namespace PokeCreator.Studio
                 db.DropDownItems.Add(new ToolStripSeparator());
                 db.DropDownItems.Add("Add Missing Pokémon && Data…", null, (a, b) => MergeBaseData());
                 db.DropDownItems.Add("Import PBS Files…", null, (a, b) => ImportPbsFiles());
+                db.DropDownItems.Add("Sprite Positions…", null, (a, b) =>
+                {
+                    SaveAll();
+                    foreach (TabPage tp in _tabs.TabPages.Cast<TabPage>().Where(t => (t.Name ?? "") == "db:species").ToList()) { _tabs.TabPages.Remove(tp); tp.Dispose(); }
+                    using (var f = new SpritePositioner(Project)) f.ShowDialog(this);
+                });
             };
             db.DropDownItems.Add("(open a project)");
 
