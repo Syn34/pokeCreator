@@ -14,7 +14,10 @@ namespace PokeCreator.Runtime.World
         public readonly Dictionary<int, int> Variables = new Dictionary<int, int>();
         public readonly HashSet<string> SelfSwitches = new HashSet<string>();
         public readonly Dictionary<string, int> Bag = new Dictionary<string, int>();
-        public int Money;
+        int _money, _coins, _bp;
+        /// <summary>Money, kept between 0 and MaxMoney (Game Settings; 999,999 as Essentials).</summary>
+        public int Money { get { return _money; } set { _money = Math.Max(0, Math.Min(MaxMoney, value)); } }
+        public static int MaxMoney = 999999, MaxCoins = 99999, MaxBattlePoints = 9999, MaxPerSlot = 999;
         public string PlayerName = "Red";
         public int Steps;
         public int PlayerCharacter;
@@ -42,7 +45,8 @@ namespace PokeCreator.Runtime.World
         /// <summary>Pokégear phone contacts.</summary>
         public List<PhoneContact> Phone = new List<PhoneContact>();
         /// <summary>Game Corner coins, Battle Points and gym badges (0-based, as $player.badges[n]).</summary>
-        public int Coins, BattlePoints;
+        public int Coins { get { return _coins; } set { _coins = Math.Max(0, Math.Min(MaxCoins, value)); } }
+        public int BattlePoints { get { return _bp; } set { _bp = Math.Max(0, Math.Min(MaxBattlePoints, value)); } }
         public readonly HashSet<int> Badges = new HashSet<int>();
         /// <summary>Teams entered into the Hall of Fame, newest last.</summary>
         public List<HallOfFameEntry> HallOfFame = new List<HallOfFameEntry>();
@@ -85,7 +89,7 @@ namespace PokeCreator.Runtime.World
         public void AddItem(string item, int qty)
         {
             int n; Bag.TryGetValue(item, out n);
-            n = Math.Max(0, n + qty);
+            n = Math.Max(0, Math.Min(MaxPerSlot, n + qty));
             if (n == 0) Bag.Remove(item); else Bag[item] = n;
         }
     }

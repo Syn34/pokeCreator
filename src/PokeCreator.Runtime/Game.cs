@@ -95,6 +95,9 @@ namespace PokeCreator.Runtime
         {
             Project = Project.Load(_opt.ProjectDir);
             World.Berries.Use(Project); Script.RibbonInfo.Project = Project; UI.BagScene.UseSettings(Project);
+            World.GameState.MaxMoney = Project.Settings.MaxMoney > 0 ? Project.Settings.MaxMoney : 999999;
+            World.GameState.MaxCoins = Project.Settings.MaxCoins > 0 ? Project.Settings.MaxCoins : 99999;
+            World.GameState.MaxPerSlot = Project.Settings.MaxPerSlot > 0 ? Project.Settings.MaxPerSlot : 999;
             // Plugins: their graphics / sounds and database records join the project's
             PokeCreator.Projects.Plugins.UseAssets(Project);
             int pluginRecords = PokeCreator.Projects.Plugins.MergeData(Project);

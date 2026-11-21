@@ -1538,9 +1538,10 @@ namespace PokeCreator.Runtime.Script
         {
             switch (name)
             {
-                case "MAX_COINS": return 99999;
                 case "MAX_BATTLE_POINTS": return 9999;
-                case "MAX_MONEY": return 999999;
+                case "MAX_MONEY": return World.GameState.MaxMoney;
+                case "MAX_COINS": return World.GameState.MaxCoins;
+                case "BAG_MAX_PER_SLOT": return World.GameState.MaxPerSlot;
                 case "MAX_PLAYER_NAME_SIZE": return 10;
                 case "MAX_PARTY_SIZE": return GameState.MaxParty;
                 case "MAXIMUM_LEVEL": return PokeCreator.Pkmn.GrowthRates.MaxLevel;
