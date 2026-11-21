@@ -381,6 +381,7 @@ namespace PokeCreator.Runtime.UI
             int fw;
             var tex = BattlerTexture(pk, side == 0, out fw);
             int h = tex != null ? tex.Height : 96;
+            bottom = SpriteBottom(pk, side == 0, bottom, tex, fw);
             return new AnimBattler { Key = k, X = x, Y = bottom - h / 2.0, Tex = tex, FrameW = tex != null ? fw : 0, FrameH = h };
         }
 
@@ -1040,10 +1041,24 @@ namespace PokeCreator.Runtime.UI
             g.DrawEx(tex, 0, 0, fw, tex.Height, st.X, st.Y, st.ZoomX, st.ZoomY, st.Angle, st.Mirror, st.Opacity, st.Blend, st.Color);
         }
 
+        /// <summary>
+        /// Where a battler sprite's bottom edge goes: opposing Pokémon stand with their feet on the base whatever empty
+        /// space their picture has below them, raised by their altitude (pokemon_metrics) when they float or fly.
+        /// </summary>
+        int SpriteBottom(Pokemon pk, bool back, int bottom, Texture tex, int fw)
+        {
+            if (back || tex == null) return bottom;
+            int pad = Game.Gfx.BottomPadding(tex, fw);
+            var d = pk.Data(Game.Project);
+            int altitude = d != null ? d.FrontSpriteAltitude : 0;
+            return bottom - 14 + Math.Min(pad, tex.Height / 2) - altitude * 2;
+        }
+
         void DrawPokemon(Gfx g, Pokemon pk, bool back, int cx, int bottom)
         {
             int fwUnused;
             var tex = BattlerTexture(pk, back, out fwUnused);
+            bottom = SpriteBottom(pk, back, bottom, tex, fwUnused);
             if (tex == null)
             {
                 if (back) { Ui.PokemonFront(g, Game, pk, cx, bottom, 160); return; } // no back sprite: show the front one

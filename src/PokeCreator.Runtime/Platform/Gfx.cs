@@ -165,6 +165,31 @@ namespace PokeCreator.Runtime.Platform
 
         static int Clamp(double v) { return v < 0 ? 0 : v > 255 ? 255 : (int)v; }
 
+        readonly Dictionary<string, int> _bottomPad = new Dictionary<string, int>();
+        /// <summary>How many fully transparent rows are at the bottom of an image (of its first frameW columns).</summary>
+        public int BottomPadding(Texture t, int frameW)
+        {
+            if (t == null || t.Path == null) return 0;
+            int pad;
+            if (_bottomPad.TryGetValue(t.Path, out pad)) return pad;
+            pad = 0;
+            var px = ReadPixels(t.Path);
+            if (px != null)
+            {
+                int h = px.GetLength(0), w = Math.Min(px.GetLength(1), frameW > 0 ? frameW : px.GetLength(1));
+                for (int y = h - 1; y >= 0; y--)
+                {
+                    bool empty = true;
+                    for (int x = 0; x < w && empty; x++) if ((px[y, x] >> 24) > 16) empty = false;
+                    if (!empty) break;
+                    pad++;
+                }
+                if (pad >= h) pad = 0;
+            }
+            _bottomPad[t.Path] = pad;
+            return pad;
+        }
+
         /// <summary>Reads an image's pixels as ARGB values ([y, x]); null if it can't be loaded.</summary>
         public uint[,] ReadPixels(string path)
         {
