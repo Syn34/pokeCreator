@@ -360,6 +360,8 @@ namespace PokeCreator.Data
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }
         [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
         [Field("Safari steps", Group = "Safari Zone", Help = "Steps allowed in a Safari game (0 = no limit).")] public int SafariSteps { get; set; }
+        [Field("Maximum level", Group = "Pokémon", Help = "Highest level Pokémon can reach (0 = 100). Essentials' MAXIMUM_LEVEL.")] public int MaxLevel { get; set; }
+        [Field("Shiny odds (1 in N)", Group = "Pokémon", Help = "0 = 1 in 4096.")] public int ShinyOdds { get; set; }
         [Field("Hyper Training level", Group = "Battle", Help = "Level a Pokémon needs before Bottle Caps work (0 = the maximum level, as Essentials).")] public int HyperTrainingLevel { get; set; }
         [Field("No double battles in tall grass", Group = "Battle", Help = "Otherwise 30% of encounters in tall grass (terrain tag 10) are wild double battles when the player has two Pokémon that can fight, as in Essentials.")] public bool NoTallGrassDoubles { get; set; }
         [Field("No disobedience", Group = "Battle", Help = "Otherwise Pokémon received from other trainers (trades) above the badge level - 10 per badge, any level with 8 - may ignore orders in battle, as in Essentials.")] public bool NoDisobedience { get; set; }

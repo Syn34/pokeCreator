@@ -247,6 +247,7 @@ namespace PokeCreator.Projects
             p.Ribbons = LoadOr(p.DataFile("ribbons.json"), p.Ribbons);
             p.PhoneMessages = LoadOr(p.DataFile("phone_messages.json"), p.PhoneMessages);
             PokeCreator.Pkmn.FormRules.EnsureGen9Forms(p);
+            PokeCreator.Pkmn.Pokemon.UseSettings(p);
             return p;
         }
 

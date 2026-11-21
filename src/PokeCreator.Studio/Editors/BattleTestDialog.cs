@@ -54,7 +54,7 @@ namespace PokeCreator.Studio.Editors
             for (int i = 0; i < 6; i++)
             {
                 _species[i] = Species(speciesIds, _lastSpecies[i]); _species[i].Location = new Point(28, 48 + i * 30); _species[i].Width = 170;
-                _levels[i] = new NumericUpDown { Minimum = 1, Maximum = 100, Value = _lastLevels[i], Location = new Point(206, 48 + i * 30), Width = 60 };
+                _levels[i] = new NumericUpDown { Minimum = 1, Maximum = PokeCreator.Pkmn.GrowthRates.MaxLevel, Value = Math.Min(PokeCreator.Pkmn.GrowthRates.MaxLevel, Math.Max(1, _lastLevels[i])), Location = new Point(206, 48 + i * 30), Width = 60 };
                 team.Controls.Add(_species[i]); team.Controls.Add(_levels[i]);
             }
             team.Controls.Add(_teamTrainer); _teamTrainer.Location = new Point(10, 234);
@@ -72,7 +72,7 @@ namespace PokeCreator.Studio.Editors
             for (int i = 0; i < 3; i++)
             {
                 _wild[i] = Species(speciesIds, _lastWild[i]); _wild[i].Location = new Point(28, 110 + i * 30); _wild[i].Width = 180;
-                _wildLv[i] = new NumericUpDown { Minimum = 1, Maximum = 100, Value = _lastWildLv[i], Location = new Point(216, 110 + i * 30), Width = 60 };
+                _wildLv[i] = new NumericUpDown { Minimum = 1, Maximum = PokeCreator.Pkmn.GrowthRates.MaxLevel, Value = Math.Min(PokeCreator.Pkmn.GrowthRates.MaxLevel, Math.Max(1, _lastWildLv[i])), Location = new Point(216, 110 + i * 30), Width = 60 };
                 foe.Controls.Add(_wild[i]); foe.Controls.Add(_wildLv[i]);
             }
             foe.Controls.Add(new Label { Text = "(the 2nd and 3rd are used in double / triple battles)", Location = new Point(28, 202), AutoSize = true, ForeColor = Color.DimGray });

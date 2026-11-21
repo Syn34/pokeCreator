@@ -74,7 +74,7 @@ namespace PokeCreator.Runtime.World
         public static void ShinyCharm(Game g, Pokemon pk)
         {
             if (pk == null || pk.Shiny || g.State.ItemCount("SHINYCHARM") <= 0) return;
-            for (int i = 0; i < 2 && !pk.Shiny; i++) if (g.Rng.Next(4096) == 0) pk.Shiny = true;
+            for (int i = 0; i < 2 && !pk.Shiny; i++) if (g.Rng.Next(PokeCreator.Pkmn.Pokemon.ShinyOdds) == 0) pk.Shiny = true;
         }
 
         /// <summary>Synchronize and Cute Charm on the wild Pokémon just made.</summary>

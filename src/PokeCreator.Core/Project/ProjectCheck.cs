@@ -145,7 +145,7 @@ namespace PokeCreator.Projects
                         if (!Known("items", pk.Item)) Add(ProblemSeverity.Error, where, target, pk.Species + " holds an unknown item " + pk.Item + ".");
                         if (!Known("abilities", pk.Ability)) Add(ProblemSeverity.Error, where, target, pk.Species + " has an unknown ability " + pk.Ability + ".");
                         if (pk.Moves != null) foreach (var m in pk.Moves) if (!Known("moves", m)) Add(ProblemSeverity.Error, where, target, pk.Species + " knows an unknown move " + m + ".");
-                        if (pk.Level < 1 || pk.Level > 100) Add(ProblemSeverity.Warning, where, target, pk.Species + " is level " + pk.Level + " (should be 1-100).");
+                        if (pk.Level < 1 || pk.Level > PokeCreator.Pkmn.GrowthRates.MaxLevel) Add(ProblemSeverity.Warning, where, target, pk.Species + " is level " + pk.Level + " (should be 1-" + PokeCreator.Pkmn.GrowthRates.MaxLevel + ").");
                     }
             }
             foreach (var en in _p.Encounters)

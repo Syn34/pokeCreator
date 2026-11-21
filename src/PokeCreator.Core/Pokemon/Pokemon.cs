@@ -46,7 +46,8 @@ namespace PokeCreator.Pkmn
 
     public static class GrowthRates
     {
-        public const int MaxLevel = 100;
+        /// <summary>The level cap (Game Settings → Maximum level; 100 unless changed).</summary>
+        public static int MaxLevel = 100;
 
         public static int ExpForLevel(string rate, int n)
         {
@@ -54,7 +55,11 @@ namespace PokeCreator.Pkmn
             if (n > MaxLevel) n = MaxLevel;
             double c = (double)n * n * n;
             double e;
-            switch ((rate ?? "Medium").ToLowerInvariant())
+            string r = (rate ?? "Medium").ToLowerInvariant();
+            // Beyond level 100, Erratic and Fluctuating use Essentials' extended formulas
+            if (n > 100 && r == "erratic") return (int)Math.Min(int.MaxValue, Math.Floor((Math.Pow(n, 4) + c * 2000) / 3500));
+            if (n > 100 && r == "fluctuating") return (int)Math.Min(int.MaxValue, Math.Floor(Math.Pow(n, 4) * Math.Max(82 - (n - 100) / 2.0, 40) / 5000));
+            switch (r)
             {
                 case "erratic":
                     if (n <= 50) e = c * (100 - n) / 50;
@@ -296,6 +301,16 @@ namespace PokeCreator.Pkmn
         }
 
         /// <summary>Creates a wild-style Pokémon: random IVs, nature, gender, ability; level-up moves; full HP.</summary>
+        /// <summary>Shiny chance, 1 in this many (Game Settings → Shiny odds).</summary>
+        public static int ShinyOdds = 4096;
+
+        /// <summary>Applies the project's level cap and shiny odds (called when a project is loaded).</summary>
+        public static void UseSettings(Project p)
+        {
+            GrowthRates.MaxLevel = p.Settings.MaxLevel > 0 ? Math.Min(999, p.Settings.MaxLevel) : 100;
+            ShinyOdds = p.Settings.ShinyOdds > 0 ? p.Settings.ShinyOdds : 4096;
+        }
+
         public static Pokemon Create(Project p, string species, int level, Random rng)
         {
             var pk = new Pokemon { Species = (species ?? "").ToUpperInvariant(), Level = Math.Max(1, Math.Min(GrowthRates.MaxLevel, level)) };
@@ -312,7 +327,7 @@ namespace PokeCreator.Pkmn
             int gf = FormRules.GenderForm(p, pk);
             if (gf >= 0 && pk.Form == 0) { pk.Form = gf; d = pk.Data(p); }
             pk.AbilityIndex = d != null && d.Abilities.Count > 1 ? rng.Next(d.Abilities.Count) : 0;
-            pk.Shiny = rng.Next(4096) == 0;
+            pk.Shiny = rng.Next(ShinyOdds) == 0;
             pk.Happiness = d != null ? d.Happiness : 70;
             pk.Exp = GrowthRates.ExpForLevel(d != null ? d.GrowthRate : "Medium", pk.Level);
             pk.MetLevel = pk.Level;
