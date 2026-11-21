@@ -219,6 +219,15 @@ namespace PokeCreator.Runtime.Script
                 if (compound) lhs = lhs.Substring(0, lhs.Length - 1).Trim();
                 object val = Eval(e.Substring(asg + 1), ctx);
                 if (compound) val = Arith(Eval(lhs, ctx), val, opc);
+                // A script resumed after a question doesn't redo changes to game state it already made
+                // ($game_variables[1] += 1 before a message runs once); locals are simply recomputed
+                bool local = Regex.IsMatch(lhs, @"^[a-z_]\w*(\[.+\])?$") && !lhs.StartsWith("$");
+                if (!local && _rec != null && _recActive)
+                {
+                    if (_recPos < _rec.Count) { _recPos++; return val; }
+                    if (_game.PromptPending) return val;
+                    _rec.Add(null); _recPos++;
+                }
                 Assign(lhs, val, ctx);
                 return val;
             }
