@@ -193,7 +193,7 @@ namespace PokeCreator.Studio.Editors
             if (_redoButton != null) _redoButton.Enabled = _redo.Count > 0;
         }
 
-        string CurrentState() { return Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events }, false); }
+        string CurrentState() { return Json.Json.Write(new UndoState { Layers = _map.Layers, Events = _map.Events, Width = _map.Width, Height = _map.Height }, false); }
 
         /// <summary>Remembers the map for Undo. Returns false if it was the same as the last remembered state.</summary>
         public bool Snapshot()
@@ -212,6 +212,8 @@ namespace PokeCreator.Studio.Editors
         {
             public List<List<List<int>>> Layers { get; set; }
             public List<MapEvent> Events { get; set; }
+            public int Width { get; set; }
+            public int Height { get; set; }
             // Empty lists aren't written to the snapshot, so they must exist after reading it back
             public UndoState() { Layers = new List<List<List<int>>>(); Events = new List<MapEvent>(); }
         }
@@ -219,6 +221,8 @@ namespace PokeCreator.Studio.Editors
         void Restore(string snap)
         {
             var st = Json.Json.Deserialize<UndoState>(snap);
+            // Undoing a resize puts the old size back first
+            if (st.Width > 0 && st.Height > 0 && (st.Width != _map.Width || st.Height != _map.Height)) { _map.Resize(st.Width, st.Height); _canvas.Resized(); }
             // Only take layers that fit this map (a damaged snapshot must not break the map)
             if (st.Layers != null && st.Layers.Count == _map.Layers.Count && st.Layers.All(l => l != null && l.Count == _map.Height && l.All(r => r != null && r.Count == _map.Width)))
                 _map.Layers = st.Layers;
@@ -328,6 +332,18 @@ namespace PokeCreator.Studio.Editors
             _map.Properties = s.Properties;
             _canvas.Resized(); _canvas.InvalidateAll();
             MarkDirty();
+        }
+
+        /// <summary>Resizes the map from the canvas's drag handles (top-left stays put; Undo puts it back).</summary>
+        public void ResizeMap(int w, int h)
+        {
+            w = Math.Max(1, Math.Min(500, w)); h = Math.Max(1, Math.Min(500, h));
+            if (w == _map.Width && h == _map.Height) { _canvas.Resized(); return; }
+            Snapshot();
+            _map.Resize(w, h);
+            _canvas.Resized(); _canvas.InvalidateAll();
+            MarkDirty();
+            ShowInfo(-1, -1);
         }
 
         public void Save()
@@ -493,6 +509,21 @@ namespace PokeCreator.Studio.Editors
         static TileClip _tileClip;          // copied tiles (shared by all maps)
         Rectangle _sel = Rectangle.Empty;   // selected area (Select tool)
         bool _pasting;
+        // Resize handles along the right and bottom edges: drag them to make the map bigger or smaller
+        const int Grip = 14;
+        int _resizeEdge;                    // 0 none, 1 right, 2 bottom, 3 corner
+        Size _resizeTo;
+        int MapPxW { get { return _map.Width * CellPx; } }
+        int MapPxH { get { return _map.Height * CellPx; } }
+
+        int GripAt(Point p)
+        {
+            int w = MapPxW, h = MapPxH;
+            bool right = p.X >= w && p.X < w + Grip && p.Y < h + Grip;
+            bool bottom = p.Y >= h && p.Y < h + Grip && p.X < w + Grip;
+            if (right && p.Y >= h - 6 || bottom && p.X >= w - 6) return 3;
+            return right ? 1 : bottom ? 2 : 0;
+        }
 
         /// <summary>Tiles copied from a map: all three layers.</summary>
         class TileClip { public int W, H; public int[][,] Layers = new int[3][,]; }
@@ -515,7 +546,12 @@ namespace PokeCreator.Studio.Editors
         int CellPx { get { return (int)Math.Round(32 * Scale); } }
 
         public void SetZoom(int z) { _zoom = z; Resized(); Invalidate(); }
-        public void Resized() { Width = Math.Max(1, (int)(_map.Width * 32 * Scale)); Height = Math.Max(1, (int)(_map.Height * 32 * Scale)); }
+        public void Resized()
+        {
+            int w = _map.Width, h = _map.Height;
+            if (_resizeEdge != 0) { w = Math.Max(w, _resizeTo.Width); h = Math.Max(h, _resizeTo.Height); }
+            Width = Math.Max(1, w * CellPx + Grip); Height = Math.Max(1, h * CellPx + Grip);
+        }
 
         public void InvalidateAll()
         {
@@ -571,7 +607,8 @@ namespace PokeCreator.Studio.Editors
             var g = e.Graphics;
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.Half;
-            g.Clear(Color.Black);
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
+            g.FillRectangle(Brushes.Black, 0, 0, MapPxW, MapPxH);
             float s = Scale;
             var clip = e.ClipRectangle;
             int cx0 = Math.Max(0, (int)(clip.Left / s) / (Chunk * 32)), cy0 = Math.Max(0, (int)(clip.Top / s) / (Chunk * 32));
@@ -629,6 +666,48 @@ namespace PokeCreator.Studio.Editors
                 var sr = new Rectangle(_sel.X * c, _sel.Y * c, _sel.Width * c - 1, _sel.Height * c - 1);
                 using (var fill = new SolidBrush(Color.FromArgb(40, 80, 160, 255))) g.FillRectangle(fill, sr);
                 using (var pen = new Pen(Color.Yellow, 2) { DashStyle = DashStyle.Dash }) g.DrawRectangle(pen, sr);
+            }
+            DrawResizeHandles(g, c);
+        }
+
+        void DrawResizeHandles(Graphics g, int c)
+        {
+            int w = MapPxW, h = MapPxH;
+            var hot = _resizeEdge != 0 ? _resizeEdge : GripAt(PointToClient(MousePosition));
+            using (var bar = new SolidBrush(Theme.ButtonBack))
+            using (var hi = new SolidBrush(Theme.Selection))
+            {
+                g.FillRectangle(hot == 1 || hot == 3 ? hi : bar, w, 0, Grip, h);
+                g.FillRectangle(hot == 2 || hot == 3 ? hi : bar, 0, h, w, Grip);
+                g.FillRectangle(hot == 3 ? hi : bar, w, h, Grip, Grip);
+            }
+            // Grip marks in the middle of each bar and in the corner
+            using (var dot = new SolidBrush(Theme.SubText))
+            {
+                for (int i = -2; i <= 2; i++) { g.FillRectangle(dot, w + Grip / 2 - 1, h / 2 + i * 5, 3, 3); g.FillRectangle(dot, w / 2 + i * 5, h + Grip / 2 - 1, 3, 3); }
+                g.FillRectangle(dot, w + Grip - 5, h + Grip - 5, 3, 3); g.FillRectangle(dot, w + Grip - 9, h + Grip - 5, 3, 3); g.FillRectangle(dot, w + Grip - 5, h + Grip - 9, 3, 3);
+            }
+            if (_resizeEdge == 0) return;
+            // While dragging: the new size, what gets added (green) or cut off (red)
+            int nw = _resizeTo.Width * c, nh = _resizeTo.Height * c;
+            using (var cut = new SolidBrush(Color.FromArgb(90, 220, 40, 40)))
+            using (var add = new SolidBrush(Color.FromArgb(60, 60, 200, 90)))
+            {
+                if (nw < w) g.FillRectangle(cut, nw, 0, w - nw, h);
+                if (nh < h) g.FillRectangle(cut, 0, nh, Math.Min(w, nw), h - nh);
+                if (nw > w) g.FillRectangle(add, w + Grip, 0, nw - w, nh);
+                if (nh > h) g.FillRectangle(add, 0, h + Grip, Math.Min(nw, w), nh - h);
+            }
+            using (var pen = new Pen(Color.Yellow, 2) { DashStyle = DashStyle.Dash }) g.DrawRectangle(pen, 1, 1, nw - 2, nh - 2);
+            string label = _resizeTo.Width + " × " + _resizeTo.Height + "  (was " + _map.Width + " × " + _map.Height + ")";
+            using (var f = new Font("Segoe UI", 9f, FontStyle.Bold))
+            {
+                var sz = g.MeasureString(label, f);
+                // Next to the mouse, so it's in view on big maps
+                var m = PointToClient(MousePosition);
+                float lx = Math.Max(2, Math.Min(Width - sz.Width - 4, m.X + 16)), ly = Math.Max(2, Math.Min(Height - sz.Height - 4, m.Y + 16));
+                g.FillRectangle(Brushes.Black, lx - 3, ly - 1, sz.Width + 6, sz.Height + 2);
+                g.DrawString(label, f, Brushes.Yellow, lx, ly);
             }
         }
 
@@ -736,6 +815,8 @@ namespace PokeCreator.Studio.Editors
         protected override void OnMouseDown(MouseEventArgs e)
         {
             Focus();
+            int grip = e.Button == MouseButtons.Left ? GripAt(e.Location) : 0;
+            if (grip != 0) { _resizeEdge = grip; _resizeTo = new Size(_map.Width, _map.Height); Capture = true; Invalidate(); return; }
             var cell = CellAt(e.Location);
             if (!_map.Valid(cell.X, cell.Y)) return;
             SelectedCell = cell;
@@ -770,6 +851,30 @@ namespace PokeCreator.Studio.Editors
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (_resizeEdge != 0)
+            {
+                int c = CellPx;
+                int nw = _resizeEdge == 2 ? _map.Width : Math.Max(1, Math.Min(500, (int)Math.Round(e.X / (double)c)));
+                int nh = _resizeEdge == 1 ? _map.Height : Math.Max(1, Math.Min(500, (int)Math.Round(e.Y / (double)c)));
+                if (nw != _resizeTo.Width || nh != _resizeTo.Height)
+                {
+                    _resizeTo = new Size(nw, nh);
+                    Resized();   // room to drag past the current edge
+                }
+                // Scroll along when dragging past the visible part of the map
+                var sc = Parent as ScrollableControl;
+                if (sc != null)
+                {
+                    var pt = sc.PointToClient(PointToScreen(e.Location));
+                    int dx = pt.X > sc.ClientSize.Width - 16 ? c : pt.X < 16 ? -c : 0, dy = pt.Y > sc.ClientSize.Height - 16 ? c : pt.Y < 16 ? -c : 0;
+                    if (dx != 0 || dy != 0) sc.AutoScrollPosition = new Point(Math.Max(0, -sc.AutoScrollPosition.X + dx), Math.Max(0, -sc.AutoScrollPosition.Y + dy));
+                }
+                Invalidate();
+                return;
+            }
+            int over = GripAt(e.Location);
+            var want = over == 1 ? Cursors.SizeWE : over == 2 ? Cursors.SizeNS : over == 3 ? Cursors.SizeNWSE : Cursors.Default;
+            if (Cursor != want) { Cursor = want; Invalidate(new Rectangle(0, MapPxH, Width, Grip)); Invalidate(new Rectangle(MapPxW, 0, Grip, Height)); }
             var cell = CellAt(e.Location);
             if (cell != _hover)
             {
@@ -785,6 +890,18 @@ namespace PokeCreator.Studio.Editors
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
+            if (_resizeEdge != 0)
+            {
+                _resizeEdge = 0; Capture = false;
+                var to = _resizeTo;
+                // Shrinking cuts off tiles and events: check first if there are events in the way
+                int lost = _map.Events.Count(ev => ev.X >= to.Width || ev.Y >= to.Height);
+                if (lost > 0 && MessageBox.Show(FindForm(), lost + (lost == 1 ? " event is" : " events are") + " outside the new size and will be removed (Undo brings them back). Resize to " + to.Width + " × " + to.Height + "?", "Resize map", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)
+                { Resized(); Invalidate(); return; }
+                _ed.ResizeMap(to.Width, to.Height);
+                Invalidate();
+                return;
+            }
             if (_rectDragging) { _rectDragging = false; FillRect(CellRect(_dragStart, _dragEnd)); }
             if (_selecting) { _selecting = false; _sel = CellRect(_dragStart, _dragEnd); Invalidate(); }
             if (_picking)
