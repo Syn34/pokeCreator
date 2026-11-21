@@ -660,6 +660,10 @@ namespace PokeCreator.Runtime
             if (!string.IsNullOrEmpty(bd)) setup.Backdrop = bd.ToLowerInvariant();
             string bgm = str("battleBGM");
             if (!string.IsNullOrEmpty(bgm)) setup.Bgm = bgm;
+            if (on("forceCatchIntoParty")) setup.ForceCatchIntoParty = true;
+            if (on("noAnims") || on("noanims")) setup.Anims = false;
+            else if (on("anims")) setup.Anims = true;
+            if (on("inverseBattle") || on("inverse")) b.Inverse = true;
         }
 
         void StartBattle(PokeCreator.Battles.Battle b, BattleSetup setup)
@@ -1133,6 +1137,12 @@ namespace PokeCreator.Runtime
                     }
                 case "fish": World.FieldMoves.Fish(_g, p[1]); break;
                 case "bagitem": UI.ItemFlow.UseFromBag(_g, p[1], null); break;
+                case "throw": // throw BALL: in an open battle waiting for a command
+                    {
+                        var bs = _g.FindScene<PokeCreator.Runtime.UI.BattleScene>();
+                        Console.WriteLine("[autotest] throw " + (bs != null && bs.DebugThrow(p[1])));
+                        break;
+                    }
                 case "weather": _g.Weather.Set(int.Parse(p[1]), p.Length > 2 ? int.Parse(p[2]) : 9, p.Length > 3 ? int.Parse(p[3]) : 0); break;
                 case "ability": _g.State.Party[int.Parse(p[1])].Ability = p[2]; break;
                 case "held": _g.State.Party[int.Parse(p[1])].Item = p[2]; break;

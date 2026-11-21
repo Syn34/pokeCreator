@@ -483,6 +483,7 @@ namespace PokeCreator.Battles
             {
                 var td = P.Types.FirstOrDefault(x => x.Id == t);
                 if (td == null) continue;
+                if (Inverse) { m *= InverseMod(td, moveType); continue; }
                 if (td.Immunities.Contains(moveType)) return 0;
                 if (td.Weaknesses.Contains(moveType)) m *= 2;
                 else if (td.Resistances.Contains(moveType)) m *= 0.5;
@@ -595,6 +596,15 @@ namespace PokeCreator.Battles
             return 1;
         }
 
+        /// <summary>Inverse Battle (setBattleRule("inverseBattle")): weaknesses and resistances swap, immunities become weaknesses.</summary>
+        public bool Inverse;
+        static double InverseMod(TypeData td, string moveType)
+        {
+            if (td.Immunities.Contains(moveType) || td.Resistances.Contains(moveType)) return 2;
+            if (td.Weaknesses.Contains(moveType)) return 0.5;
+            return 1;
+        }
+
         public double Effectiveness(string moveType, Pokemon target)
         {
             double m = 1;
@@ -602,6 +612,7 @@ namespace PokeCreator.Battles
             {
                 var td = P.Types.FirstOrDefault(x => x.Id == t);
                 if (td == null) continue;
+                if (Inverse) { m *= InverseMod(td, moveType); continue; }
                 if (td.Immunities.Contains(moveType)) return 0;
                 if (td.Weaknesses.Contains(moveType)) m *= 2;
                 else if (td.Resistances.Contains(moveType)) m *= 0.5;

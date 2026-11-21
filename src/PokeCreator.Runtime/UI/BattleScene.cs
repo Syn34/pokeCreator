@@ -33,6 +33,10 @@ namespace PokeCreator.Runtime.UI
         public bool Link;
         /// <summary>setBattleRule("noMoney") / ("noPartner").</summary>
         public bool NoMoney, NoPartner;
+        /// <summary>setBattleRule("forceCatchIntoParty"): a catch with a full party always asks which party Pokémon to send to the PC.</summary>
+        public bool ForceCatchIntoParty;
+        /// <summary>setBattleRule("noAnims") / ("anims"): null = the player's Battle Effects option.</summary>
+        public bool? Anims;
         /// <summary>Plays back a recorded battle: the recorded decisions are made instead of asking the player.</summary>
         public List<List<int>> Replay;
         public Action LinkUpdate;
@@ -70,7 +74,7 @@ namespace PokeCreator.Runtime.UI
         bool _megaOn;
         int _formFlash; // Mega Evolve the Pokémon choosing its move (toggled with Shift in the Fight menu)
         bool _animThisMove;
-        bool AnimsOn { get { return Game.Project.Animations.Count > 0 && Game.Options.BattleEffects; } }
+        bool AnimsOn { get { return Game.Project.Animations.Count > 0 && (_setup.Anims ?? Game.Options.BattleEffects); } }
         bool _trainerVisible, _ballVisible, _ballCaught;
         int _ballShakes, _ballSlot;
         int _introSlide = 120;
@@ -399,6 +403,15 @@ namespace PokeCreator.Runtime.UI
         }
 
         /// <summary>Autotest: plays a move's (or "Common:X") animation now, from userSide's first Pokémon.</summary>
+        /// <summary>Autotests: throws a ball when the battle is waiting for a command.</summary>
+        public bool DebugThrow(string ball)
+        {
+            if (_mode != Mode.Command) return false;
+            Game.State.AddItem(ball, -1);
+            Commit(BattleCommand.Ball(ball));
+            return true;
+        }
+
         public string DebugAnimation(string what, int userSide, int targetSlot)
         {
             if (what.StartsWith("Common:")) return StartCommon(what.Substring(7), userSide, 0) ? "common" : "none";
@@ -688,6 +701,7 @@ namespace PokeCreator.Runtime.UI
                 else steps.Add(next =>
                 {
                     if (Game.State.Party.Count < GameState.MaxParty) { Game.State.Party.Add(pk); next(); }
+                    else if (Game.Options.SendToBoxesManual || _setup.ForceCatchIntoParty) StoreWithChoice(pk, next);
                     else { Game.State.Storage.Add(pk); Game.Message.Show(pk.Name(Game.Project) + " was sent to the PC.", null, -1, _ => next()); }
                 });
             }
@@ -726,6 +740,33 @@ namespace PokeCreator.Runtime.UI
                 });
             }
             RunSteps(steps, 0, Finish);
+        }
+
+        /// <summary>Party full: the player may send a party Pokémon to the PC to make room for the catch.</summary>
+        void StoreWithChoice(Pokemon pk, Action next)
+        {
+            string name = pk.Name(Game.Project);
+            Action toPc = () => { Game.State.Storage.Add(pk); Game.Message.Show(name + " was sent to the PC.", null, -1, _ => next()); };
+            Func<Pokemon, bool> canGo = p => p.IsEgg || Game.State.Party.Any(x => !x.IsEgg && !x.Fainted && x != p);
+            Action choose = null;
+            choose = () => Game.PushScene(new PartyScene(Game, "Send which Pokémon to the PC?", p => canGo(p) ? null : "NOT ABLE", (i, close) =>
+            {
+                var old = Game.State.Party[i];
+                if (!canGo(old)) { Game.Audio.PlaySe("GUI sel buzzer"); return; }
+                close();
+                Game.State.Party.RemoveAt(i);
+                Game.State.Storage.Add(old);
+                Game.State.Party.Add(pk);
+                Game.Message.Show(old.Name(Game.Project) + " was sent to the PC.\\n" + name + " joined your team!", null, -1, _ => next());
+            }, () =>
+            {
+                if (_setup.ForceCatchIntoParty) choose(); else toPc();
+            }));
+            if (_setup.ForceCatchIntoParty) { Game.Message.Show("Your party is full. Choose a Pokémon to send to the PC.", null, -1, _ => choose()); return; }
+            Game.Message.Show("Would you like to add " + name + " to your party?", new List<string> { "Yes", "No" }, 1, c =>
+            {
+                if (c == 0) choose(); else toPc();
+            });
         }
 
         static void RunSteps(List<Action<Action>> steps, int i, Action done)
