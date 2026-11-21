@@ -89,7 +89,12 @@ namespace PokeCreator.Runtime.Script
                 object v = a[0];
                 double d = ToDouble(v);
                 int frames = v is double || d < 10 ? (int)Math.Round(d * 60) : (int)(d * 3 / 2);
+                // The rest of the script runs after the wait (the script resumes without repeating earlier calls)
+                object done;
+                if (_game.TakePrompt(c, out done)) return true;
                 c.Wait(Math.Max(1, frames));
+                _game.PromptPending = true;
+                _game.SetPrompt(c, true);
                 return true;
             });
             Register("pbSEPlay", (c, a) => { _game.Audio.PlaySe(AudioName(Arg(a, 0)), a.Count > 1 ? ToInt(a[1]) : 100); return true; });
