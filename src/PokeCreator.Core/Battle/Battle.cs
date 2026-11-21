@@ -361,7 +361,12 @@ namespace PokeCreator.Battles
                 var cmd = o.Value;
                 if (cmd.Kind == BattleCommandKind.Run) { if (TryRun()) return _ev; orders.Remove(o); break; }
                 if (cmd.Kind == BattleCommandKind.Ball) { ThrowBall(cmd.Item); if (Outcome != BattleOutcome.Ongoing) return _ev; orders.Remove(o); }
-                else if (cmd.Kind == BattleCommandKind.Item) { UseItem(cmd.Item, cmd.Index); orders.Remove(o); }
+                else if (cmd.Kind == BattleCommandKind.Item)
+                {
+                    UseItem(cmd.Item, cmd.Index, cmd.TargetSlot, o.Key);
+                    if (Outcome != BattleOutcome.Ongoing) return _ev;
+                    orders.Remove(o);
+                }
                 else if (cmd.Kind == BattleCommandKind.Switch)
                 {
                     if (IsTrapped(o.Key)) Say(Name(o.Key) + " can't be switched out!");
@@ -1724,19 +1729,85 @@ namespace PokeCreator.Battles
             return false;
         }
 
-        void UseItem(string itemId, int party)
+        /// <summary>
+        /// X items, Dire Hit, Guard Spec., flutes and Poké Doll-style items used from the Bag in battle
+        /// (Essentials' BattleUse OnBattler / Direct). Returns false if the item isn't one of them.
+        /// </summary>
+        public static bool IsBattlerItem(string id)
+        {
+            return XItemStat(id) >= 0 || id == "DIREHIT" || id == "DIREHIT2" || id == "DIREHIT3" || id == "GUARDSPEC" || id == "YELLOWFLUTE" || id == "REDFLUTE"
+                || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY";
+        }
+        /// <summary>Items used on the whole side or the battle, not on a chosen Pokémon.</summary>
+        public static bool IsDirectBattleItem(string id) { return id == "GUARDSPEC" || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY"; }
+
+        static int XItemStat(string id)
+        {
+            string b = id.TrimEnd('2', '3', '6');
+            switch (b)
+            {
+                case "XATTACK": return 1; case "XDEFENSE": case "XDEFEND": return 2; case "XSPEED": return 3;
+                case "XSPATK": case "XSPECIAL": return 4; case "XSPDEF": return 5; case "XACCURACY": return 6;
+            }
+            return -1;
+        }
+
+        void UseItem(string itemId, int party, int moveSlot = -1, Battler user = null)
         {
             var item = P.Items.FirstOrDefault(i => i.Id == itemId);
             if (item == null) return;
+            if (IsBattlerItem(itemId)) { UseBattlerItem(item, party, user); return; }
             var pk = Parties[0][party];
             var info = ItemEffects.Info(P, item);
             int from = pk.HP;
-            var o = ItemEffects.Use(P, pk, item, info, -1, new EvolutionContext());
-            Say(PlayerName + " used the " + (item.Name ?? item.Id) + ".");
+            var o = ItemEffects.Use(P, pk, item, info, moveSlot, new EvolutionContext());
+            Say(PlayerName + " used the " + (item.Name ?? item.Id) + ((item.Name ?? item.Id).EndsWith(".") ? "" : "."));
             var onField = Field[0].Take(SlotsPerSide).FirstOrDefault(x => x != null && x.PartyIndex == party);
             if (onField != null && pk.HP != from) Hp(onField, from);
             if (onField != null) StatusEvent(onField);
             Say(o.Message);
+        }
+
+        void UseBattlerItem(ItemData item, int party, Battler user)
+        {
+            string id = item.Id, iname = item.Name ?? id;
+            Say(PlayerName + " used the " + iname + (iname.EndsWith(".") ? "" : "."));
+            if (id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY")
+            {
+                if (!IsWild || CannotRun) { Say("But it had no effect!"); return; }
+                Outcome = BattleOutcome.Escaped;
+                Say("You got away safely!");
+                _ev.Add(new BattleEvent { Kind = BattleEventKind.Flee });
+                return;
+            }
+            if (id == "GUARDSPEC")
+            {
+                if (Mist[0] > 0) { Say("But it had no effect!"); return; }
+                Mist[0] = 5; Say("Your team became shrouded in mist!");
+                return;
+            }
+            var b = Field[0].Take(SlotsPerSide).FirstOrDefault(x => x != null && x.PartyIndex == party && !x.Pk.Fainted) ?? user;
+            if (b == null) { Say("But it had no effect!"); return; }
+            int stat = XItemStat(id);
+            if (stat >= 0)
+            {
+                // Gen 7+: X items raise by 2 stages; X Attack 2 / 3 / 6 by that many
+                char last = id[id.Length - 1];
+                int amount = last == '2' ? 2 : last == '3' ? 3 : last == '6' ? 6 : 2;
+                if (b.Stages[stat] >= 6) { Say("But it had no effect!"); return; }
+                ChangeStat(b, stat, amount, b);
+                return;
+            }
+            if (id.StartsWith("DIREHIT"))
+            {
+                int amount = id == "DIREHIT3" ? 3 : 2;
+                if (b.CritStage >= 2) { Say("But it had no effect!"); return; }
+                b.CritStage = Math.Min(3, b.CritStage + amount);
+                Say(Name(b) + " is getting pumped!");
+                return;
+            }
+            if (id == "YELLOWFLUTE") { if (b.Confusion <= 0) { Say("But it had no effect!"); return; } b.Confusion = 0; Say(Name(b) + " snapped out of its confusion!"); return; }
+            if (id == "REDFLUTE") { if (b.AttractedTo == null) { Say("But it had no effect!"); return; } b.AttractedTo = null; Say(Name(b) + " got over its infatuation!"); return; }
         }
 
         // ------------------------------------------------------------------ catching

@@ -560,8 +560,9 @@ namespace PokeCreator.Runtime.UI
         bool BattleItem(ItemData it)
         {
             if (it.Pocket == 3) return true;
+            if (PokeCreator.Battles.Battle.IsBattlerItem(it.Id)) return true;
             var k = ItemEffects.Info(Game.Project, it).Kind;
-            return k == ItemKind.HealHP || k == ItemKind.FullRestore || k == ItemKind.CureStatus || k == ItemKind.Revive;
+            return k == ItemKind.HealHP || k == ItemKind.FullRestore || k == ItemKind.CureStatus || k == ItemKind.Revive || k == ItemKind.RestorePP;
         }
 
         void OpenBag()
@@ -587,8 +588,46 @@ namespace PokeCreator.Runtime.UI
                     Commit(BattleCommand.Ball(id));
                     return;
                 }
+                // Poké Doll, Guard Spec.: no Pokémon to choose
+                if (PokeCreator.Battles.Battle.IsDirectBattleItem(id))
+                {
+                    Game.State.AddItem(id, -1);
+                    var c = BattleCommand.UseItem(id, Me != null ? Me.PartyIndex : 0);
+                    Commit(c);
+                    return;
+                }
+                // X items, Dire Hit, flutes: on a Pokémon in battle
+                if (PokeCreator.Battles.Battle.IsBattlerItem(id))
+                {
+                    Action<int> useOn = party => { Game.State.AddItem(id, -1); Commit(BattleCommand.UseItem(id, party)); };
+                    if (_b.SlotsPerSide == 1 && Me != null) { useOn(Me.PartyIndex); return; }
+                    Game.PushScene(new PartyScene(Game, "Use on which Pokémon?", p => OnField(_party.IndexOf(p)) ? null : "NOT ABLE", (i, close) =>
+                    {
+                        if (!OnField(i)) { Game.Audio.PlaySe("GUI sel buzzer"); return; }
+                        close(); useOn(i);
+                    }, () => _mode = Mode.Command));
+                    return;
+                }
                 var info = ItemEffects.Info(Game.Project, item);
                 var ctx = ItemFlow.Context(Game);
+                if (info.NeedsMove)
+                {
+                    // Ethers: choose the Pokémon, then the move
+                    Game.PushScene(new PartyScene(Game, "Restore which Pokémon's PP?", null, (i, close) =>
+                    {
+                        ItemFlow.ChooseMove(Game, _party[i], "Restore which move?", slot =>
+                        {
+                            if (slot < 0) return;
+                            var test = Json.Json.Deserialize<Pokemon>(Json.Json.Write(_party[i]));
+                            if (!ItemEffects.Use(Game.Project, test, item, info, slot, ctx).Used) { Game.Message.Show("It won't have any effect."); return; }
+                            close();
+                            Game.State.AddItem(id, -1);
+                            var c = BattleCommand.UseItem(id, i); c.TargetSlot = slot;
+                            Commit(c);
+                        });
+                    }, () => _mode = Mode.Command));
+                    return;
+                }
                 Game.PushScene(new PartyScene(Game, "Use on which Pokémon?", null, (i, close) =>
                 {
                     // Try it on a copy first so the item isn't wasted
