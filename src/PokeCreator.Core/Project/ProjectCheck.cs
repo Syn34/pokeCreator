@@ -294,9 +294,48 @@ namespace PokeCreator.Projects
             if (!string.IsNullOrEmpty(name) && !HasAsset(folder, name)) Add(ProblemSeverity.Warning, where, target, what + ": '" + name + "' is missing from " + folder + ".");
         }
 
+        /// <summary>Script calls the game understands (filled in by the Studio from Game.exe); null = don't check.</summary>
+        public static HashSet<string> KnownScriptCalls;
+        static readonly Regex CallName = new Regex(@"(?<![\w.$:@])(\$[A-Za-z_]\w*(?:\.[A-Za-z_]\w*[?!]?)*|pb[A-Z]\w*[?!]?(?:\.[A-Za-z_]\w*[?!]?)*|[A-Z][A-Za-z]+(?:::[A-Z]\w*)*\.[a-z_]\w*[?!]?)", RegexOptions.Compiled);
+        static readonly HashSet<string> RubyBuiltins = new HashSet<string> { "Math.sqrt", "Math.max", "Math.min", "Time.now", "Kernel.rand", "Integer.new", "Array.new", "Hash.new", "String.new", "Pokemon.new", "Color.new", "Tone.new", "Rect.new" };
+
+        bool CallKnown(string name)
+        {
+            var known = KnownScriptCalls;
+            if (known.Contains(name) || RubyBuiltins.Contains(name)) return true;
+            // As the game resolves them: the longest registered start, or the last part
+            for (int cut = name.LastIndexOf('.'); cut > 0; cut = name.LastIndexOf('.', cut - 1)) if (known.Contains(name.Substring(0, cut))) return true;
+            int dot = name.LastIndexOf('.');
+            if (dot > 0 && known.Contains(name.Substring(dot + 1))) return true;
+            // Things the evaluator handles itself
+            if (name.StartsWith("$game_variables") || name.StartsWith("$game_switches") || name.StartsWith("$game_self_switches") || name.StartsWith("$stats.") || name.StartsWith("$player") || name.StartsWith("$Trainer") || name.StartsWith("$game_map")) return true;
+            // A global the project's own scripts make ($speeches...), not one of Essentials'
+            if (name.StartsWith("$"))
+            {
+                string root = name.Split('.')[0];
+                string[] essentials = { "$game_temp", "$game_system", "$game_screen", "$game_player", "$PokemonGlobal", "$PokemonBag", "$bag", "$PokemonStorage", "$PokemonSystem", "$PokemonTemp", "$PokemonMap", "$PokemonEncounters", "$scene" };
+                if (!essentials.Contains(root)) return true;
+            }
+            return false;
+        }
+
+        void CheckCalls(string script, string where, string target)
+        {
+            if (KnownScriptCalls == null) return;
+            var globalsSet = new HashSet<string>(Regex.Matches(script, @"(\$[A-Za-z_]\w*)\s*=[^=]").Cast<Match>().Select(m => m.Groups[1].Value));
+            var reported = new HashSet<string>();
+            foreach (Match m in CallName.Matches(Regex.Replace(script, "\"(?:[^\"\\\\]|\\\\.)*\"|'[^']*'|#.*", "\"\"")))
+            {
+                string name = m.Groups[1].Value;
+                if (globalsSet.Contains(name.Split('.')[0]) || CallKnown(name) || !reported.Add(name)) continue;
+                Add(ProblemSeverity.Info, where, target, "The script call '" + name + "' isn't one the game understands (unless one of your scripts or plugins adds it); it will be skipped.");
+            }
+        }
+
         void CheckScript(string script, string where, string target)
         {
             if (string.IsNullOrEmpty(script)) return;
+            CheckCalls(script, where, target);
             foreach (Match m in SpeciesCall.Matches(script))
                 if (!Known("species", m.Groups[2].Value)) Add(ProblemSeverity.Error, where, target, m.Groups[1].Value + " uses :" + m.Groups[2].Value + ", but there is no such Pokémon.");
             foreach (Match m in SecondSpecies.Matches(script))

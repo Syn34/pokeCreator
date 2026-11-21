@@ -23,6 +23,13 @@ namespace PokeCreator.Runtime.Script
         readonly Dictionary<string, Handler> _commands = new Dictionary<string, Handler>(StringComparer.OrdinalIgnoreCase);
         readonly HashSet<string> _warned = new HashSet<string>();
 
+        /// <summary>Every script call name the game understands (for the Studio's checks).</summary>
+        public static List<string> KnownCalls()
+        {
+            var c = new EssentialsCompat(null);
+            return c._commands.Keys.ToList();
+        }
+
         public EssentialsCompat(Game g)
         {
             _game = g;
@@ -1019,6 +1026,9 @@ namespace PokeCreator.Runtime.Script
             });
             Handler ready = (c, a) => Phone.ReadyToBattle(_game, Str(a, 0), Str(a, 1));
             Register("Phone.can_rematch?", ready); Register("Phone.rematch?", ready); Register("pbPhoneReadyToBattle?", ready);
+            // v21 rematches: Phone.battle(:TYPE, "Name") fights the trainer's current version; Phone.reset_after_win(...) after a win
+            Register("Phone.battle", (c, a) => TrainerBattle(Str(a, 0), Str(a, 1), Phone.Variant(_game, Str(a, 0), Str(a, 1)), c));
+            Register("Phone.reset_after_win", (c, a) => { Phone.Rematched(_game, Str(a, 0), Str(a, 1)); return true; });
             Handler variant = (c, a) => Phone.Variant(_game, Str(a, 0), Str(a, 1));
             Register("Phone.variant", variant); Register("pbPhoneBattleCount", variant);
             Handler rematched = (c, a) => { Phone.Rematched(_game, Str(a, 0), Str(a, 1)); return true; };

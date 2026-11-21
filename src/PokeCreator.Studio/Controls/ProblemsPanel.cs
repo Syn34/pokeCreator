@@ -92,6 +92,7 @@ namespace PokeCreator.Studio.Controls
             _project = p;
             if (p == null) { _all = new List<Problem>(); Filter(); return; }
             Cursor = Cursors.WaitCursor;
+            LoadKnownCalls();
             try { _all = ProjectCheck.Run(p); }
             catch (Exception ex) { _all = new List<Problem> { new Problem { Severity = ProblemSeverity.Error, Where = "Checker", Message = "The check stopped early: " + ex.Message } }; }
             finally { Cursor = Cursors.Default; }
@@ -119,6 +120,23 @@ namespace PokeCreator.Studio.Controls
                 }
                 catch (InvalidOperationException) { }
             });
+        }
+
+        /// <summary>Asks Game.exe which script calls it understands, once, so event scripts can be checked.</summary>
+        static void LoadKnownCalls()
+        {
+            if (ProjectCheck.KnownScriptCalls != null) return;
+            try
+            {
+                string game = Path.Combine(Application.StartupPath, "Game.exe");
+                if (!File.Exists(game)) return;
+                var asm = System.Reflection.Assembly.LoadFrom(game);
+                var t = asm.GetType("PokeCreator.Runtime.Script.EssentialsCompat");
+                var m = t != null ? t.GetMethod("KnownCalls") : null;
+                var list = m != null ? m.Invoke(null, null) as List<string> : null;
+                if (list != null) ProjectCheck.KnownScriptCalls = new HashSet<string>(list, StringComparer.OrdinalIgnoreCase);
+            }
+            catch { }
         }
 
         Form _form;
