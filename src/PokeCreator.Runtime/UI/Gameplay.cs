@@ -544,7 +544,7 @@ namespace PokeCreator.Runtime.UI
             {
                 if (!Game.State.Seen.Contains(_list[_index].Id)) { Buzz(); return; }
                 Decide();
-                Game.PushScene(new PokedexEntryScene(Game, _list, _index, i => { _index = i; _scroll = Math.Max(0, Math.Min(_index - Rows / 2, _list.Count - Rows)); }));
+                Game.PushScene(new PokedexEntryScene(Game, _list, _index, i => { _index = i; _scroll = Math.Max(0, Math.Min(_index - Rows / 2, _list.Count - Rows)); }) { Number = sp => { int dn; return _numbers.TryGetValue(sp.Id, out dn) ? dn : 0; } });
             }
         }
 
@@ -637,6 +637,14 @@ namespace PokeCreator.Runtime.UI
         int _form;
         /// <summary>Shown after catching a new species: Action closes it too, and the cry plays when it opens.</summary>
         public bool Registration;
+        /// <summary>The Pokédex number shown (the list's own numbering from the Pokédex; the National number otherwise).</summary>
+        public Func<SpeciesData, int> Number;
+        int Num(SpeciesData s)
+        {
+            if (Number != null) return Number(s);
+            int n = Game.Project.Species.Where(x => x.Form == 0).ToList().FindIndex(x => x.Id == s.Id);
+            return n >= 0 ? n + 1 : _index + 1;
+        }
         static readonly string[] PageNames = { "INFO", "AREA", "FORMS" };
 
         protected override void Update()
@@ -732,7 +740,7 @@ namespace PokeCreator.Runtime.UI
             {
                 Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
                 Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 240), new Color(120, 24, 24));
-                Ui.Text(g, 20, 14, (_index + 1).ToString("000") + "  " + (s.Name ?? s.Id));
+                Ui.Text(g, 20, 14, Num(s).ToString("000") + "  " + (s.Name ?? s.Id));
                 Ui.TextRight(g, g.Width - 20, 14, "< " + PageNames[_page] + " >");
                 if (_page == 1) DrawArea(g, s); else DrawForms(g);
                 return;
@@ -742,7 +750,7 @@ namespace PokeCreator.Runtime.UI
             Ui.Panel(g, 8, 8, g.Width - 16, g.Height - 16, new Color(248, 248, 240), new Color(120, 24, 24));
             Ui.Panel(g, 20, 20, 200, 200, new Color(232, 232, 224), new Color(160, 160, 152));
             Ui.PokemonFront(g, Game, new Pokemon { Species = s.Id }, 120, 210, 176);
-            Ui.Text(g, 236, 24, (_index + 1).ToString("000") + "  " + (s.Name ?? s.Id));
+            Ui.Text(g, 236, 24, Num(s).ToString("000") + "  " + (s.Name ?? s.Id));
             Ui.Text(g, 236, 58, caught && !string.IsNullOrEmpty(s.Category) ? s.Category + " Pokémon" : "????? Pokémon");
             if (caught)
             {
