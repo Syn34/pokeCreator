@@ -562,6 +562,7 @@ namespace PokeCreator.Runtime
             var w1 = PokeCreator.Pkmn.Pokemon.Create(Project, species1, level1, Rng);
             var w2 = PokeCreator.Pkmn.Pokemon.Create(Project, species2, level2, Rng);
             if (w1.Data(Project) == null || w2.Data(Project) == null || !PartyCanBattle) { if (onEnd != null) onEnd(PokeCreator.Battles.BattleOutcome.Win); return; }
+            foreach (var w in new[] { w1, w2 }) { World.EncounterModifiers.ApplyToWild(this, w); Script.GameEvents.RaiseWildPokemonCreated(this, w); }
             var b = new PokeCreator.Battles.Battle(Project, State.Party, new List<PokeCreator.Pkmn.Pokemon> { w1, w2 }, true, Rng, true) { PlayerName = State.PlayerName };
             b.AlreadyCaught = sp => State.Caught.Contains(sp);
             StartBattle(b, new BattleSetup { Wild = true, Backdrop = Backdrop(), OnEnd = onEnd });

@@ -454,6 +454,20 @@ namespace PokeCreator.Runtime.World
             _cooldown = 4;
             if (sp == null || !_game.PartyCanBattle) return;
             if (Roaming.TryEncounter(_game, method)) return;
+            // Tall grass: 30% of encounters are double battles when two party Pokémon can fight (as Essentials)
+            if (tag == GameMap.TagTallGrass && !_game.Project.Settings.NoTallGrassDoubles && _game.State.Extras.Partner == null
+                && _game.State.Party.Count(p => !p.IsEgg && !p.Fainted) > 1 && !Safari.InZone(_game) && !BugContest.InProgress(_game) && _game.Rng.Next(100) < 30)
+            {
+                int roll2 = _game.Rng.Next(Math.Max(1, total));
+                EncounterSlot slot2 = m.Slots[0];
+                foreach (var s in m.Slots) { if (roll2 < s.Chance) { slot2 = s; break; } roll2 -= s.Chance; }
+                int level2 = EncounterModifiers.AdjustLevel(_game, slot2, _game.Rng.Next(slot2.MinLevel, Math.Max(slot2.MinLevel, slot2.MaxLevel) + 1));
+                if (_game.Project.Species.Any(s => s.Id == slot2.Species))
+                {
+                    _game.StartDoubleWildBattle(slot.Species, level, slot2.Species, level2, null);
+                    return;
+                }
+            }
             _game.StartWildEncounter(slot.Species, level);
         }
     }
