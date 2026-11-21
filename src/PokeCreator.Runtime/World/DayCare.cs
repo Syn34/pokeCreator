@@ -123,7 +123,16 @@ namespace PokeCreator.Runtime.World
             var egg = Pokemon.Create(g.Project, species, 1, g.Rng);
             // Three random IVs from the parents (five with a Destiny Knot)
             int inherit = mother.Item == "DESTINYKNOT" || father.Item == "DESTINYKNOT" ? 5 : 3;
-            var stats = Enumerable.Range(0, 6).OrderBy(x => g.Rng.Next()).Take(inherit);
+            var used = new List<int>();
+            // A parent holding a Power item (Power Weight...) passes on that stat's IV
+            var powered = new[] { mother, father }.Where(p => PokeCreator.Battles.Battle.PowerItemStat(p.Item) >= 0).ToList();
+            if (powered.Count > 0)
+            {
+                var pp = powered[g.Rng.Next(powered.Count)];
+                int ps = PokeCreator.Battles.Battle.PowerItemStat(pp.Item);
+                egg.IV[ps] = pp.IV[ps]; used.Add(ps); inherit--;
+            }
+            var stats = Enumerable.Range(0, 6).Where(s => !used.Contains(s)).OrderBy(x => g.Rng.Next()).Take(inherit);
             foreach (int s in stats) egg.IV[s] = (g.Rng.Next(2) == 0 ? mother : father).IV[s];
             // Everstone passes on the nature
             if (mother.Item == "EVERSTONE") egg.Nature = mother.Nature;
@@ -139,6 +148,12 @@ namespace PokeCreator.Runtime.World
                         if (egg.Moves.Count >= 4) egg.Moves.RemoveAt(0);
                         egg.Moves.Add(new PokemonMove { Id = m, PP = md.TotalPP });
                     }
+            // Pichu from a parent holding a Light Ball knows Volt Tackle
+            if (egg.Species == "PICHU" && (mother.Item == "LIGHTBALL" || father.Item == "LIGHTBALL") && !egg.Moves.Any(m => m.Id == "VOLTTACKLE"))
+            {
+                var vt = g.Project.Moves.FirstOrDefault(x => x.Id == "VOLTTACKLE");
+                if (vt != null) { if (egg.Moves.Count >= 4) egg.Moves.RemoveAt(0); egg.Moves.Add(new PokemonMove { Id = vt.Id, PP = vt.TotalPP }); }
+            }
             egg.Ball = mother.Ball ?? "POKEBALL";
             if (egg.Ball == "MASTERBALL" || egg.Ball == "CHERISHBALL") egg.Ball = "POKEBALL";
             // Regional and other inheritable forms come from the mother (the other parent with Ditto)
@@ -149,6 +164,9 @@ namespace PokeCreator.Runtime.World
             if (hidden && eggData != null && eggData.HiddenAbilities != null && eggData.HiddenAbilities.Count > 0 && g.Rng.Next(100) < 60) egg.Ability = eggData.HiddenAbilities[g.Rng.Next(eggData.HiddenAbilities.Count)];
             else if (!hidden && g.Rng.Next(100) < 80) egg.AbilityIndex = mother.AbilityIndex;
             EncounterModifiers.ShinyCharm(g, egg);
+            // Masuda method: parents from different trainers give five more chances of a shiny
+            if (!egg.Shiny && !string.IsNullOrEmpty(mother.OTName) && !string.IsNullOrEmpty(father.OTName) && mother.OTName != father.OTName)
+                for (int i = 0; i < 5 && !egg.Shiny; i++) if (g.Rng.Next(Pokemon.ShinyOdds) == 0) egg.Shiny = true;
             egg.IsEgg = true;
             egg.EggSteps = data != null && data.HatchSteps > 1 ? data.HatchSteps : 5120;
             egg.OTName = g.State.PlayerName; egg.OTId = g.State.TrainerId;
