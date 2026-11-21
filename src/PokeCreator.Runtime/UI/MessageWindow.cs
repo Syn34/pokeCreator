@@ -49,7 +49,9 @@ namespace PokeCreator.Runtime.UI
         bool _noKeyAtEnd;          // \^
         int _autoClose = -1;       // \wtnp[n]: frames before closing by itself
         int _position = 2;         // 0 top, 1 middle, 2 bottom
-        bool _showGold;
+        bool _showGold, _showCoins;
+        string _face, _skin;
+        WindowSkin _skinObj; string _skinLoaded;
         string _speaker;
 
         const int Margin = 4, PadX = 22, PadY = 14;
@@ -73,7 +75,7 @@ namespace PokeCreator.Runtime.UI
             text = PokeCreator.Projects.Localization.T(text ?? "");
             if (choices != null) choices = choices.Select(PokeCreator.Projects.Localization.T).ToList();
             if (Echo) Console.WriteLine("[msg] " + Expand(text).Replace("\n", " / "));
-            _linesPerPage = 2; _framesPerChar = 0; _noKeyAtEnd = false; _autoClose = -1; _position = DefaultPosition; _showGold = false; _speaker = null;
+            _linesPerPage = 2; _framesPerChar = 0; _noKeyAtEnd = false; _autoClose = -1; _position = DefaultPosition; _showGold = false; _showCoins = false; _face = null; _skin = null; _speaker = null;
             _waitFrames = 0; _waitingKey = false; _charTimer = 0;
             var tokens = Parse(text);
             int width = _game.Gfx.Width - Margin * 2 - PadX * 2;
@@ -92,7 +94,7 @@ namespace PokeCreator.Runtime.UI
             s = Variables(s ?? "");
             s = Regex.Replace(s, @"\\xn\[[^\]]*\]", "");
             s = Regex.Replace(s, @"\\[a-zA-Z]+\[[^\]]*\]", "");                    // codes with arguments: \c[1], \se[..], \wtnp[..]
-            s = Regex.Replace(s, @"\\(?:op|cl|wu|wd|wm|pm|pg|cn|CN|[brigG])", "");      // argument-less codes
+            s = Regex.Replace(s, @"\\(?:op|cl|wu|wd|wm|pm|pog|pg|cn|CN|[brigG])", "");      // argument-less codes
             s = Regex.Replace(s, @"<[^>]+>", "");                                // <ac>, <b> style tags
             s = s.Replace("\\.", "").Replace("\\|", "").Replace("\\!", "").Replace("\\^", "").Replace("\\\\", "\\");
             return s;
@@ -149,7 +151,7 @@ namespace PokeCreator.Runtime.UI
                 if (c == '\\' && i + 1 < s.Length)
                 {
                     // Longest code names first
-                    var m = Regex.Match(s.Substring(i + 1), @"^(wtnp|wt|ts|se|me|xn|dxn|fs|fn|ff|op|cl|wu|wd|wm|pm|pg|CN|cn|l|c|w|[brigG.|!^\\])");
+                    var m = Regex.Match(s.Substring(i + 1), @"^(wtnp|wt|ts|se|me|xn|dxn|fs|fn|ff|op|cl|wu|wd|wm|pm|pog|pg|CN|cn|l|c|w|f|[brigG.|!^\\])");
                     if (m.Success)
                     {
                         string code = m.Groups[1].Value;
@@ -175,6 +177,18 @@ namespace PokeCreator.Runtime.UI
                             case "se": if (!string.IsNullOrEmpty(arg)) list.Add(new Token { Kind = TokKind.Se, Text = arg }); break;
                             case "me": if (!string.IsNullOrEmpty(arg)) list.Add(new Token { Kind = TokKind.Me, Text = arg }); break;
                             case "G": _showGold = true; break;
+                            case "CN": case "cn": _showCoins = true; break;
+                            case "pg": case "pog":
+                                {
+                                    // The player's gender colour (\pog: the other gender's)
+                                    var look = _game.Player != null ? _game.Player.Look : null;
+                                    var ptt = look != null ? _game.Project.TrainerTypes.FirstOrDefault(t => t.Id == look.TrainerType) : null;
+                                    bool female = ptt != null && ptt.Gender == "Female";
+                                    if (code == "pog") female = !female;
+                                    b = CodeBase[female ? 2 : 1]; sh = CodeShadow[female ? 2 : 1]; break;
+                                }
+                            case "w": _skin = arg; break;
+                            case "f": case "ff": _face = arg; break;
                             case "wu": _position = 0; break;
                             case "wm": _position = 1; break;
                             case "wd": _position = 2; break;
@@ -400,7 +414,18 @@ namespace PokeCreator.Runtime.UI
             int bh = BoxHeight(g);
             int bx = Margin, bw = g.Width - Margin * 2;
             int by = _position == 0 ? Margin : _position == 1 ? (g.Height - bh) / 2 : g.Height - bh - Margin;
-            if (!FrameHidden) DrawSpeechBox(g, bx, by, bw, bh);
+            if (!FrameHidden)
+            {
+                if (!string.IsNullOrEmpty(_skin) && _skinLoaded != _skin) { _skinLoaded = _skin; _skinObj = WindowSkin.Load(g, _game.Project.FindAsset("Graphics/Windowskins", _skin)); }
+                var skin = !string.IsNullOrEmpty(_skin) ? _skinObj : null;
+                if (skin != null) skin.Draw(g, bx, by, bw, bh); else DrawSpeechBox(g, bx, by, bw, bh);
+            }
+            // \f[face]: a picture beside the message (Graphics/Pictures or Graphics/Faces), above the box
+            if (!string.IsNullOrEmpty(_face))
+            {
+                var face = g.Load(_game.Project.FindAsset("Graphics/Faces", _face) ?? _game.Project.FindAsset("Graphics/Pictures", _face));
+                if (face != null) g.Draw(face, 0, 0, face.Width, face.Height, bx + 8, _position == 0 ? by + bh + 4 : by - face.Height - 4);
+            }
             if (!string.IsNullOrEmpty(_speaker))
             {
                 string sp = Expand(_speaker);
@@ -416,6 +441,14 @@ namespace PokeCreator.Runtime.UI
                 DrawBox(g, g.Width - gw - Margin, Margin, gw, gh);
                 g.DrawText(g.Width - gw - Margin + 16, Margin + 10, "Money:", Color.TextBase, Color.TextShadow);
                 g.DrawText(g.Width - Margin - 16 - g.TextWidth(money), Margin + 10 + LineH(g), money, Color.TextBase, Color.TextShadow);
+            }
+            if (_showCoins)
+            {
+                string coins = _game.State.Coins.ToString("N0", CultureInfo.InvariantCulture);
+                int cw = Math.Max(150, g.TextWidth(coins) + 40), ch = LineH(g) * 2 + 20, cy = _showGold ? Margin + LineH(g) * 2 + 26 : Margin;
+                DrawBox(g, g.Width - cw - Margin, cy, cw, ch);
+                g.DrawText(g.Width - cw - Margin + 16, cy + 10, "Coins:", Color.TextBase, Color.TextShadow);
+                g.DrawText(g.Width - Margin - 16 - g.TextWidth(coins), cy + 10 + LineH(g), coins, Color.TextBase, Color.TextShadow);
             }
             int remaining = _revealed;
             int lh = LineH(g);
