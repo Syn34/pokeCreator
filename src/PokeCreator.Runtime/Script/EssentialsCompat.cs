@@ -1232,10 +1232,26 @@ namespace PokeCreator.Runtime.Script
         object GiveItem(string id, int qty, string verb)
         {
             var item = _game.Project.Items.FirstOrDefault(i => i.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-            string name = item == null ? id : (qty > 1 && !string.IsNullOrEmpty(item.NamePlural) ? item.NamePlural : item.Name);
+            if (item != null) id = item.Id;
             _game.State.AddItem(id, qty);
-            _game.Audio.PlayMe(item != null && item.Pocket == 8 ? "Key item get" : "Item get");
-            _game.Message.Show("\\PN " + verb + " " + (qty > 1 ? qty + " " : (StartsWithVowel(name) ? "an " : "a ")) + name + "!");
+            bool machine = item != null && (item.FieldUse == "TM" || item.FieldUse == "HM" || item.FieldUse == "TR") && !string.IsNullOrEmpty(item.Move);
+            _game.Audio.PlayMe(machine ? "Item get" : item != null && item.Pocket == 8 ? "Key item get" : "Item get");
+            // As Essentials: portion names ("a bag of Sacred Ash"), TMs with their move, then which pocket it went in
+            string what;
+            if (item == null) what = (qty > 1 ? qty + " " : StartsWithVowel(id) ? "an " : "a ") + id;
+            else if (machine) what = "\\c[1]" + item.Name + " " + PokeCreator.Pkmn.ItemEffects.MoveName(_game.Project, item.Move) + "\\c[0]";
+            else if (qty > 1) what = qty + " \\c[1]" + (!string.IsNullOrEmpty(item.PortionNamePlural) ? item.PortionNamePlural : !string.IsNullOrEmpty(item.NamePlural) ? item.NamePlural : item.Name) + "\\c[0]";
+            else
+            {
+                string portion = !string.IsNullOrEmpty(item.PortionName) ? item.PortionName : item.Name;
+                what = (item.Pocket == 8 ? "the " : StartsWithVowel(portion) ? "an " : "a ") + "\\c[1]" + portion + "\\c[0]";
+            }
+            string pocket = item != null && item.Pocket >= 1 && item.Pocket <= UI.BagScene.PocketNames.Length ? UI.BagScene.PocketNames[item.Pocket - 1] : null;
+            string itemName = item == null ? id : qty > 1 && !string.IsNullOrEmpty(item.NamePlural) ? item.NamePlural : item.Name;
+            _game.Message.Show("\\PN " + verb + " " + what + "!", null, -1, _ =>
+            {
+                if (pocket != null) _game.Message.Show("You put the " + itemName + " in\\nyour Bag's \\c[1]" + pocket + "\\c[0] pocket.");
+            });
             return true;
         }
 

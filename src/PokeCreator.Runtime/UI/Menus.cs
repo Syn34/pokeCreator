@@ -582,7 +582,7 @@ namespace PokeCreator.Runtime.UI
     /// <summary>Bag: pockets (Left/Right), item list, icon and description.</summary>
     public class BagScene : Scene
     {
-        static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
+        public static readonly string[] PocketNames = { "Items", "Medicine", "Poké Balls", "TMs & HMs", "Berries", "Mail", "Battle Items", "Key Items" };
         int _pocket, _index, _scroll;
         CommandList _popup;
         readonly Action<string> _choose; // choose mode: picking an item to give or use in battle
