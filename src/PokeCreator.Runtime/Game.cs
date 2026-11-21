@@ -371,6 +371,7 @@ namespace PokeCreator.Runtime
             Planes.FromTileset(Map.Tileset);
             World.Roaming.OnMapChanged(this);
             World.Followers.Rebuild(this);
+            if (State != null) PokeCreator.Pkmn.FormRules.UpdateTimeForms(Project, State.Party.Concat(State.Storage));
             Script.GameEvents.RaiseMapChanged(this);
             var props = data.Properties;
             if (props != null && props.ShowArea) { _signText = Message.Expand(Map.DisplayName); _signTimer = 150; }
@@ -696,6 +697,11 @@ namespace PokeCreator.Runtime
             {
                 LastOutcome = o; ResumeOutcome = o;
                 if (!setup.Facility) World.Pokerus.AfterBattle(this);
+                if (!setup.Facility && !setup.Link)
+                {
+                    string env = Map != null && Map.Data.Properties != null ? Map.Data.Properties.Environment : null;
+                    foreach (var pk in State.Party.Where(p => p.Species == "BURMY" && b.SentOut.Contains(p))) PokeCreator.Pkmn.FormRules.BurmyCloak(Project, pk, string.IsNullOrEmpty(env) ? setup.Backdrop : env);
+                }
                 if (!setup.Link) World.GameStats.OnBattleEnd(this, setup.Wild, o);
                 foreach (var pk in State.Party.Where(p => p.ShadowPokemon && b.SentOut.Contains(p) && !p.Fainted)) PokeCreator.Pkmn.Shadow.AdjustHeart(pk, -100);
                 Script.GameEvents.RaiseBattleEnded(this, o);

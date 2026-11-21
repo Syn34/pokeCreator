@@ -20,6 +20,37 @@ namespace PokeCreator.Pkmn
         static int FormCount(Project p, string species) { int n = 1; while (p.Species.Any(s => s.Id == species + "_" + n)) n++; return n; }
 
         /// <summary>The form a newly created Pokémon gets (before its held item is considered).</summary>
+        /// <summary>Essentials' season: it changes every month (January spring, February summer, March autumn, April winter, May spring...).</summary>
+        public static int Season() { return (DateTime.Now.Month - 1) % 4; }
+
+        /// <summary>
+        /// Forms that follow the clock and calendar (as Essentials): Deerling and Sawsbuck always show the current season,
+        /// Shaymin's Sky Forme goes back to Land Forme at night. Returns true if anything changed.
+        /// </summary>
+        public static bool UpdateTimeForms(Project p, IEnumerable<Pokemon> mons)
+        {
+            bool changed = false;
+            int season = Season(), hour = DateTime.Now.Hour;
+            foreach (var pk in mons)
+            {
+                if (pk == null || pk.IsEgg) continue;
+                int f = pk.Form;
+                if ((pk.Species == "DEERLING" || pk.Species == "SAWSBUCK") && HasForm(p, pk.Species, season)) f = season;
+                if (pk.Species == "SHAYMIN" && pk.Form == 1 && (hour >= 20 || hour < 5)) f = 0;
+                if (f != pk.Form) { pk.Form = f; changed = true; }
+            }
+            return changed;
+        }
+
+        /// <summary>Burmy's cloak after a battle it took part in: grass → Plant, sand / caves / rocks → Sandy, buildings → Trash.</summary>
+        public static void BurmyCloak(Project p, Pokemon pk, string environment)
+        {
+            if (pk == null || pk.Species != "BURMY") return;
+            string e = (environment ?? "").ToLowerInvariant();
+            int f = e.Contains("grass") || e.Contains("forest") || e == "" ? 0 : e.Contains("sand") || e.Contains("cave") || e.Contains("rock") || e.Contains("mountain") ? 1 : 2;
+            if (HasForm(p, "BURMY", f)) pk.Form = f;
+        }
+
         public static int FormOnCreation(Project p, Pokemon pk, Random rng)
         {
             switch (pk.Species)
@@ -33,8 +64,7 @@ namespace PokeCreator.Pkmn
                     }
                 case "DEERLING": case "SAWSBUCK":
                     {
-                        int m = DateTime.Now.Month;
-                        int season = m >= 3 && m <= 5 ? 0 : m >= 6 && m <= 8 ? 1 : m >= 9 && m <= 11 ? 2 : 3;
+                        int season = Season();
                         return HasForm(p, pk.Species, season) ? season : 0;
                     }
                 case "TOXTRICITY": return LowKeyNatures.Contains(pk.Nature) && HasForm(p, pk.Species, 1) ? 1 : 0;
