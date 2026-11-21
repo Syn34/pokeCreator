@@ -1459,10 +1459,10 @@ namespace PokeCreator.Runtime.Script
             {
                 _game.Audio.PlayMe("Pkmn get");
                 string name = pk.Name(_game.Project);
-                Action nickname = () => _game.Message.Show("Would you like to give a nickname to " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
+                Action nickname = () => { if (_game.Options != null && _game.Options.NoNicknames) return; _game.Message.Show("Would you like to give a nickname to " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
                 {
                     if (c == 0) _game.AskName(name + "'s nickname?", "", 12, n => pk.Nickname = n, null);
-                });
+                }); };
                 // A species new to the Pokédex: its entry is shown first (as Essentials)
                 var entry = newEntry && _game.State.HasPokedex ? _game.Project.Species.FirstOrDefault(s => s.Id == pk.Species && s.Form == 0) : null;
                 _game.Message.Show("\\PN obtained " + name + "!" + (toParty ? "" : "\\n" + name + " was sent to the PC."), null, -1, _ =>

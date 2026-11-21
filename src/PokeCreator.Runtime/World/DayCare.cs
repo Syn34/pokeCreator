@@ -227,11 +227,11 @@ namespace PokeCreator.Runtime.World
                 g.PushScene(new UI.EggHatchScene(g, egg, close =>
                 {
                     Action finish = () => { close(); g.RestoreMapBgm(); };
-                    Action nickname = () => g.Message.Show("Would you like to nickname the newly hatched " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
+                    Action nickname = () => { if (g.Options != null && g.Options.NoNicknames) { finish(); return; } g.Message.Show("Would you like to nickname the newly hatched " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
                     {
                         if (c == 0) g.PushScene(new UI.NameEntryScene(g, name + "'s nickname?", "", 12, n => { if (!string.IsNullOrEmpty(n)) egg.Nickname = n; finish(); }));
                         else finish();
-                    });
+                    }); };
                     g.Message.Show(name + " hatched from the Egg!", null, -1, __ =>
                     {
                         if (entry == null) { nickname(); return; }

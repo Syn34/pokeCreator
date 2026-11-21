@@ -748,7 +748,7 @@ namespace PokeCreator.Runtime.UI
                     var entry = Game.Project.Species.FirstOrDefault(s => s.Id == pk.Species && s.Form == 0);
                     if (entry != null) steps.Add(next => Game.PushScene(new PokedexEntryScene(Game, new List<SpeciesData> { entry }, 0, _ => next()) { Registration = true }));
                 }
-                steps.Add(next => Game.Message.Show("Would you like to give a nickname to " + pk.Name(Game.Project) + "?", new List<string> { "Yes", "No" }, 1, c =>
+                if (!Game.Options.NoNicknames) steps.Add(next => Game.Message.Show("Would you like to give a nickname to " + pk.Name(Game.Project) + "?", new List<string> { "Yes", "No" }, 1, c =>
                 {
                     if (c == 0) { Game.AskName(pk.Name(Game.Project) + "'s nickname?", "", 12, n => pk.Nickname = n, null); }
                     next();

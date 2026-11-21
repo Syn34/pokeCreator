@@ -30,6 +30,8 @@ namespace PokeCreator.Runtime.UI
         public bool SendToBoxesManual { get; set; }
         /// <summary>Show "Super effective" / "Not very effective" in the battle move menu against Pokémon already seen.</summary>
         public bool MoveHints { get; set; }
+        /// <summary>Essentials' "Give Nicknames" option turned off: no nickname question for new Pokémon.</summary>
+        public bool NoNicknames { get; set; }
         /// <summary>Translation chosen by the player (a file in the project's Languages folder; "" = original).</summary>
         public string Language { get; set; }
         /// <summary>Window size: 0 = the game's default, 1-4 = times the game size, 5 = full screen.</summary>
@@ -779,8 +781,8 @@ namespace PokeCreator.Runtime.UI
             _menu = PlayerOptions.Frames(g, "choice"); _menu.Insert(0, "");
             _langs = PokeCreator.Projects.Localization.Available(g.Project); _langs.Insert(0, "");
             var labels = (_langs.Count > 1
-                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
-                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" }).ToList();
+                ? new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Give Nicknames", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Language", "Controls", "Close" }
+                : new[] { "Text Speed", "Music Volume", "Sound Volume", "Battle Effects", "Battle Style", "Send to Boxes", "Give Nicknames", "Move Hints", "Speech Frame", "Menu Frame", "Running Key", "Screen Size", "Controls", "Close" }).ToList();
             if (g.Project.Settings.FollowingPokemon) labels.Insert(labels.IndexOf("Speech Frame"), "Following Pokémon");
             Labels = labels.ToArray();
         }
@@ -802,6 +804,7 @@ namespace PokeCreator.Runtime.UI
                 case "Sound Volume": return _o.SeVolume + "%";
                 case "Battle Effects": return _o.BattleEffects ? "On" : "Off";
                 case "Battle Style": return _o.BattleStyleSet ? "Set" : "Switch";
+                case "Give Nicknames": return _o.NoNicknames ? "Don't Give" : "Give";
                 case "Send to Boxes": return _o.SendToBoxesManual ? "Manual" : "Automatic";
                 case "Move Hints": return _o.MoveHints ? "On" : "Off";
                 case "Following Pokémon": return Game.State.Flags.Contains("following_pokemon_off") ? "Off" : "On";
@@ -831,6 +834,7 @@ namespace PokeCreator.Runtime.UI
                     case "Battle Style": _o.BattleStyleSet = !_o.BattleStyleSet; break;
                     case "Send to Boxes": _o.SendToBoxesManual = !_o.SendToBoxesManual; break;
                     case "Move Hints": _o.MoveHints = !_o.MoveHints; break;
+                    case "Give Nicknames": _o.NoNicknames = !_o.NoNicknames; break;
                     case "Following Pokémon": if (Game.State.Flags.Contains("following_pokemon_off")) Game.State.Flags.Remove("following_pokemon_off"); else Game.State.Flags.Add("following_pokemon_off"); break;
                     case "Speech Frame": _o.SpeechFrame = Cycle(_speech, _o.SpeechFrame, d); break;
                     case "Menu Frame": _o.MenuFrame = Cycle(_menu, _o.MenuFrame, d); break;
