@@ -381,7 +381,9 @@ namespace PokeCreator.Runtime.UI
             int fw;
             var tex = BattlerTexture(pk, side == 0, out fw);
             int h = tex != null ? tex.Height : 96;
-            bottom = SpriteBottom(pk, side == 0, bottom, tex, fw);
+            int sdx;
+            bottom = SpriteBottom(pk, side == 0, bottom, tex, fw, out sdx);
+            x += sdx;
             return new AnimBattler { Key = k, X = x, Y = bottom - h / 2.0, Tex = tex, FrameW = tex != null ? fw : 0, FrameH = h };
         }
 
@@ -1045,11 +1047,27 @@ namespace PokeCreator.Runtime.UI
         /// Where a battler sprite's bottom edge goes: opposing Pokémon stand with their feet on the base whatever empty
         /// space their picture has below them, raised by their altitude (pokemon_metrics) when they float or fly.
         /// </summary>
-        int SpriteBottom(Pokemon pk, bool back, int bottom, Texture tex, int fw)
+        int SpriteBottom(Pokemon pk, bool back, int bottom, Texture tex, int fw) { int dx; return SpriteBottom(pk, back, bottom, tex, fw, out dx); }
+
+        /// <summary>
+        /// With pokemon_metrics (Essentials' sprite offsets) the sprite goes where Essentials puts it: the base centre plus
+        /// twice the offset (the player's Pokémon sit 16 pixels lower, partly behind the message box). Without them,
+        /// opposing Pokémon are set down on the base.
+        /// </summary>
+        int SpriteBottom(Pokemon pk, bool back, int bottom, Texture tex, int fw, out int dx)
         {
-            if (back || tex == null) return bottom;
-            int pad = Game.Gfx.BottomPadding(tex, fw);
+            dx = 0;
+            if (tex == null) return bottom;
             var d = pk.Data(Game.Project);
+            var off = d == null ? null : back ? d.BackSprite : d.FrontSprite;
+            if (off != null && off.Count >= 2 && (off[0] != 0 || off[1] != 0))
+            {
+                dx = off[0] * 2;
+                if (back) return bottom + 16 + off[1] * 2;
+                return bottom - 24 + off[1] * 2 - d.FrontSpriteAltitude * 2;
+            }
+            if (back) return bottom;
+            int pad = Game.Gfx.BottomPadding(tex, fw);
             int altitude = d != null ? d.FrontSpriteAltitude : 0;
             return bottom - 14 + Math.Min(pad, tex.Height / 2) - altitude * 2;
         }
@@ -1058,7 +1076,19 @@ namespace PokeCreator.Runtime.UI
         {
             int fwUnused;
             var tex = BattlerTexture(pk, back, out fwUnused);
-            bottom = SpriteBottom(pk, back, bottom, tex, fwUnused);
+            if (!back && tex != null)
+            {
+                // A shadow on the ground under Pokémon that float (altitude in pokemon_metrics)
+                var d = pk.Data(Game.Project);
+                if (d != null && d.FrontSpriteAltitude > 0 && d.ShadowSize != 0)
+                {
+                    int sw = 18 + Math.Max(1, Math.Abs(d.ShadowSize)) * 10;
+                    Ellipse(g, cx + d.ShadowX * 2, bottom - 14, sw, 6, new Color(0, 0, 0, 70));
+                }
+            }
+            int sdx;
+            bottom = SpriteBottom(pk, back, bottom, tex, fwUnused, out sdx);
+            cx += sdx;
             if (tex == null)
             {
                 if (back) { Ui.PokemonFront(g, Game, pk, cx, bottom, 160); return; } // no back sprite: show the front one
