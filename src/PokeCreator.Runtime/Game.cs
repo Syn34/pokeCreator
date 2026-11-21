@@ -165,6 +165,7 @@ namespace PokeCreator.Runtime
                 Update();
                 Draw();
                 if (test != null) test.AfterDraw();
+                if (Input.KeyTrigger(Scancode.F8)) TakeScreenshot();
                 Gfx.Present();
                 FrameCount++;
                 // Frame limiter (vsync usually handles this)
@@ -339,6 +340,20 @@ namespace PokeCreator.Runtime
             var pr = Map.Data.Properties;
             if (pr.BicycleAlways && !Player.Surfing) Player.Cycling = true;
             else if (Player.Cycling && !World.FieldMoves.CanBike(this)) Player.Cycling = false;
+        }
+
+        /// <summary>F8 (as Essentials): saves the screen to Screenshots/ in the game folder.</summary>
+        void TakeScreenshot()
+        {
+            try
+            {
+                string dir = System.IO.Path.Combine(Project.Root, "Screenshots");
+                System.IO.Directory.CreateDirectory(dir);
+                string file = System.IO.Path.Combine(dir, "Screenshot_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".png");
+                Gfx.SaveScreenshot(file);
+                Audio.PlaySe("Pkmn exp full");
+            }
+            catch (Exception ex) { Console.WriteLine("Screenshot failed: " + ex.Message); }
         }
 
         /// <summary>F12 (as Essentials): drop the current game without saving and go back to the title screen.</summary>
