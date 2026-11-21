@@ -73,6 +73,9 @@ namespace PokeCreator.Runtime.World
         public string PlayerName, Location;
         public long PlayFrames;
         public int PartyCount;
+        public List<Pokemon> Party = new List<Pokemon>();
+        public int Badges, Caught;
+        public bool HasPokedex;
     }
 
     /// <summary>
@@ -98,7 +101,13 @@ namespace PokeCreator.Runtime.World
             {
                 if (!Exists(p)) return null;
                 var d = Json.Json.FromFile<SaveData>(FilePath(p));
-                return new SaveSummary { PlayerName = d.PlayerName, Location = d.Location, PlayFrames = d.PlayFrames, PartyCount = d.Party.Count };
+                return new SaveSummary
+                {
+                    PlayerName = d.PlayerName, Location = d.Location, PlayFrames = d.PlayFrames, PartyCount = d.Party.Count,
+                    Party = d.Party ?? new List<Pokemon>(), Badges = d.Badges != null ? d.Badges.Count : 0,
+                    Caught = d.Caught != null ? d.Caught.Count : 0,
+                    HasPokedex = d.Flags != null && d.Flags.Contains("has_pokedex")
+                };
             }
             catch { return null; }
         }

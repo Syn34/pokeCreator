@@ -91,12 +91,22 @@ namespace PokeCreator.Runtime.UI
                 _menu.Draw(g, g.Width / 2 - w / 2, g.Height - h - 24);
                 if (_save != null && _menu.Items[_menu.Index] == "Continue")
                 {
-                    int bx = 16, by = 16, bw = g.Width - 32, bh = 104;
+                    // Essentials' load panel: name, badges, Pokédex, time; the party; where the game was saved
+                    int bx = 16, by = 8, bw = g.Width - 32, bh = 132;
                     Ui.Box(g, bx, by, bw, bh);
-                    Ui.Text(g, bx + 20, by + 14, _save.PlayerName);
-                    Ui.TextRight(g, bx + bw - 20, by + 14, "Time  " + Ui.PlayTime(_save.PlayFrames));
-                    Ui.Text(g, bx + 20, by + 50, _save.Location);
-                    Ui.TextRight(g, bx + bw - 20, by + 50, "Pokémon  " + _save.PartyCount);
+                    Ui.Text(g, bx + 20, by + 12, _save.PlayerName);
+                    Ui.TextRight(g, bx + bw - 20, by + 12, Ui.PlayTime(_save.PlayFrames));
+                    Ui.Text(g, bx + 20, by + 42, "Badges");
+                    Ui.TextRight(g, bx + bw / 2 - 12, by + 42, _save.Badges.ToString());
+                    if (_save.HasPokedex)
+                    {
+                        Ui.Text(g, bx + bw / 2 + 12, by + 42, "Pokédex");
+                        Ui.TextRight(g, bx + bw - 20, by + 42, _save.Caught.ToString());
+                    }
+                    for (int i = 0; i < _save.Party.Count && i < 6; i++)
+                        Ui.PokemonIcon(g, Game, _save.Party[i], bx + 16 + i * ((bw - 32) / 6), by + 68, Frame);
+                    Ui.Box(g, bx, by + bh + 4, bw, 56);
+                    Ui.Text(g, bx + 20, by + bh + 16, _save.Location ?? "");
                 }
             }
             if (_fade > 0) g.FillRect(0, 0, g.Width, g.Height, new Color(0, 0, 0, (byte)Math.Min(255, _fade)));
