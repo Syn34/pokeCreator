@@ -314,7 +314,12 @@ namespace PokeCreator.Runtime.Script
                         return true;
                     }
                 case 233: _game.Pictures.Get(c.IntParam(0)).RotateSpeed = c.IntParam(1); return true;
-                case 234: return true; // picture tone: not drawn yet
+                case 234: // Change Picture Tone: number, tone, duration
+                    {
+                        var tone = c.Params.Count > 1 ? ToneValues(c.Params[1]) : null;
+                        if (tone != null) _game.Pictures.Get(c.IntParam(0)).SetTone(tone, c.IntParam(2) * 3 / 2);
+                        return true;
+                    }
                 case 235: _game.Pictures.Erase(c.IntParam(0)); return true;
                 case 103:
                     {
@@ -366,6 +371,17 @@ namespace PokeCreator.Runtime.Script
         }
 
         bool _resumeBattleCondition;
+
+        /// <summary>An RPG Maker Tone parameter ({"_class":"Tone","Values":[r,g,b,gray]}) as numbers.</summary>
+        static double[] ToneValues(object p)
+        {
+            var jo = p as JsonObject;
+            var vals = jo != null ? jo.GetArray("Values") : p as List<object>;
+            if (vals == null) return null;
+            var r = new double[4];
+            for (int i = 0; i < 4 && i < vals.Count; i++) r[i] = Convert.ToDouble(vals[i], System.Globalization.CultureInfo.InvariantCulture);
+            return r;
+        }
 
         bool BattleBranch(EventCommand c)
         {

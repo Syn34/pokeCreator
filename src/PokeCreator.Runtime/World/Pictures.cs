@@ -17,6 +17,17 @@ namespace PokeCreator.Runtime.World
         public double Angle, RotateSpeed;
         double _tx, _ty, _tzx, _tzy, _top;
         int _frames;
+        /// <summary>Change Picture Tone: red, green, blue (-255..255), gray (ignored), changing over a duration.</summary>
+        public double[] Tone = new double[4];
+        double[] _toneTarget = new double[4];
+        int _toneFrames;
+
+        public void SetTone(double[] tone, int frames)
+        {
+            for (int i = 0; i < 4 && i < tone.Length; i++) _toneTarget[i] = tone[i];
+            _toneFrames = Math.Max(0, frames);
+            if (_toneFrames == 0) Array.Copy(_toneTarget, Tone, 4);
+        }
 
         public void Show(string name, int origin, double x, double y, double zx, double zy, double opacity, int blend)
         {
@@ -44,6 +55,11 @@ namespace PokeCreator.Runtime.World
                 _frames--;
             }
             if (RotateSpeed != 0) Angle = (Angle + RotateSpeed / 2.0) % 360;
+            if (_toneFrames > 0)
+            {
+                for (int i = 0; i < 4; i++) Tone[i] = (Tone[i] * (_toneFrames - 1) + _toneTarget[i]) / _toneFrames;
+                _toneFrames--;
+            }
         }
 
         public void Draw(Gfx g, Game game)
@@ -51,10 +67,10 @@ namespace PokeCreator.Runtime.World
             if (string.IsNullOrEmpty(Name) || Opacity <= 0) return;
             var tex = g.Load(game.Project.FindAsset("Graphics/Pictures", Name));
             if (tex == null) return;
-            int w = (int)(tex.Width * ZoomX / 100), h = (int)(tex.Height * ZoomY / 100);
-            int x = (int)X, y = (int)Y;
-            if (Origin == 1) { x -= w / 2; y -= h / 2; }
-            g.Draw(tex, 0, 0, tex.Width, tex.Height, x, y, w, h, (int)Math.Min(255, Opacity));
+            double w = tex.Width * ZoomX / 100, h = tex.Height * ZoomY / 100;
+            // Centre point (rotation happens around it); origin 0 = X/Y is the top-left corner
+            double cx = Origin == 1 ? X : X + w / 2, cy = Origin == 1 ? Y : Y + h / 2;
+            g.DrawToned(tex, 0, 0, tex.Width, tex.Height, cx, cy, ZoomX / 100, ZoomY / 100, Angle, (int)Math.Min(255, Opacity), Blend, (int)Tone[0], (int)Tone[1], (int)Tone[2]);
         }
     }
 

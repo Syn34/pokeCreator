@@ -242,6 +242,37 @@ namespace PokeCreator.Runtime.Platform
             SDL.SDL_SetTextureBlendMode(t.Handle, 1);
         }
 
+        /// <summary>
+        /// Draws like DrawEx with an RPG Maker tone (red, green, blue -255..255): negative values darken that channel,
+        /// positive ones brighten it with an additive pass.
+        /// </summary>
+        public void DrawToned(Texture t, int sx, int sy, int sw, int sh, double cx, double cy, double zoomX, double zoomY, double angle, int opacity, int blend, int tr, int tg, int tb)
+        {
+            if (t == null) return;
+            if (tr == 0 && tg == 0 && tb == 0) { DrawEx(t, sx, sy, sw, sh, cx, cy, zoomX, zoomY, angle, false, opacity, blend); return; }
+            if (opacity <= 0 || zoomX == 0 || zoomY == 0) return;
+            int dw = (int)Math.Round(sw * Math.Abs(zoomX)), dh = (int)Math.Round(sh * Math.Abs(zoomY));
+            if (dw <= 0 || dh <= 0) return;
+            var src = new SDL_Rect(sx, sy, sw, sh);
+            var dst = new SDL_Rect((int)Math.Round(cx - dw / 2.0), (int)Math.Round(cy - dh / 2.0), dw, dh);
+            var center = new SDL_Point(dw / 2, dh / 2);
+            Func<int, byte> dark = v => (byte)Math.Max(0, Math.Min(255, 255 + Math.Min(0, v)));
+            Func<int, byte> light = v => (byte)Math.Max(0, Math.Min(255, v));
+            SDL.SDL_SetTextureBlendMode(t.Handle, blend == 1 ? 2 : 1);
+            SDL.SDL_SetTextureAlphaMod(t.Handle, (byte)Math.Max(0, Math.Min(255, opacity)));
+            SDL.SDL_SetTextureColorMod(t.Handle, dark(tr), dark(tg), dark(tb));
+            SDL.SDL_RenderCopyEx(Renderer, t.Handle, ref src, ref dst, -angle, ref center, 0);
+            if (tr > 0 || tg > 0 || tb > 0)
+            {
+                SDL.SDL_SetTextureBlendMode(t.Handle, 2);
+                SDL.SDL_SetTextureColorMod(t.Handle, light(tr), light(tg), light(tb));
+                SDL.SDL_RenderCopyEx(Renderer, t.Handle, ref src, ref dst, -angle, ref center, 0);
+            }
+            SDL.SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
+            SDL.SDL_SetTextureAlphaMod(t.Handle, 255);
+            SDL.SDL_SetTextureBlendMode(t.Handle, 1);
+        }
+
         public void DrawTinted(Texture t, int sx, int sy, int sw, int sh, int dx, int dy, Color tint)
         {
             if (t == null) return;
