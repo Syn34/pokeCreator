@@ -332,7 +332,7 @@ namespace PokeCreator.Runtime.World
         public static void StopRiding(Game g) { g.Player.Cycling = false; g.Player.Surfing = false; g.Player.Diving = false; }
 
         // ------------------------------------------------------------------ field moves from the party screen
-        public static readonly string[] PartyMoves = { "CUT", "FLY", "SURF", "STRENGTH", "ROCKSMASH", "HEADBUTT", "FLASH", "WATERFALL", "DIVE", "TELEPORT", "DIG", "SWEETSCENT" };
+        public static readonly string[] PartyMoves = { "CUT", "FLY", "SURF", "STRENGTH", "ROCKSMASH", "HEADBUTT", "FLASH", "WATERFALL", "DIVE", "TELEPORT", "DIG", "SWEETSCENT", "SOFTBOILED", "MILKDRINK" };
 
         public static List<string> FieldMovesOf(Pokemon pk)
         {
@@ -348,6 +348,26 @@ namespace PokeCreator.Runtime.World
             return g.Map.EventsAt(fx, fy).FirstOrDefault(e => e.Name != null && e.Name.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0 && e.CharacterName.Length > 0);
         }
 
+        /// <summary>Soft-Boiled / Milk Drink from the party screen: gives a fifth of the user's max HP to another Pokémon.</summary>
+        static void ShareHp(Game g, Pokemon pk, string move)
+        {
+            string name = pk.Name(g.Project), mname = g.Project.Moves.Where(m => m.Id == move).Select(m => m.Name).FirstOrDefault() ?? move;
+            int share = pk.TotalHP(g.Project) / 5;
+            if (pk.HP <= share) { g.Message.Show("Not enough HP..."); return; }
+            g.PushScene(new UI.PartyScene(g, "Use on which Pokémon?", null, (i, close) =>
+            {
+                var t = g.State.Party[i];
+                if (t == pk) { g.Message.Show(name + " can't use " + mname + " on itself."); return; }
+                if (t.IsEgg) { g.Message.Show(mname + " can't be used on an Egg!"); return; }
+                int max = t.TotalHP(g.Project);
+                if (t.HP <= 0 || t.HP >= max) { g.Message.Show(mname + " can't be used on that Pokémon."); return; }
+                int amt = Math.Min(share, max - t.HP);
+                pk.HP -= amt; t.HP += amt;
+                close();
+                g.Message.Show(t.Name(g.Project) + "'s HP was restored by " + amt + " points.");
+            }, null));
+        }
+
         /// <summary>Using a field move from the party screen (as Essentials' HiddenMoveHandlers).</summary>
         public static void UseFromParty(Game g, Pokemon pk, string move)
         {
@@ -358,6 +378,7 @@ namespace PokeCreator.Runtime.World
                 case "TELEPORT": Teleport(g, pk); return;
                 case "DIG": Escape(g, name + " used Dig!"); return;
                 case "SWEETSCENT": SweetScent(g, pk); return;
+                case "SOFTBOILED": case "MILKDRINK": ShareHp(g, pk, move); return;
                 case "FLASH": Flash(g, pk); return;
                 case "DIVE": g.CloseAllScenes(); if (!TryDive(g)) g.Message.Show("Can't use that here."); return;
                 case "WATERFALL":
