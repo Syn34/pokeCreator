@@ -162,7 +162,8 @@ namespace PokeCreator.Runtime.World
         public static readonly string[] Rods = { "OLDROD", "GOODROD", "SUPERROD" };
         /// <summary>Key items used straight from the Bag (besides rods).</summary>
         public static readonly string[] DirectKeyItems = { "BICYCLE", "MACHBIKE", "ACROBIKE", "TOWNMAP", "ESCAPEROPE", "ITEMFINDER", "POKERADAR", "DOWSINGMACHINE", "DOWSINGMCHN", "SPRAYDUCK", "SQUIRTBOTTLE", "WAILMERPAIL", "SPRINKLOTAD",
-            "GRACIDEA", "REVEALGLASS", "PRISONBOTTLE", "ROTOMCATALOG", "DNASPLICERS", "NSOLARIZER", "NLUNARIZER", "REINSOFUNITY", "REDNECTAR", "YELLOWNECTAR", "PINKNECTAR", "PURPLENECTAR", "COINCASE", "POKEMONBOXLINK", "HONEY" };
+            "GRACIDEA", "REVEALGLASS", "PRISONBOTTLE", "ROTOMCATALOG", "DNASPLICERS", "NSOLARIZER", "NLUNARIZER", "REINSOFUNITY", "REDNECTAR", "YELLOWNECTAR", "PINKNECTAR", "PURPLENECTAR", "COINCASE", "POKEMONBOXLINK", "HONEY",
+            "DNASPLICERSUSED", "NSOLARIZERUSED", "NLUNARIZERUSED", "REINSOFUNITYUSED", "SCROLLOFDARKNESS", "SCROLLOFWATERS", "LINKINGCORD" };
 
         /// <summary>
         /// Itemfinder / Dowsing Machine (as in Essentials): looks for the nearest event named "HiddenItem" that still has

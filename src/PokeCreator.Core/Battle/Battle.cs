@@ -1993,7 +1993,7 @@ namespace PokeCreator.Battles
         public static bool IsBattlerItem(string id)
         {
             return XItemStat(id) >= 0 || id == "DIREHIT" || id == "DIREHIT2" || id == "DIREHIT3" || id == "GUARDSPEC" || id == "YELLOWFLUTE" || id == "REDFLUTE"
-                || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY" || id == "POKEFLUTE";
+                || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY" || id == "POKEFLUTE" || id == "MAXMUSHROOMS" || id == "PERSIMBERRY";
         }
         /// <summary>Items used on the whole side or the battle, not on a chosen Pokémon.</summary>
         public static bool IsDirectBattleItem(string id) { return id == "GUARDSPEC" || id == "POKEDOLL" || id == "FLUFFYTAIL" || id == "POKETOY" || id == "POKEFLUTE"; }
@@ -2073,7 +2073,14 @@ namespace PokeCreator.Battles
                 Say(Name(b) + " is getting pumped!");
                 return;
             }
-            if (id == "YELLOWFLUTE") { if (b.Confusion <= 0) { Say("But it had no effect!"); return; } b.Confusion = 0; Say(Name(b) + " snapped out of its confusion!"); return; }
+            if (id == "MAXMUSHROOMS")
+            {
+                var all = new[] { PokeCreator.Pkmn.Stat.Attack, PokeCreator.Pkmn.Stat.Defense, PokeCreator.Pkmn.Stat.SpAtk, PokeCreator.Pkmn.Stat.SpDef, PokeCreator.Pkmn.Stat.Speed };
+                if (all.All(s => b.Stages[s] >= 6)) { Say("But it had no effect!"); return; }
+                foreach (int s in all) ChangeStat(b, s, 1, b);
+                return;
+            }
+            if (id == "YELLOWFLUTE" || id == "PERSIMBERRY") { if (b.Confusion <= 0) { Say("But it had no effect!"); return; } b.Confusion = 0; Say(Name(b) + " snapped out of its confusion!"); return; }
             if (id == "REDFLUTE") { if (b.AttractedTo == null) { Say("But it had no effect!"); return; } b.AttractedTo = null; Say(Name(b) + " got over its infatuation!"); return; }
         }
 

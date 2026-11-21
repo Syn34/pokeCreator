@@ -81,7 +81,7 @@ namespace PokeCreator.Pkmn
             else if (id == "FULLRESTORE") info.Kind = ItemKind.FullRestore;
             else if (StatusItems.TryGetValue(id, out s)) { info.Kind = ItemKind.CureStatus; info.Cures = s; }
             else if (id == "REVIVE") { info.Kind = ItemKind.Revive; info.Amount = 50; }
-            else if (id == "MAXREVIVE" || id == "REVIVALHERB") { info.Kind = ItemKind.Revive; info.Amount = 100; }
+            else if (id == "MAXREVIVE" || id == "REVIVALHERB" || id == "MAXHONEY") { info.Kind = ItemKind.Revive; info.Amount = 100; }
             else if (id == "ETHER" || id == "LEPPABERRY") { info.Kind = ItemKind.RestorePP; info.Amount = 10; }
             else if (id == "MAXETHER") { info.Kind = ItemKind.RestorePP; info.Amount = 999; }
             else if (id == "ELIXIR") { info.Kind = ItemKind.RestorePP; info.Amount = 10; info.AllMoves = true; }

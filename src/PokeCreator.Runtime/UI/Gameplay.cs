@@ -118,6 +118,8 @@ namespace PokeCreator.Runtime.UI
                 case "POKEMONBOXLINK": g.PushScene(new StorageScene(g, StorageScene.Mode.Organize)); return;
                 case "GRACIDEA": case "REVEALGLASS": case "PRISONBOTTLE": case "ROTOMCATALOG": case "DNASPLICERS": case "NSOLARIZER": case "NLUNARIZER": case "REINSOFUNITY":
                 case "REDNECTAR": case "YELLOWNECTAR": case "PINKNECTAR": case "PURPLENECTAR":
+                case "DNASPLICERSUSED": case "NSOLARIZERUSED": case "NLUNARIZERUSED": case "REINSOFUNITYUSED":
+                case "SCROLLOFDARKNESS": case "SCROLLOFWATERS": case "LINKINGCORD":
                     g.PushScene(new PartyScene(g, "Use on which Pokémon?", null, (i, close) => { close(); FormItems.Use(g, itemId, g.State.Party[i], refresh); }, null));
                     return;
                 case "WHITEFLUTE": case "BLACKFLUTE":
@@ -1205,10 +1207,27 @@ namespace PokeCreator.Runtime.UI
                         });
                         return;
                     }
-                case "DNASPLICERS": Fuse(g, pk, "KYUREM", new[] { "RESHIRAM", "ZEKROM" }, done); return;
-                case "NSOLARIZER": Fuse(g, pk, "NECROZMA", new[] { "SOLGALEO" }, done); return;
-                case "NLUNARIZER": Fuse(g, pk, "NECROZMA", new[] { null, "LUNALA" }, done); return;
-                case "REINSOFUNITY": Fuse(g, pk, "CALYREX", new[] { "GLASTRIER", "SPECTRIER" }, done); return;
+                case "DNASPLICERS": case "DNASPLICERSUSED": Fuse(g, pk, "KYUREM", new[] { "RESHIRAM", "ZEKROM" }, done); return;
+                case "NSOLARIZER": case "NSOLARIZERUSED": Fuse(g, pk, "NECROZMA", new[] { "SOLGALEO" }, done); return;
+                case "NLUNARIZER": case "NLUNARIZERUSED": Fuse(g, pk, "NECROZMA", new[] { null, "LUNALA" }, done); return;
+                case "REINSOFUNITY": case "REINSOFUNITYUSED": Fuse(g, pk, "CALYREX", new[] { "GLASTRIER", "SPECTRIER" }, done); return;
+                case "SCROLLOFDARKNESS": case "SCROLLOFWATERS":
+                    {
+                        // Kubfu becomes Single Strike (Darkness) or Rapid Strike (Waters) Urshifu
+                        if (pk.Species != "KUBFU" || !p.Species.Any(s => s.Id == "URSHIFU")) { NoEffect(g, done); return; }
+                        int form = item == "SCROLLOFWATERS" && p.Species.Any(s => s.Id == "URSHIFU_1") ? 1 : 0;
+                        g.PushScene(new EvolutionScene(g, pk, "URSHIFU", true, () => { if (pk.Species == "URSHIFU") pk.Form = form; if (done != null) done(); }));
+                        return;
+                    }
+                case "LINKINGCORD":
+                    {
+                        // Evolves Pokémon that evolve by trading, without a trade
+                        string to = Growth.CheckTradeEvolution(p, pk, null);
+                        if (to == null) { NoEffect(g, done); return; }
+                        g.State.AddItem(item, -1);
+                        g.PushScene(new EvolutionScene(g, pk, to, false, () => { if (done != null) done(); }));
+                        return;
+                    }
             }
             NoEffect(g, done);
         }
