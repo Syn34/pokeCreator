@@ -167,12 +167,22 @@ namespace PokeCreator.Runtime.World
         /// <summary>F5: use the registered key item (or choose between several).</summary>
         void UseRegisteredItem()
         {
+            // The Ready menu (as Essentials): registered items, then the party's field moves
             var reg = (Game.State.Extras.Registered ?? new List<string>()).Where(id => Game.State.ItemCount(id) > 0).ToList();
-            if (reg.Count == 0) { Game.Message.Show("An item in the Bag can be registered to this key for instant use."); return; }
-            if (reg.Count == 1) { PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[0], null); return; }
+            var moves = new List<KeyValuePair<string, PokeCreator.Pkmn.Pokemon>>();
+            foreach (var pk in Game.State.Party.Where(p => !p.IsEgg))
+                foreach (var m in FieldMoves.FieldMovesOf(pk))
+                    if (!moves.Any(x => x.Key == m) && (m == "FLY" || m == "FLASH" || m == "DIG" || m == "TELEPORT" || m == "SWEETSCENT" || m == "SURF" || m == "DIVE")) moves.Add(new KeyValuePair<string, PokeCreator.Pkmn.Pokemon>(m, pk));
+            if (reg.Count == 0 && moves.Count == 0) { Game.Message.Show("An item in the Bag can be registered to this key for instant use."); return; }
+            if (reg.Count == 1 && moves.Count == 0) { PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[0], null); return; }
             var names = reg.Select(id => { var it = Game.Project.Items.FirstOrDefault(i => i.Id == id); return it != null ? it.Name : id; }).ToList();
+            names.AddRange(moves.Select(m => PokeCreator.Pkmn.ItemEffects.MoveName(Game.Project, m.Key) + " (" + m.Value.Name(Game.Project) + ")"));
             names.Add("Cancel");
-            Game.Message.Show("Use which item?", names, names.Count - 1, k => { if (k >= 0 && k < reg.Count) PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[k], null); });
+            Game.Message.Show("Use what?", names, names.Count - 1, k =>
+            {
+                if (k >= 0 && k < reg.Count) PokeCreator.Runtime.UI.ItemFlow.UseFromBag(Game, reg[k], null);
+                else if (k >= reg.Count && k < reg.Count + moves.Count) { var m = moves[k - reg.Count]; FieldMoves.UseFromParty(Game, m.Value, m.Key); }
+            });
         }
         /// <summary>Underwater after Dive.</summary>
         public bool Diving;
