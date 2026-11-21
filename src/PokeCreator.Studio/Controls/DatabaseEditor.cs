@@ -72,7 +72,7 @@ namespace PokeCreator.Studio.Controls
                 if (_images.HasAnimatedKinds)
                 {
                     _useAnimated.Checked = p.Settings.UseAnimatedSprites;
-                    new ToolTip().SetToolTip(_useAnimated, "Ticked: the game shows animated sprites (Graphics/Pokemon/Animated) and Pokémon without them are listed as missing details.\nUnticked: animated sprites aren't used or checked for.");
+                    new ToolTip().SetToolTip(_useAnimated, "Ticked: the game shows animated sprites (Graphics/Pokemon/Animated); missing details look only at the animated sprites (and icons), not the still ones.\nUnticked: animated sprites aren't used or checked for; missing details look at the still sprites.");
                     _useAnimated.CheckedChanged += (s, e) =>
                     {
                         p.Settings.UseAnimatedSprites = _useAnimated.Checked;
@@ -183,7 +183,7 @@ namespace PokeCreator.Studio.Controls
         void UpdateLegend()
         {
             var all = Items.Cast<GameRecord>().ToList();
-            var parts = _images.Active.Select(k => new { k.Label, Count = all.Count(r => !_images.Has(r, k)) }).ToList();
+            var parts = _images.Active.Select(k => new { Label = k.Label.Replace("Animated ", "Anim. "), Count = all.Count(r => !_images.Has(r, k)) }).ToList();
             if (parts.All(p => p.Count == 0)) { _legend.Text = "Nothing missing: every entry has all its images."; _legend.ForeColor = Color.SeaGreen; return; }
             _legend.ForeColor = Color.IndianRed;
             if (parts.Count == 1) { _legend.Text = "Missing images: " + parts[0].Count + " of " + all.Count; return; }
@@ -191,7 +191,7 @@ namespace PokeCreator.Studio.Controls
             var lines = new List<string> { "Missing images (" + all.Count(r => _images.MissingAny(r)) + " entries):" };
             lines.Add(string.Join("  ·  ", parts.Take(3).Select(p => p.Label + " " + p.Count)));
             if (parts.Count > 3) lines.Add(string.Join("  ·  ", parts.Skip(3).Take(2).Select(p => p.Label + " " + p.Count)));
-            for (int i = 5; i < parts.Count; i += 2) lines.Add(string.Join("  ·  ", parts.Skip(i).Take(2).Select(p => p.Label.Replace("Animated ", "Anim. ") + " " + p.Count)));
+            for (int i = 5; i < parts.Count; i += 2) lines.Add(string.Join("  ·  ", parts.Skip(i).Take(2).Select(p => p.Label + " " + p.Count)));
             _legend.Text = string.Join("\n", lines);
         }
 

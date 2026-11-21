@@ -26,8 +26,10 @@ namespace PokeCreator.Studio.Controls
             public string Prefix = "";
             /// <summary>A 4×4 character sheet (overworld sprite): the pane shows the four facing directions.</summary>
             public bool Charset;
-            /// <summary>An animated sprite (Gen 5 style strip): only checked for when the game uses animated sprites.</summary>
+            /// <summary>An animated sprite (strip of pictures): only checked for when the game uses animated sprites.</summary>
             public bool Animated;
+            /// <summary>A still battle sprite (front, back, shiny): not checked for when the game uses animated sprites instead.</summary>
+            public bool Still;
             public Kind(string label, string folder) { Label = label; Folder = folder; }
             public override string ToString() { return Label; }
         }
@@ -45,8 +47,8 @@ namespace PokeCreator.Studio.Controls
         {
             if (recordType == typeof(SpeciesData))
                 return new RecordImages(p, recordType, new[] {
-                    new Kind("Front", "Graphics/Pokemon/Front"), new Kind("Back", "Graphics/Pokemon/Back"),
-                    new Kind("Front shiny", "Graphics/Pokemon/Front shiny"), new Kind("Back shiny", "Graphics/Pokemon/Back shiny"),
+                    new Kind("Front", "Graphics/Pokemon/Front") { Still = true }, new Kind("Back", "Graphics/Pokemon/Back") { Still = true },
+                    new Kind("Front shiny", "Graphics/Pokemon/Front shiny") { Still = true }, new Kind("Back shiny", "Graphics/Pokemon/Back shiny") { Still = true },
                     new Kind("Icon", "Graphics/Pokemon/Icons"),
                     new Kind("Animated front", "Graphics/Pokemon/Animated/Front") { Animated = true },
                     new Kind("Animated back", "Graphics/Pokemon/Animated/Back") { Animated = true },
@@ -61,8 +63,12 @@ namespace PokeCreator.Studio.Controls
             return null;
         }
 
-        /// <summary>The kinds that count as missing: animated sprites only when the game uses them (Game Settings → Using animated sprites).</summary>
-        public Kind[] Active { get { return Kinds.Where(k => !k.Animated || _p.Settings.UseAnimatedSprites).ToArray(); } }
+        /// <summary>
+        /// The kinds that count as missing. With "Using animated sprites" the animated sprites (and icons) count and the still
+        /// battle sprites don't; without it, the still sprites count and the animated ones don't.
+        /// </summary>
+        public Kind[] Active { get { bool anim = _p.Settings.UseAnimatedSprites; return Kinds.Where(k => anim ? !k.Still : !k.Animated).ToArray(); } }
+        public bool IsActive(Kind k) { return Active.Contains(k); }
         public bool HasAnimatedKinds { get { return Kinds.Any(k => k.Animated); } }
         public bool UsingAnimated { get { return _p.Settings.UseAnimatedSprites; } }
         public int AnimatedSpeed { get { return _p.Settings.AnimatedSpriteSpeed > 0 ? _p.Settings.AnimatedSpriteSpeed : 3; } }
@@ -278,7 +284,7 @@ namespace PokeCreator.Studio.Controls
             _others.Height = _small.Count == 0 ? 0 : _small.Sum(b => b.Charset ? 140 : 0) + ((_small.Count(b => !b.Charset) + 1) / 2) * 122 + 4;
             if (_images.HasAnimatedKinds)
             {
-                var group = new GroupBox { Text = "Animated sprites (Gen 5)", Dock = DockStyle.Top, Padding = new Padding(4) };
+                var group = new GroupBox { Text = "Animated sprites", Dock = DockStyle.Top, Padding = new Padding(4) };
                 var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(2, 0, 0, 0) };
                 foreach (var k in _images.Kinds.Where(x => x.Animated))
                 {
@@ -320,14 +326,15 @@ namespace PokeCreator.Studio.Controls
         public void Show(GameRecord r)
         {
             _record = r;
-            _main.SetImage(r == null ? null : _images.PathOf(r, _images.Main), _images.Main.Label, r != null && !_images.HasMain(r));
+            bool mainNeeded = _images.IsActive(_images.Main);
+            _main.SetImage(r == null ? null : _images.PathOf(r, _images.Main), _images.Main.Label, r != null && mainNeeded && !_images.HasMain(r));
             bool has = r != null && _images.HasMain(r);
-            _caption.Text = r == null ? "" : has ? RecordImages.FileKey(r, _images.Main) + ".png" : "No " + _images.Main.Label.ToLowerInvariant() + " image";
-            _caption.ForeColor = has ? (Theme.Dark ? Color.Gainsboro : Color.DimGray) : Color.IndianRed;
+            _caption.Text = r == null ? "" : has ? RecordImages.FileKey(r, _images.Main) + ".png" : "No " + _images.Main.Label.ToLowerInvariant() + " image" + (mainNeeded ? "" : " (not needed)");
+            _caption.ForeColor = has || !mainNeeded ? (Theme.Dark ? Color.Gainsboro : Color.DimGray) : Color.IndianRed;
             for (int i = 0; i < _small.Count; i++)
             {
                 var k = _smallKinds[i];
-                _small[i].SetImage(r == null ? null : _images.PathOf(r, k), k.Charset && r != null ? k.Label + "\n" + RecordImages.FileKey(r, k) + ".png" : k.Label, r != null && !_images.Has(r, k));
+                _small[i].SetImage(r == null ? null : _images.PathOf(r, k), k.Charset && r != null ? k.Label + "\n" + RecordImages.FileKey(r, k) + ".png" : k.Label, r != null && _images.IsActive(k) && !_images.Has(r, k));
             }
             // Animated sprites only count as missing when the game uses them
             for (int i = 0; i < _anim.Count; i++)
@@ -335,7 +342,7 @@ namespace PokeCreator.Studio.Controls
                 var k = _animKinds[i];
                 _anim[i].SetImage(r == null ? null : _images.PathOf(r, k), k.Label.Replace("Animated ", ""), r != null && _images.UsingAnimated && !_images.Has(r, k));
             }
-            _animNote.Text = _images.UsingAnimated ? "Graphics/Pokemon/Animated: GIFs become strips; Gen 5 sizes are doubled."
+            _animNote.Text = _images.UsingAnimated ? "Checked for instead of the still sprites. GIFs become strips; small sprites are doubled."
                                                    : "Not checked: tick \"Using animated sprites\" to use and check for them.";
         }
 
