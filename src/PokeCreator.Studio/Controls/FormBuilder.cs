@@ -315,6 +315,7 @@ namespace PokeCreator.Studio.Controls
         void Pull()
         {
             if (_filling) return;
+            string before = Json.Json.Write(_list, false);
             _list.Clear();
             foreach (DataGridViewRow row in _grid.Rows)
             {
@@ -329,7 +330,8 @@ namespace PokeCreator.Studio.Controls
                 }
                 if (any) _list.Add(obj);
             }
-            if (Changed != null) Changed();
+            // (some grids report a row deleted when they're only rebuilt: nothing changed then)
+            if (Json.Json.Write(_list, false) != before && Changed != null) Changed();
         }
 
         static object FromCell(string s, Type t)
