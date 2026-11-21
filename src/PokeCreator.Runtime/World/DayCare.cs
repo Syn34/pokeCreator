@@ -140,6 +140,14 @@ namespace PokeCreator.Runtime.World
                         egg.Moves.Add(new PokemonMove { Id = m, PP = md.TotalPP });
                     }
             egg.Ball = mother.Ball ?? "POKEBALL";
+            if (egg.Ball == "MASTERBALL" || egg.Ball == "CHERISHBALL") egg.Ball = "POKEBALL";
+            // Regional and other inheritable forms come from the mother (the other parent with Ditto)
+            if (mother.Form > 0 && g.Project.Species.Any(s => s.Id == egg.Species + "_" + mother.Form)) egg.Form = mother.Form;
+            // Abilities: a hidden ability passes on 60% of the time, otherwise the same ability slot 80% of the time
+            var md = mother.Data(g.Project); var ed = egg.Data(g.Project);
+            bool hidden = md != null && !string.IsNullOrEmpty(mother.Ability) && md.HiddenAbilities != null && md.HiddenAbilities.Contains(mother.Ability);
+            if (hidden && ed != null && ed.HiddenAbilities != null && ed.HiddenAbilities.Count > 0 && g.Rng.Next(100) < 60) egg.Ability = ed.HiddenAbilities[g.Rng.Next(ed.HiddenAbilities.Count)];
+            else if (!hidden && g.Rng.Next(100) < 80) egg.AbilityIndex = mother.AbilityIndex;
             EncounterModifiers.ShinyCharm(g, egg);
             egg.IsEgg = true;
             egg.EggSteps = data != null && data.HatchSteps > 1 ? data.HatchSteps : 5120;
