@@ -1137,3 +1137,32 @@ namespace PokeCreator.Runtime.UI
         }
     }
 }
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>"Oh! A bite!": press Action within about a second to hook the Pokémon.</summary>
+    public class HookScene : Scene
+    {
+        readonly Action<bool> _done;
+        int _t;
+        const int Window = 50;
+        public HookScene(Game g, Action<bool> done) : base(g) { Opaque = false; _done = done; }
+
+        protected override void Update()
+        {
+            _t++;
+            if (_t > 4 && Input.Trigger(Button.Action)) { Close(); _done(true); return; }
+            if (_t > Window) { Close(); _done(false); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            string s = "Oh! A bite!";
+            int w = g.TextWidth(s) + 40, h = 56, x = (g.Width - w) / 2, y = g.Height - h - 24;
+            Ui.Box(g, x, y, w, h);
+            Ui.Text(g, x + 20, y + 12, s);
+            // The "!" above the player's head
+            if (Game.Player != null) Game.Exclaim(Game.Player, 2);
+        }
+    }
+}

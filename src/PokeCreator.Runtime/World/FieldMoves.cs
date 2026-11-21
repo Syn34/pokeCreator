@@ -218,7 +218,13 @@ namespace PokeCreator.Runtime.World
                 bool hasTable = g.Project.Encounters.Any(en => en.Map == g.Map.Id && en.Methods.Any(m => m.Type == method && m.Slots.Count > 0));
                 if (!hasTable || g.Rng.Next(100) >= bite) { g.Message.Show("Not even a nibble..."); return; }
                 g.Audio.PlaySe("Exclaim");
-                g.Message.Show("Oh! A bite!", null, -1, __ => EncounterFrom(g, new[] { method }));
+                // The player has to react in time (as Essentials, unless fishing hooks by itself)
+                if (g.Project.Settings.FishingAutoHook) { g.Message.Show("Oh! A bite!", null, -1, __ => EncounterFrom(g, new[] { method })); return; }
+                g.PushScene(new UI.HookScene(g, hooked =>
+                {
+                    if (hooked) g.Message.Show("Landed a Pokémon!", null, -1, __ => EncounterFrom(g, new[] { method }));
+                    else g.Message.Show("The Pokémon got away...");
+                }));
             });
         }
 
