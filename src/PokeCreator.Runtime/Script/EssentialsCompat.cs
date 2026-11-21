@@ -454,6 +454,7 @@ namespace PokeCreator.Runtime.Script
             for (int cut = dot; cut > 0; cut = name.LastIndexOf('.', cut - 1))
             {
                 if (!_commands.TryGetValue(name.Substring(0, cut), out h)) continue;
+                { string pre = name.Substring(0, cut); if (pre == "$player" || pre == "$Trainer") continue; } // bare $player is only an argument
                 var parts = name.Substring(cut + 1).Split('.');
                 Handler direct;
                 object obj = h(ctx, new List<object>());
@@ -484,7 +485,12 @@ namespace PokeCreator.Runtime.Script
             var m = Regex.Match(lhs, @"^\$game_switches\[(.+)\]$");
             if (m.Success) { _game.State.SetSwitch(ToInt(Eval(m.Groups[1].Value, ctx)), Truthy(val)); _game.Map.RefreshEvents(); return; }
             m = Regex.Match(lhs, @"^\$game_variables\[(.+)\]$");
-            if (m.Success) { _game.State.SetVar(ToInt(Eval(m.Groups[1].Value, ctx)), ToInt(val)); _game.Map.RefreshEvents(); return; }
+            if (m.Success)
+            {
+                int vid = ToInt(Eval(m.Groups[1].Value, ctx));
+                if (val is string) _game.State.SetStr(vid, (string)val); else _game.State.SetVar(vid, ToInt(val));
+                _game.Map.RefreshEvents(); return;
+            }
             m = Regex.Match(lhs, @"^\$game_self_switches\[\[(.+)\]\]$");
             if (m.Success)
             {
@@ -553,7 +559,33 @@ namespace PokeCreator.Runtime.Script
             }
             if (lhs == "$PokemonGlobal.dungeon_area") { _game.State.Extras.DungeonArea = val == null ? null : Convert.ToString(val, CultureInfo.InvariantCulture); return; }
             if (lhs == "$PokemonGlobal.dungeon_version") { _game.State.Extras.DungeonVersion = ToInt(val); return; }
+            // Any other receiver: pbGetPokemon(1).name = x, $player.party[0].item = :ORANBERRY, pkmn.moves[0].pp = 5
+            var gm = Regex.Match(lhs, @"^(.+)\.(\w+)(?:\[(.+)\])?$");
+            if (gm.Success && Balanced(gm.Groups[1].Value) && (!gm.Groups[3].Success || Balanced(gm.Groups[3].Value)))
+            {
+                object recv = null;
+                try { recv = Eval(gm.Groups[1].Value, ctx); } catch { recv = null; }
+                if (recv != null && !(recv is Interpreter) && !(recv is IConvertible))
+                {
+                    SetMember(recv, gm.Groups[2].Value, gm.Groups[3].Success ? Eval(gm.Groups[3].Value, ctx) : null, val);
+                    return;
+                }
+            }
             WarnOnce("Can't assign to " + lhs);
+        }
+
+        /// <summary>True when every bracket and quote in the text is closed.</summary>
+        static bool Balanced(string s)
+        {
+            int depth = 0; bool q = false; char qc = '\0';
+            foreach (char ch in s)
+            {
+                if (q) { if (ch == qc) q = false; continue; }
+                if (ch == '"' || ch == '\'') { q = true; qc = ch; continue; }
+                if (ch == '(' || ch == '[' || ch == '{') depth++;
+                else if (ch == ')' || ch == ']' || ch == '}') { depth--; if (depth < 0) return false; }
+            }
+            return depth == 0 && !q;
         }
 
         void RememberMoved(GameEvent ch)
@@ -963,6 +995,9 @@ namespace PokeCreator.Runtime.Script
             Register("$player.pokemon_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg).ToList());
             Register("$player.able_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg && !p.Fainted).ToList());
             Register("$player.party", (c, a) => _game.State.Party);
+            // $player passed as an argument (pkmn.foreign?($player), pkmn.owner = Owner.new_from_trainer($player))
+            Register("$player", (c, a) => _game.State);
+            Register("$Trainer", (c, a) => _game.State);
             Register("$Trainer.party", (c, a) => _game.State.Party);
             Register("follower_animation", (c, a) => { var f = World.Followers.Characters.FirstOrDefault(); if (f != null) _game.Exclaim(f, 30); return true; });
             Register("setPrice", (c, a) =>
@@ -1576,6 +1611,20 @@ namespace PokeCreator.Runtime.Script
 
         void SetMember(object obj, string member, object index, object val)
         {
+            var ch = obj as World.Character;
+            if (ch != null)
+            {
+                switch (member)
+                {
+                    case "pattern": ch.Pattern = ToInt(val); return;
+                    case "direction": ch.Turn(ToInt(val)); return;
+                    case "opacity": ch.Opacity = ToInt(val); return;
+                    case "through": ch.Through = Truthy(val); return;
+                    case "move_speed": ch.MoveSpeed = ToInt(val); return;
+                    case "character_name": ch.CharacterName = Convert.ToString(val); return;
+                    case "transparent": ch.Transparent = Truthy(val); return;
+                }
+            }
             var pk = obj as PokeCreator.Pkmn.Pokemon;
             if (pk == null) { WarnOnce("Can't set " + member); return; }
             switch (member)

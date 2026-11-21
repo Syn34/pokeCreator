@@ -815,7 +815,7 @@ namespace PokeCreator.Runtime.UI
 
         public NameEntryScene(Game g, string prompt, string initial, int max, Action<string> done) : base(g)
         {
-            Opaque = true; _prompt = prompt; _max = Math.Max(1, max); _done = done; _name = initial ?? "";
+            Opaque = true; _prompt = g.Message != null ? g.Message.Expand(prompt ?? "") : prompt; _max = Math.Max(1, max); _done = done; _name = initial ?? "";
             if (_name.Length > _max) _name = _name.Substring(0, _max);
         }
 

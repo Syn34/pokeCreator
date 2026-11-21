@@ -457,7 +457,7 @@ namespace PokeCreator.Studio.Editors
     }
 
     /// <summary>The map drawing surface. Tiles are cached in 16x16-tile chunks per layer.</summary>
-    public class MapCanvas : Control, IWheelTarget
+    public partial class MapCanvas : Control, IWheelTarget
     {
         public void Wheel(int delta) { WheelScroll.ScrollParent(this, delta); }
         const int Chunk = 16;
@@ -839,6 +839,7 @@ namespace PokeCreator.Studio.Editors
                 dcMenu.DropDownItems.Add("Day Care Lady (takes and returns Pokémon)", null, (s, a) => QuickDayCare(cell, true));
                 dcMenu.DropDownItems.Add("Day Care Man (gives Eggs)", null, (s, a) => QuickDayCare(cell, false));
                 menu.Items.Add(dcMenu);
+                menu.Items.Add(NpcMenu(cell));
                 if (_clipboard != null) menu.Items.Add("Paste Event", null, (s, a) => PasteEvent(cell));
             }
             else

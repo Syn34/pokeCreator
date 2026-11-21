@@ -103,6 +103,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] NPC followers (Followers.add / remove / clear, pbAddDependency2: an event walks behind the player, through doors, talking runs its common event)
 - [x] Ribbons, contest conditions, happiness changes, encounter table versions
 - [x] Fishing reaction: after "Oh! A bite!" press Action in time to hook the Pokémon (Game Settings → Fishing hooks by itself to skip it)
+- [x] Map right-click → New Service NPC / Pokémon: gift Pokémon, static (legendary) encounters, in-game trades, Move Relearner, Move Deleter, Name Rater; script assignment to any Pokémon expression (pbGetPokemon(1).name = …)
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing
