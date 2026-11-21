@@ -116,6 +116,7 @@ namespace PokeCreator.Studio
             var save = new ToolStripMenuItem("&Save All", null, (s, e) => SaveAll()) { ShortcutKeys = Keys.Control | Keys.S };
             file.DropDownItems.Add(save);
             file.DropDownItems.Add(new ToolStripMenuItem("Close Tab", null, (s, e) => CloseTab(_tabs.SelectedTab)) { ShortcutKeys = Keys.Control | Keys.W });
+            file.DropDownItems.Add(new ToolStripMenuItem("Find in Events…", null, (s, e) => { if (Project != null) new Editors.FindDialog(Project, NavigateTo).Show(this); }) { ShortcutKeys = Keys.Control | Keys.Shift | Keys.F });
             file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add("Open Project Folder in Explorer", null, (s, e) => { if (Project != null) OpenInShell(Project.Root); });
             file.DropDownItems.Add(new ToolStripSeparator());
