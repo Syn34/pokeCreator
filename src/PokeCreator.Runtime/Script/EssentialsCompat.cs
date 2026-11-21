@@ -885,7 +885,9 @@ namespace PokeCreator.Runtime.Script
             {
                 var stock = Arg(a, 0) as List<object>;
                 var ids = stock == null ? new List<string>() : stock.Select(x => Convert.ToString(x)).ToList();
-                _game.PushScene(new MartScene(_game, ids, a.Count > 2 && Truthy(a[2])));
+                var mart = new MartScene(_game, ids, a.Count > 2 && Truthy(a[2]));
+                mart.OnClosed = () => MartScene.PriceOverrides.Clear();
+                _game.PushScene(mart);
                 return true;
             });
             Register("pbSellItem", (c, a) => true);
@@ -956,6 +958,33 @@ namespace PokeCreator.Runtime.Script
             Register("$player.party", (c, a) => _game.State.Party);
             Register("$Trainer.party", (c, a) => _game.State.Party);
             Register("follower_animation", (c, a) => { var f = World.Followers.Characters.FirstOrDefault(); if (f != null) _game.Exclaim(f, 30); return true; });
+            Register("setPrice", (c, a) =>
+            {
+                string id = Str(a, 0); if (string.IsNullOrEmpty(id)) return false;
+                int buy = a.Count > 1 && a[1] != null ? ToInt(a[1]) : -1, sell = a.Count > 2 && a[2] != null ? ToInt(a[2]) : (buy >= 0 ? buy / 2 : -1);
+                MartScene.PriceOverrides[id] = new[] { buy, sell };
+                return true;
+            });
+            Register("$game_screen.weather", (c, a) =>
+            {
+                object t = Arg(a, 0); string ts = t as string;
+                int type = ts != null ? (int.TryParse(ts, out type) ? type : WeatherSystem.TypeFromName(ts.TrimStart(':'))) : ToInt(t);
+                _game.Weather.Set(type, a.Count > 1 ? ToInt(a[1]) : 5, a.Count > 2 ? ToInt(a[2]) : 0);
+                return true;
+            });
+            // Event variables (Essentials' setVariable / getVariable: a number kept for this event)
+            Register("setVariable", (c, a) =>
+            {
+                if (c == null) return false;
+                if (_game.State.Extras.EventVars == null) _game.State.Extras.EventVars = new Dictionary<string, int>();
+                _game.State.Extras.EventVars[c.MapId + "," + c.EventId] = ToInt(Arg(a, 0));
+                return true;
+            });
+            Register("getVariable", (c, a) =>
+            {
+                int v; return c != null && _game.State.Extras.EventVars != null && _game.State.Extras.EventVars.TryGetValue(c.MapId + "," + c.EventId, out v) ? v : 0;
+            });
+            Register("setSellPrice", (c, a) => { string id = Str(a, 0); int[] o; if (!MartScene.PriceOverrides.TryGetValue(id, out o)) o = new[] { -1, -1 }; o[1] = ToInt(Arg(a, 1)); MartScene.PriceOverrides[id] = o; return true; });
             foreach (var n in new[] { "setBattleRule", "$game_screen.weather", "pbPickBerry", "setPrice", "setVariable", "pbToneChangeAll" })
                 if (!_commands.ContainsKey(n)) Register(n, noop);
             // ---- Pokégear phone and trainer rematches

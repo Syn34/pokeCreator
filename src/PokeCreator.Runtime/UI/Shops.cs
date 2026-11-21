@@ -25,7 +25,9 @@ namespace PokeCreator.Runtime.UI
         /// <summary>Battle Point shop (pbBattlePointShop): prices in BP, nothing to sell.</summary>
         public bool BattlePoints;
         int Funds { get { return BattlePoints ? Game.State.BattlePoints : Game.State.Money; } set { if (BattlePoints) Game.State.BattlePoints = value; else Game.State.Money = value; } }
-        int Cost(ItemData it) { return BattlePoints ? (it.BPPrice > 0 ? it.BPPrice : Math.Max(1, it.Price / 500)) : it.Price; }
+        /// <summary>setPrice(item, buy, sell) from the event that opened this shop (Essentials).</summary>
+        public static Dictionary<string, int[]> PriceOverrides = new Dictionary<string, int[]>();
+        int Cost(ItemData it) { int[] o; if (PriceOverrides.TryGetValue(it.Id, out o) && o[0] >= 0) return o[0]; return BattlePoints ? (it.BPPrice > 0 ? it.BPPrice : Math.Max(1, it.Price / 500)) : it.Price; }
         string Fmt(int v) { return BattlePoints ? v + " BP" : "$" + v; }
 
         public MartScene(Game g, IEnumerable<string> stock, bool cantSell) : base(g)
@@ -35,7 +37,7 @@ namespace PokeCreator.Runtime.UI
         }
 
         ItemData Item(string id) { return Game.Project.Items.FirstOrDefault(i => i.Id == id); }
-        static int SellPrice(ItemData it) { return it.SellPrice > 0 ? it.SellPrice : it.Price / 2; }
+        static int SellPrice(ItemData it) { int[] o; if (PriceOverrides.TryGetValue(it.Id, out o) && o[1] >= 0) return o[1]; return it.SellPrice > 0 ? it.SellPrice : it.Price / 2; }
         int Have(string id) { int n; return Game.State.Bag.TryGetValue(id, out n) ? n : 0; }
 
         void Welcome(string text)
