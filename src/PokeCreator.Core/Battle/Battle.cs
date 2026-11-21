@@ -443,6 +443,8 @@ namespace PokeCreator.Battles
                 AnnounceMoveFirst(user);
                 Act(user, target ?? user, cmd.Index);
                 CheckAllItems();
+                ShowFaintsNow();
+                if (!AnyAble(0) || !AnyAble(1)) break;   // one side is out of Pokémon: the battle ends now
             }
 
             if (Outcome == BattleOutcome.Ongoing && Live(0).Count > 0 && Live(1).Count > 0) { EndOfTurn(); ArenaEndOfTurn(); }
@@ -1715,6 +1717,28 @@ namespace PokeCreator.Battles
         }
 
         // ------------------------------------------------------------------ fainting, EXP, next Pokémon
+        /// <summary>As Essentials: "X fainted!" (and the EXP for it) right after the move, not at the end of the turn.</summary>
+        void ShowFaintsNow()
+        {
+            if (Outcome != BattleOutcome.Ongoing) return;
+            for (int side = 0; side < 2; side++)
+                for (int slot = 0; slot < SlotsPerSide; slot++)
+                {
+                    var b = Field[side][slot];
+                    if (b == null || !b.Pk.Fainted || b.FaintShown) continue;
+                    b.FaintShown = true;
+                    if (side == 0)
+                    {
+                        int foeLevel = Field[1].Where(f => f != null).Select(f => f.Pk.Level).DefaultIfEmpty(0).Max();
+                        b.Pk.ChangeHappiness(foeLevel >= b.Pk.Level + 30 ? "faintbad" : "faint");
+                    }
+                    Say(Name(b) + " fainted!");
+                    _ev.Add(new BattleEvent { Kind = BattleEventKind.Faint, Side = side, Party = b.PartyIndex, Slot = slot });
+                    if (side == 1) GiveExp(b);
+                    if (Outcome != BattleOutcome.Ongoing) return;
+                }
+        }
+
         void AfterFaints()
         {
             // Opponents that fainted: EXP, then the trainer sends out another (or the slot stays empty)
@@ -1768,8 +1792,9 @@ namespace PokeCreator.Battles
                 for (int slot = 0; slot < SlotsPerSide; slot++)
                 {
                     var me = Field[0][slot];
+                    if (me != null && me.Pk.Fainted) anyFainted = true;
                     if (me == null || !me.Pk.Fainted || me.FaintShown) continue;
-                    me.FaintShown = true; anyFainted = true;
+                    me.FaintShown = true;
                     // Friendship drops (a lot if the foe was 30+ levels higher)
                     int foeLevel = Field[1].Where(f => f != null).Select(f => f.Pk.Level).DefaultIfEmpty(0).Max();
                     me.Pk.ChangeHappiness(foeLevel >= me.Pk.Level + 30 ? "faintbad" : "faint");
