@@ -210,6 +210,7 @@ namespace PokeCreator.Runtime.UI
                     return false;
                 case BattleEventKind.SendOut:
                     {
+                        _lineupGone[e.Side] = true;
                         if (e.Side == 1) _trainerVisible = false;
                         int k = Key(e.Side, e.Slot);
                         _shownParty[k] = e.Party; _visible[k] = true; _faintDrop[k] = 0;
@@ -928,6 +929,7 @@ namespace PokeCreator.Runtime.UI
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
             DrawSplash(g);
+            DrawLineups(g);
             // Databoxes
             for (int slot = 0; slot < _b.SlotsPerSide; slot++)
             {
@@ -950,6 +952,38 @@ namespace PokeCreator.Runtime.UI
                 {
                     MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
                     if (_briefText != null && _mode == Mode.Events) g.DrawText(26, g.Height - 86, _briefText, Color.TextBase, Color.TextShadow);
+                }
+            }
+        }
+
+        // Party lineups (trainer battles): a ball per party member until that side sends out its first Pokémon
+        readonly bool[] _lineupGone = new bool[2];
+        void DrawLineups(Gfx g)
+        {
+            if (_setup.Wild || _setup.Link) return;
+            for (int side = 0; side < 2; side++)
+            {
+                if (_lineupGone[side]) continue;
+                var party = _b.Parties[side];
+                int n = 6, bw = 22, w = n * bw + 24;
+                int slide = Math.Max(0, _introSlide) * 2;
+                int x = side == 1 ? -slide : g.Width - w + slide, y = side == 1 ? 96 : 200;
+                Ui.Panel(g, x, y, w, 28, new Color(48, 48, 56, 200), new Color(220, 220, 228));
+                for (int i = 0; i < n; i++)
+                {
+                    int bx = x + 12 + i * bw + bw / 2, by = y + 14;
+                    var pk = i < party.Count ? party[i] : null;
+                    Color c = pk == null || pk.IsEgg ? new Color(0, 0, 0, 0) : pk.Fainted ? new Color(120, 120, 128) : !string.IsNullOrEmpty(pk.Status) ? new Color(232, 176, 56) : new Color(232, 64, 56);
+                    // A small Poké Ball: coloured top, white bottom (outline only for an empty slot)
+                    g.FillRect(bx - 7, by - 7, 14, 14, new Color(32, 32, 40));
+                    if (pk != null && !pk.IsEgg)
+                    {
+                        g.FillRect(bx - 6, by - 6, 12, 6, c);
+                        g.FillRect(bx - 6, by, 12, 6, new Color(240, 240, 240));
+                        g.FillRect(bx - 6, by - 1, 12, 2, new Color(32, 32, 40));
+                        g.FillRect(bx - 2, by - 2, 4, 4, new Color(240, 240, 240));
+                    }
+                    else g.FillRect(bx - 6, by - 6, 12, 12, new Color(88, 88, 96));
                 }
             }
         }
