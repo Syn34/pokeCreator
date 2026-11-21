@@ -8,7 +8,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - Essentials script-call compatibility layer; C# project scripts
 - Studio: project tree, generated database editors, map editor, event editor, tileset editor, asset browser, script/text editor, import wizard, playtest
 
-## v0.2: Core gameplay loop (in progress)
+## ✅ v0.2: Core gameplay loop (done)
 - [x] Pokémon instances (stats, IVs/EVs, natures, abilities, moves, EXP curves)
 - [x] Party and bag data; give Pokémon and items from events; healing
 - [x] Pause menu: Party, Summary, Bag, Trainer Card, Save, Quit to Title
@@ -25,7 +25,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Name entry (pbTrainerName / pbEnterPlayerName) and nicknames when receiving a Pokémon
 - [x] Intro sequence: choosing the player character (pbChangePlayer)
 
-## v0.3: Battles
+## ✅ v0.3: Battles (done)
 - [x] Single wild battles: scene, HP bars, move selection, damage formula, type matchups, catching
 - [x] Trainer battles from `trainers.json`, AI by skill level, prize money, lose text, blacking out
 - [x] Move effects read from Essentials function code names (stat changes, status, confusion, flinch, multi-hit, recoil, draining, healing, fixed damage, OHKO, two-turn, Protect, binding...)
@@ -43,7 +43,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Mega Evolution (Mega Ring, Mega Stones / Mega move, AI trainers, reverts after battle)
 - [x] Triple battles (adjacency for targets and spread moves, setBattleRule("triple"), three-Pokémon WildBattle.start)
 
-## v0.4: World features
+## ✅ v0.4: World features (done)
 - [x] Field moves: Surf, Cut, Strength, Rock Smash, Headbutt; berry plants (picking)
 - [x] Fly with the Town Map, Teleport, Dig, Sweet Scent; field moves in the party menu
 - [x] Waterfall, Dive, Flash with dark maps, ice
@@ -60,7 +60,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Flash/darkness maps, windowskins and text codes
 - [x] Fog/panorama images (tileset settings, Change Fog / Panorama / Fog Opacity commands)
 
-## v0.5: Studio power features
+## ✅ v0.5: Studio power features (done)
 - [x] Forms: random/seasonal/nature forms on creation (Unown, Deerling, Flabébé, Vivillon, Toxtricity...), held-item forms (Arceus, Silvally, Genesect, Giratina, Zacian, Zamazenta, Ogerpon), Gen 9 forms (Tatsugiri, Squawkabilly, Maushold, Dudunsparce, Gimmighoul, Poltchageist, Sinistcha, Palafin's Zero to Hero, Ogerpon's masks)
 - [x] Move-route editor and full command palette in the event editor
 - [x] Problems panel: missing graphics and audio, broken references, script errors
@@ -70,7 +70,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Export/distribute: one-click "Build game" to a folder (and .zip) players can run
 
 
-## v0.6: Essentials extras
+## ✅ v0.6: Essentials extras (done)
 - [x] Partner trainer (pbRegisterPartner / pbDeregisterPartner): every battle becomes a double battle with the partner's Pokémon in the second slot, AI-controlled, healed after each battle
 - [x] Roaming Pokémon (Game Settings → Roaming: species, level, switch, encounter kind, music, maps; HP carries over, flees each turn, gone once caught or defeated; pbResetAllRoamers)
 - [x] Safari Zone (pbSafariState: steps and Safari Balls from Game Settings, "Safari Zone" maps, Ball / Bait / Rock / Run battles, back to the reception when time is up)
@@ -129,7 +129,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] RPG Maker map animations: imported from Animations.rxdata (map_animations.json), played by Show Animation over characters or the screen (cells, hue, sounds, screen flashes); the trainer "!" uses animation 3; Studio Show Animation command
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
-## v0.7: Sharing
+## ✅ v0.7: Sharing (done)
 - [x] Translations (Game → Translations…: Languages/<name>.json with every message, choice, script message and database name; grid editor; refresh keeps existing translations; players choose in Options → Language; included in built games)
 - [x] Plugin system (Plugins/<name>: plugin.json, scripts, assets and database records; requirements; install / export .zip / make from scripts in Game → Plugins…; [ScriptInit] and GameEvents hooks for scripts)
 - [x] Link battles and trades with another player over the network (pbLinkBattle / pbLinkTrade / pbLinkHost / pbLinkJoin: host or join by address, both games run the same battle in step, single or double, healed copies; trades with trade evolutions); battle hooks for outside control (ExternalCommand, Start/Turn overrides, FlipNames)
