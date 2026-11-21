@@ -460,7 +460,14 @@ namespace PokeCreator.Runtime.UI
             if (ab != null && !string.IsNullOrEmpty(ab.Description))
             {
                 var lines = Wrap(g, ab.Description, rw - 28);
-                for (int i = 0; i < Math.Min(2, lines.Count); i++) Ui.Text(g, rx + 14, 262 + i * 30, lines[i]);
+                if (lines.Count > 2)
+                {
+                    // Too long for two lines: end the second one with "…"
+                    string l2 = lines[1];
+                    while (l2.Length > 0 && g.TextWidth(l2 + "…") > rw - 28) l2 = l2.Substring(0, l2.Length - 1);
+                    lines[1] = l2.TrimEnd() + "…";
+                }
+                for (int i = 0; i < Math.Min(2, lines.Count); i++) Ui.Text(g, rx + 14, 260 + i * 29, lines[i]);
             }
             int need = pk.ExpForNextLevel(p) - pk.Exp, from = pk.ExpForThisLevel(p), to = pk.ExpForNextLevel(p);
             Ui.Text(g, rx + 14, 326, "Exp. to next Lv.");
