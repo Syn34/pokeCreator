@@ -133,9 +133,10 @@ namespace PokeCreator.Runtime.UI
                 Funds -= cost; Game.State.AddItem(_item.Id, _qty);
                 if (!BattlePoints) { World.GameStats.Inc(Game, "money_spent_at_marts", cost); World.GameStats.Inc(Game, "mart_items_bought", _qty); }
                 Game.Audio.PlaySe("Mart buy item");
-                bool bonus = !BattlePoints && _item.Id == "POKEBALL" && _qty >= 10 && Item("PREMIERBALL") != null;
-                if (bonus) Game.State.AddItem("PREMIERBALL", 1);
-                Game.Message.Show("Here you are! Thank you!" + (bonus ? "\\nI'll throw in a Premier Ball, too." : ""), null, -1, _ => _mode = Mode.Buy);
+                // Gen 8+: a Premier Ball for every 10 Poké Balls of any kind
+                int premier = !BattlePoints && _item.Pocket == 3 && _item.Id != "PREMIERBALL" && Item("PREMIERBALL") != null ? _qty / 10 : 0;
+                if (premier > 0) Game.State.AddItem("PREMIERBALL", premier);
+                Game.Message.Show("Here you are! Thank you!" + (premier == 1 ? "\\nI'll throw in a Premier Ball, too." : premier > 1 ? "\\nI'll throw in some Premier Balls, too." : ""), null, -1, _ => _mode = Mode.Buy);
             });
         }
 
