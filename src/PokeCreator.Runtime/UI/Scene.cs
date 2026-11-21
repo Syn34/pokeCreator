@@ -112,6 +112,14 @@ namespace PokeCreator.Runtime.UI
         /// <summary>Coloured type label.</summary>
         public static void TypeBadge(Gfx g, Game game, int x, int y, string type)
         {
+            var t0 = game.Project.Types.FirstOrDefault(tt => tt.Id == type);
+            // Essentials' type icons (Graphics/UI/types: one 64×28 row per type, at the type's icon position)
+            var icons = g.Load(game.Project.FindAsset("Graphics/UI", "types"));
+            if (icons != null && t0 != null && icons.Width >= 64)
+            {
+                int rowH = 28, row = t0.IconPosition;
+                if ((row + 1) * rowH <= icons.Height) { g.Draw(icons, 0, row * rowH, 64, rowH, x + (BadgeWidth - 64) / 2, y); return; }
+            }
             var c = TypeColor(type);
             Panel(g, x, y, BadgeWidth, 28, c, new Color((byte)(c.R * 2 / 3), (byte)(c.G * 2 / 3), (byte)(c.B * 2 / 3)));
             var t = game.Project.Types.FirstOrDefault(tt => tt.Id == type);
