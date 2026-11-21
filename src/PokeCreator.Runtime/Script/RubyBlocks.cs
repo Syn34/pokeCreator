@@ -151,13 +151,19 @@ namespace PokeCreator.Runtime.Script
             {
                 case "stmt": return ExecStatement(n.Text, ctx);
                 case "if":
-                    foreach (var b in n.Branches) if (Cond(b.Key, ctx)) return ExecBlock(b.Value, ctx);
+                    foreach (var b in n.Branches)
+                    {
+                        bool hit = Cond(b.Key, ctx);
+                        if (_game.PromptPending) return Flow.Return; // the condition asked the player: wait for the answer
+                        if (hit) return ExecBlock(b.Value, ctx);
+                    }
                     return n.Else != null ? ExecBlock(n.Else, ctx) : Flow.None;
                 case "while":
                 case "until":
                     for (int guard = 0; guard < 10000; guard++)
                     {
                         bool c = Cond(n.Text, ctx);
+                        if (_game.PromptPending) return Flow.Return;
                         if (n.Kind == "while" ? !c : c) break;
                         var f = ExecBlock(n.Body, ctx);
                         if (f == Flow.Break) break;
@@ -178,6 +184,7 @@ namespace PokeCreator.Runtime.Script
                 case "case":
                     {
                         object v = n.Text.Length > 0 ? Eval(n.Text, ctx) : null;
+                        if (_game.PromptPending) return Flow.Return;
                         foreach (var b in n.Branches)
                         {
                             foreach (var opt in SplitTopLevel(b.Key, ','))
@@ -262,6 +269,7 @@ namespace PokeCreator.Runtime.Script
             if (cond != null)
             {
                 bool c = Cond(cond, ctx);
+                if (_game.PromptPending) return Flow.Return;
                 if (negate ? c : !c) return Flow.None;
                 return ExecStatement(body, ctx);
             }

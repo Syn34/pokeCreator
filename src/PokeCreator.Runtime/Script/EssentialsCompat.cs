@@ -46,6 +46,23 @@ namespace PokeCreator.Runtime.Script
         /// <summary>Ruby global variables set by scripts.</summary>
         readonly Dictionary<string, object> _globals = new Dictionary<string, object>();
 
+        // A script that stopped to ask the player something runs again once it's answered; the calls it had already
+        // made are not repeated (their results are replayed), so messages before the question aren't shown twice.
+        List<object> _rec;
+        int _recPos;
+        Interpreter _recCtx;
+        string _recScript;
+        bool _recActive;
+
+        object Dispatch(Handler h, Interpreter ctx, List<object> args)
+        {
+            if (_rec == null || !_recActive) return h(ctx, args);
+            if (_recPos < _rec.Count) return _rec[_recPos++];
+            var r = h(ctx, args);
+            if (!_game.PromptPending) { _rec.Add(r); _recPos++; }
+            return r;
+        }
+
         public void RunScript(string script, Interpreter ctx)
         {
             _locals = ctx != null ? ctx.Locals : new Dictionary<string, object>();
@@ -55,7 +72,18 @@ namespace PokeCreator.Runtime.Script
                 int pos = 0;
                 var tree = ParseBlock(stmts, ref pos);
                 _steps = 0;
-                ExecBlock(tree, ctx);
+                bool replay = ctx != null && _recCtx == ctx && _recScript == script && _rec != null;
+                if (!replay) _rec = ctx != null ? new List<object>() : null;
+                _recPos = 0;
+                bool outer = _recActive;
+                _recActive = _rec != null;
+                try { ExecBlock(tree, ctx); }
+                finally
+                {
+                    _recActive = outer;
+                    if (ctx != null && _game.PromptPending) { _recCtx = ctx; _recScript = script; }
+                    else { _rec = null; _recCtx = null; _recScript = null; }
+                }
                 return;
             }
             for (int i = 0; i < stmts.Count; i++)
@@ -440,7 +468,7 @@ namespace PokeCreator.Runtime.Script
         {
             string key = name;
             Handler h;
-            if (_commands.TryGetValue(key, out h)) return h(ctx, args);
+            if (_commands.TryGetValue(key, out h)) return Dispatch(h, ctx, args);
             // A script-made global's member: $speeches.push(text)
             int gd = name.IndexOf('.');
             if (name.StartsWith("$") && gd > 0 && _globals.ContainsKey(name.Substring(0, gd)))
@@ -459,11 +487,11 @@ namespace PokeCreator.Runtime.Script
                 var parts = name.Substring(cut + 1).Split('.');
                 Handler direct;
                 object obj = h(ctx, new List<object>());
-                if (parts.Length == 1 && (obj == null || obj is Interpreter) && parts[0] != "nil?" && _commands.TryGetValue(parts[0], out direct)) return direct(ctx, args);
+                if (parts.Length == 1 && (obj == null || obj is Interpreter) && parts[0] != "nil?" && _commands.TryGetValue(parts[0], out direct)) return Dispatch(direct, ctx, args);
                 for (int k = 0; k < parts.Length; k++) obj = Member(obj, parts[k], k == parts.Length - 1 ? args : new List<object>());
                 return obj;
             }
-            if (dot > 0 && _commands.TryGetValue(name.Substring(dot + 1), out h)) return h(ctx, args);
+            if (dot > 0 && _commands.TryGetValue(name.Substring(dot + 1), out h)) return Dispatch(h, ctx, args);
             WarnOnce("Unsupported Essentials call: " + name + " (ignored)");
             return null;
         }
