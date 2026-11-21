@@ -422,8 +422,10 @@ namespace PokeCreator.Runtime.World
             else return;
             var table = _game.EncounterTable(map.Id);
             if (table == null) return;
-            bool night = DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20;
-            var m = table.Methods.FirstOrDefault(mm => mm.Type == method + (night ? "Night" : "Day")) ?? table.Methods.FirstOrDefault(mm => mm.Type == method);
+            int hour = DateTime.Now.Hour;
+            bool night = hour < 6 || hour >= 20, morning = hour >= 5 && hour < 10;
+            var m = (morning ? table.Methods.FirstOrDefault(mm => mm.Type == method + "Morning" && mm.Slots.Count > 0) : null)
+                 ?? table.Methods.FirstOrDefault(mm => mm.Type == method + (night ? "Night" : "Day") && mm.Slots.Count > 0) ?? table.Methods.FirstOrDefault(mm => mm.Type == method);
             if (method == "Land" && BugContest.InProgress(_game)) m = table.Methods.FirstOrDefault(mm => mm.Type == "BugContest" && mm.Slots.Count > 0) ?? m;
             if (m == null || m.Slots.Count == 0) return;
             int density = m.Density > 0 ? m.Density : 25;
