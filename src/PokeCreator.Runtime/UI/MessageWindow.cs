@@ -35,6 +35,7 @@ namespace PokeCreator.Runtime.UI
         int _revealed;             // tokens revealed on the current page
         bool _pageDone;
         List<string> _choices;
+        bool _choicesOnly;
         int _cancelIndex = -1;
         int _cursor;
         Action<int> _onChoice;
@@ -83,6 +84,8 @@ namespace PokeCreator.Runtime.UI
             if (_lines.Count == 0) _lines.Add(new Line());
             _lineIndex = 0; _revealed = 0; _pageDone = false;
             _choices = choices != null && choices.Count > 0 ? choices : null;
+            // Show Choices with no message before it: only the choice box is shown (as RPG Maker / Essentials)
+            _choicesOnly = _choices != null && Expand(text).Trim().Length == 0;
             _cancelIndex = cancelIndex; _cursor = 0; _onChoice = onChoice;
             Busy = true;
             RunCommandsAtStart();
@@ -414,7 +417,7 @@ namespace PokeCreator.Runtime.UI
             int bh = BoxHeight(g);
             int bx = Margin, bw = g.Width - Margin * 2;
             int by = _position == 0 ? Margin : _position == 1 ? (g.Height - bh) / 2 : g.Height - bh - Margin;
-            if (!FrameHidden)
+            if (!FrameHidden && !_choicesOnly)
             {
                 if (!string.IsNullOrEmpty(_skin) && _skinLoaded != _skin) { _skinLoaded = _skin; _skinObj = WindowSkin.Load(g, _game.Project.FindAsset("Graphics/Windowskins", _skin)); }
                 var skin = !string.IsNullOrEmpty(_skin) ? _skinObj : null;

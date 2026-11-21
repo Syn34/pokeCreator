@@ -287,6 +287,7 @@ namespace PokeCreator.Runtime.Script
             int n; if (int.TryParse(e, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) return n;
             double dbl; if (Regex.IsMatch(e, @"^-?\d+\.\d+$") && double.TryParse(e, NumberStyles.Float, CultureInfo.InvariantCulture, out dbl)) return dbl;
             if (e.StartsWith(":") && Regex.IsMatch(e, @"^:\w+$")) return e.Substring(1);
+            if (e.StartsWith("\"") && e.EndsWith("\"") && e.Length > 1 && e.Contains("#{") && IsSingleString(e)) return Interpolate(e, ctx);
             if ((e.StartsWith("\"") && e.EndsWith("\"")) || (e.StartsWith("'") && e.EndsWith("'"))) return Unquote(e);
             if (e.StartsWith("[") && MatchingBracket(e, 0) == e.Length - 1)
             {
@@ -607,8 +608,22 @@ namespace PokeCreator.Runtime.Script
             RegisterSceneCalls();
 
             Register("pbCommonEvent", (c, a) => c != null && c.CallCommonEvent(ToInt(Arg(a, 0))));
-            Register("pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
-            Register("Kernel.pbMessage", (c, a) => { _game.Message.Show(Str(a, 0)); return 0; });
+            // pbMessage(text) or pbMessage(text, commands, cancelIndex): with commands it waits and returns the choice
+            Handler message = (c, a) =>
+            {
+                var cmds = Arg(a, 1) as List<object>;
+                if (cmds == null || cmds.Count == 0) { _game.Message.Show(Str(a, 0)); return 0; }
+                return AskChoice(c, Str(a, 0), cmds.Select(x => Convert.ToString(x)).ToList(), a.Count > 2 ? ToInt(a[2]) : 0);
+            };
+            Register("pbMessage", message);
+            Register("Kernel.pbMessage", message);
+            // pbShowCommands(msgwindow, commands, cancelIndex)
+            Register("pbShowCommands", (c, a) =>
+            {
+                var cmds = Arg(a, 1) as List<object>;
+                if (cmds == null) return -1;
+                return AskChoice(c, "", cmds.Select(x => Convert.ToString(x)).ToList(), a.Count > 2 ? ToInt(a[2]) : -1);
+            });
             // Phone calls made from common events (Essentials' Phone::Call.start_message / end_message)
             Register("Phone::Call.start_message", (c, a) => { _game.Audio.PlaySe("Phone call"); _game.Message.Show("......\\wt[5] ......\\wt[5]"); return true; });
             Register("Phone::Call.end_message", (c, a) => { _game.Message.Show("Click!\\wt[10]\\n......\\wt[5] ......"); return true; });
@@ -618,12 +633,12 @@ namespace PokeCreator.Runtime.Script
                 var names = new Dictionary<string, string> { { "HP", "HP" }, { "ATTACK", "Attack" }, { "DEFENSE", "Defense" }, { "SPECIAL_ATTACK", "Sp. Atk" }, { "SPECIAL_DEFENSE", "Sp. Def" }, { "SPEED", "Speed" }, { "ACCURACY", "accuracy" }, { "EVASION", "evasiveness" } };
                 string n; return new Dictionary<string, object> { { "id", id }, { "name", names.TryGetValue(id ?? "", out n) ? n : id }, { "real_name", names.TryGetValue(id ?? "", out n) ? n : id } };
             });
-            Register("pbConfirmMessage", (c, a) =>
-            {
-                bool result = false;
-                _game.Message.Show(Str(a, 0), new List<string> { "Yes", "No" }, 1, r => result = r == 0);
-                return true; // answered asynchronously; conditions default to "yes"
-            });
+            // Yes/No questions wait for the answer (the event re-checks the line once it's given)
+            Handler confirm = (c, a) => { object r = AskChoice(c, Str(a, 0), new List<string> { "Yes", "No" }, 1); return r is int ? (int)r == 0 : r; };
+            Register("pbConfirmMessage", confirm);
+            Register("Kernel.pbConfirmMessage", confirm);
+            Register("pbConfirmMessageSerious", confirm);
+            Register("Kernel.pbConfirmMessageSerious", confirm);
 
             // Temp switches: like self switches, but forgotten when the player leaves the map
             Func<Interpreter, string, string> tkey = (c, ch) => (c != null ? c.MapId + "," + c.EventId : _curMap + "," + _curEvent) + "," + ch;
@@ -1192,6 +1207,20 @@ namespace PokeCreator.Runtime.Script
         }
 
         int _pairedEvent;
+
+        /// <summary>
+        /// Shows a question with choices and waits: returns the chosen index once the event re-runs the line
+        /// (until then a placeholder, with Game.PromptPending set). Cancel gives cancelIndex (-1 = can't cancel... as Essentials, 0 based).
+        /// </summary>
+        object AskChoice(Interpreter ctx, string text, List<string> choices, int cancelIndex)
+        {
+            object answer;
+            if (_game.TakePrompt(ctx, out answer)) return answer;
+            if (ctx == null) { _game.Message.Show(text, choices, cancelIndex >= 0 ? cancelIndex : -1, null); return cancelIndex >= 0 ? cancelIndex : 0; }
+            _game.PromptPending = true;
+            _game.Message.Show(text, choices, cancelIndex, r => _game.SetPrompt(ctx, r < 0 ? Math.Max(0, cancelIndex) : r));
+            return cancelIndex >= 0 ? cancelIndex : 0;
+        }
 
         /// <summary>The trainer in another event's TrainerBattle.start(...) call (its current page), or null.</summary>
         object[] TrainerArgsOf(World.GameEvent ev, Interpreter ctx)
@@ -1763,6 +1792,50 @@ namespace PokeCreator.Runtime.Script
                 case '%': if (y == 0) return 0; int m = x % y; return m != 0 && ((m < 0) != (y < 0)) ? m + y : m;
             }
             return 0;
+        }
+
+        /// <summary>True if the text is one double-quoted string (not "a" + "b").</summary>
+        static bool IsSingleString(string s)
+        {
+            int depth = 0;
+            for (int i = 1; i < s.Length - 1; i++)
+            {
+                char ch = s[i];
+                if (ch == '\\') { i++; continue; }
+                if (ch == '#' && i + 1 < s.Length - 1 && s[i + 1] == '{') { depth++; i++; continue; }
+                if (ch == '}' && depth > 0) { depth--; continue; }
+                if (ch == '"' && depth == 0) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Ruby string interpolation: "Picked #{x}" → the value of x.</summary>
+        string Interpolate(string s, Interpreter ctx)
+        {
+            var sb = new StringBuilder();
+            for (int i = 1; i < s.Length - 1; i++)
+            {
+                char ch = s[i];
+                if (ch == '\\' && i + 1 < s.Length - 1)
+                {
+                    char nx = s[i + 1];
+                    if (nx == '"' || nx == '\\' || nx == '#') { sb.Append(nx); i++; continue; }
+                    sb.Append(ch); continue; // keep message codes like \PN and \n for the message window
+                }
+                if (ch == '#' && i + 1 < s.Length - 1 && s[i + 1] == '{')
+                {
+                    int depth = 1, j = i + 2;
+                    for (; j < s.Length - 1 && depth > 0; j++) { if (s[j] == '{') depth++; else if (s[j] == '}') depth--; }
+                    string expr = s.Substring(i + 2, Math.Max(0, j - 1 - (i + 2)));
+                    object v = null;
+                    try { v = Eval(expr, ctx); } catch { v = null; }
+                    sb.Append(v == null ? "" : v is bool ? ((bool)v ? "true" : "false") : Convert.ToString(v, CultureInfo.InvariantCulture));
+                    i = j - 1;
+                    continue;
+                }
+                sb.Append(ch);
+            }
+            return sb.ToString();
         }
 
         static string Unquote(string s)
