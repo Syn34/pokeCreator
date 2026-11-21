@@ -119,6 +119,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Battle transitions: two flashes, then bars (wild) or closing squares (trainers) wipe the map to black (Game Settings can turn them off)
 - [x] Tall grass (terrain tag 10): 30% of encounters are wild double battles when two party Pokémon can fight (Game Settings can turn it off)
 - [x] Battle environments (map setting, else the tile under the player: grass, tall grass, water, puddle, sand, rock, ice, underwater) drive Nature Power, Camouflage and Secret Power; soot grass and Soot Sack; puddle splashes
+- [x] Egg hatching scene (wobbling Egg from Graphics/Pokemon/Eggs, flash, the Pokémon appears); Pokédex entry shown for species new to the Pokédex after catching, hatching, evolving or receiving them
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

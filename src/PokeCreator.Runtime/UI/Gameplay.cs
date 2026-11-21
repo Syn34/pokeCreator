@@ -400,13 +400,22 @@ namespace PokeCreator.Runtime.UI
             var p = Game.Project;
             string oldName = _pk.Name(p), oldSpecies = _pk.Species;
             string oldSpeciesName = _pk.Data(p) != null ? _pk.Data(p).Name : _pk.Species;
+            bool wasOwned = Game.State.Caught.Contains(_newSpecies);
             var moves = Growth.Evolve(p, _pk, _newSpecies);
             Game.State.Register(_pk);
+            var entry = !wasOwned && Game.State.HasPokedex ? p.Species.FirstOrDefault(s => s.Id == _newSpecies && s.Form == 0) : null;
             World.GameStats.Inc(Game, "evolution_count");
             Game.Audio.StopBgm();
             Game.Audio.PlayMe("Evolution success");
             string newName = _pk.Data(p) != null ? _pk.Data(p).Name : _newSpecies;
+            Action learn = null;
             Game.Message.Show("Congratulations! Your " + oldName + " evolved into " + newName + "!", null, -1, _ =>
+            {
+                // A species new to the Pokédex shows its entry first
+                if (entry != null) Game.PushScene(new PokedexEntryScene(Game, new List<SpeciesData> { entry }, 0, __ => learn()) { Registration = true });
+                else learn();
+            });
+            learn = () =>
                 ItemFlow.LearnMoves(Game, _pk, new Queue<string>(moves), () =>
                 {
                     // Nincada also leaves a Shedinja behind if there's room and a Poké Ball
@@ -422,7 +431,7 @@ namespace PokeCreator.Runtime.UI
                     }
                     Game.RestoreMapBgm();
                     Finish();
-                }));
+                });
         }
 
         void Finish() { Close(); if (_done != null) _done(); }
@@ -1394,6 +1403,91 @@ namespace PokeCreator.Runtime.UI
                         if (s > 0) g.FillRect(x * size + (size - s) / 2, y * size + (size - s) / 2, s, s, black);
                     }
             }
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>
+    /// "Oh?" — an Egg hatching: the Egg wobbles more and more, cracks in a flash of light, and the Pokémon appears.
+    /// Then the hatch message, the Pokédex entry for a new species, and the nickname question.
+    /// </summary>
+    public class EggHatchScene : Scene
+    {
+        readonly Pokemon _pk;
+        readonly Action<Action> _revealed;
+        int _t, _phase;
+        const int Wobble = 150;
+
+        /// <summary>revealed runs once the Pokémon is out, with an action that closes this scene (after the messages).</summary>
+        public EggHatchScene(Game g, Pokemon pk, Action<Action> revealed) : base(g) { Opaque = true; _pk = pk; _revealed = revealed; }
+
+        protected override void Update()
+        {
+            if (_phase == 0)
+            {
+                _phase = 1;
+                Game.Audio.PlayBgm("Evolution");
+                return;
+            }
+            if (_phase == 1)
+            {
+                _t++;
+                if (_t % 40 == 20) Game.Audio.PlaySe("Battle ball shake");
+                if (_t < Wobble + 30) return;
+                _phase = 2;
+                Game.Audio.StopBgm();
+                Game.Audio.PlayCry(_pk);
+                Game.Audio.PlayMe("Evolution success");
+                if (_revealed != null) _revealed(() => Close()); else Close();
+            }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 232, 176), new Color(216, 168, 104));
+            int cx = g.Width / 2, bottom = g.Height / 2 + 64;
+            if (_t < Wobble)
+            {
+                // Wobbles get bigger and closer together
+                double strength = _t / (double)Wobble;
+                int period = Math.Max(6, 40 - (int)(30 * strength));
+                int dx = (_t % period) < period / 2 ? (int)(2 + 6 * strength) : -(int)(2 + 6 * strength);
+                if (_t % 40 >= 30) dx = 0;
+                DrawEgg(g, cx + dx, bottom);
+            }
+            else
+            {
+                int k = _t - Wobble;
+                if (k < 10) DrawEgg(g, cx, bottom);
+                else Ui.PokemonFront(g, Game, _pk, cx, bottom, 192);
+                int a = k < 10 ? k * 25 : Math.Max(0, 250 - (k - 10) * 14);
+                g.FillRect(0, 0, g.Width, g.Height, new Color(255, 255, 255, (byte)Math.Min(250, a)));
+            }
+        }
+
+        void DrawEgg(Gfx g, int cx, int bottom)
+        {
+            var path = Game.Project.FindAsset("Graphics/Pokemon/Eggs", _pk.Species) ?? Game.Project.FindAsset("Graphics/Pokemon/Eggs", "000");
+            var tex = Game.Gfx.Load(path);
+            if (tex != null)
+            {
+                int fw = tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width;
+                int scale = Math.Max(1, 128 / Math.Max(fw, tex.Height));
+                g.Draw(tex, 0, 0, fw, tex.Height, cx - fw * scale / 2, bottom - tex.Height * scale, fw * scale, tex.Height * scale);
+                return;
+            }
+            // No Egg graphic: a simple spotted egg
+            var shell = new Color(248, 244, 224); var spot = new Color(120, 200, 120); var edge = new Color(96, 88, 72);
+            int[] widths = { 20, 32, 40, 46, 50, 52, 54, 54, 52, 50, 46, 40, 30 };
+            for (int i = 0; i < widths.Length; i++)
+            {
+                int w = widths[i] * 2, y = bottom - (widths.Length - i) * 8;
+                g.FillRect(cx - w / 2 - 2, y, w + 4, 8, edge);
+                g.FillRect(cx - w / 2, y, w, 8, shell);
+            }
+            g.FillRect(cx - 30, bottom - 70, 14, 12, spot); g.FillRect(cx + 12, bottom - 50, 16, 14, spot); g.FillRect(cx - 10, bottom - 30, 12, 10, spot);
         }
     }
 }

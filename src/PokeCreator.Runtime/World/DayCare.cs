@@ -218,18 +218,27 @@ namespace PokeCreator.Runtime.World
             egg.HP = egg.TotalHP(g.Project);
             egg.MetLevel = 1; egg.MetMap = g.Map != null ? g.Map.Id : egg.MetMap;
             egg.Happiness = 120;
+            bool newEntry = !g.State.Caught.Contains(egg.Species);
             g.State.Register(egg);
             GameStats.Inc(g, "eggs_hatched");
             string name = egg.Name(g.Project);
+            var entry = newEntry && g.State.HasPokedex ? g.Project.Species.FirstOrDefault(s => s.Id == egg.Species && s.Form == 0) : null;
             g.Message.Show("Oh?", null, -1, _ =>
-            {
-                g.Audio.PlayMe("Evolution success");
-                g.Message.Show(name + " hatched from the Egg!", null, -1, __ =>
-                    g.Message.Show("Would you like to nickname the newly hatched " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
+                g.PushScene(new UI.EggHatchScene(g, egg, close =>
+                {
+                    Action finish = () => { close(); g.RestoreMapBgm(); };
+                    Action nickname = () => g.Message.Show("Would you like to nickname the newly hatched " + name + "?", new List<string> { "Yes", "No" }, 1, c =>
                     {
-                        if (c == 0) g.AskName(name + "'s nickname?", "", 12, n => egg.Nickname = string.IsNullOrEmpty(n) ? null : n, null);
-                    }));
-            });
+                        if (c == 0) g.PushScene(new UI.NameEntryScene(g, name + "'s nickname?", "", 12, n => { if (!string.IsNullOrEmpty(n)) egg.Nickname = n; finish(); }));
+                        else finish();
+                    });
+                    g.Message.Show(name + " hatched from the Egg!", null, -1, __ =>
+                    {
+                        if (entry == null) { nickname(); return; }
+                        g.Message.Show(name + "'s data was added to the Pokédex.", null, -1, ___ =>
+                            g.PushScene(new UI.PokedexEntryScene(g, new List<PokeCreator.Data.SpeciesData> { entry }, 0, ____ => nickname()) { Registration = true }));
+                    });
+                })));
         }
     }
 }
