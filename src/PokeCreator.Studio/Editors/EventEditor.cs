@@ -76,6 +76,9 @@ namespace PokeCreator.Studio.Editors
                 case 235: return "◆ Erase Picture " + c.IntParam(0);
                 case 104: return "◆ Message Position: " + (c.IntParam(0) == 0 ? "top" : c.IntParam(0) == 1 ? "middle" : "bottom") + (c.IntParam(1) == 1 ? ", text only" : "");
                 case 354: return "◆ Return to Title Screen";
+                case 351: return "◆ Open Pause Menu";
+                case 352: return "◆ Ask to Save";
+                case 353: return "◆ Game Over (back to Pokémon Center)";
                 case 204:
                     {
                         int k = c.IntParam(0);

@@ -203,6 +203,10 @@ namespace PokeCreator.Studio.Editors
             cmd(flow, "Jump to Label", AddJumpToLabel);
             cmd(flow, "Wait", AddWait);
             cmd(flow, "Erase Event", () => Insert(new EventCommand(116, 0)));
+            cmd(flow, "Open Pause Menu", () => Insert(new EventCommand(351, 0)));
+            cmd(flow, "Ask to Save", () => Insert(new EventCommand(352, 0)));
+            cmd(flow, "Game Over (back to Pokémon Center)", () => Insert(new EventCommand(353, 0)));
+            cmd(flow, "Return to Title Screen", () => Insert(new EventCommand(354, 0)));
 
             var state = group("Switches && Variables");
             cmd(state, "Control Switches", AddSwitch);

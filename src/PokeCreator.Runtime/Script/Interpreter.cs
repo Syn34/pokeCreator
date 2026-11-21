@@ -361,7 +361,9 @@ namespace PokeCreator.Runtime.Script
                 case 601: case 602: case 603: return BattleBranch(c);
                 case 314: foreach (var pk in _game.State.Party) pk.Heal(_game.Project); return true; // Recover All
                 case 354: _game.ReturnToTitle(); return false;
-                case 351: case 352: case 353: return true;
+                case 351: _game.PushScene(new UI.PauseMenu(_game)); return true;   // Call Menu Screen
+                case 352: return RunCall("pbSaveScreen");                        // Call Save Screen
+                case 353: return RunCall("pbStartOver");                         // Game Over: back to the last Pokémon Center
 
                 case 355: return RunScript();
                 case 655: return true;
@@ -533,6 +535,15 @@ namespace PokeCreator.Runtime.Script
             _game.RequestTransfer(map, x, y, c.IntParam(4), c.IntParam(5) == 0);
             _index++;
             return false;
+        }
+
+        /// <summary>Runs one Essentials call as if it were a Script command (waits for its questions).</summary>
+        bool RunCall(string script)
+        {
+            _game.PromptPending = false;
+            _game.Compat.RunScript(script, this);
+            if (_game.PromptPending) { _game.PromptPending = false; return false; }
+            return true;
         }
 
         bool RunScript()
