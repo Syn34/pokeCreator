@@ -640,7 +640,16 @@ namespace PokeCreator.Runtime.Script
             Handler message = (c, a) =>
             {
                 var cmds = Arg(a, 1) as List<object>;
-                if (cmds == null || cmds.Count == 0) { _game.Message.Show(Str(a, 0)); return 0; }
+                if (cmds == null || cmds.Count == 0)
+                {
+                    // In an event the script waits until the message is closed, so the next message doesn't replace it
+                    object done;
+                    if (c != null && _game.TakePrompt(c, out done)) return 0;
+                    if (c == null) { _game.Message.Show(Str(a, 0)); return 0; }
+                    _game.PromptPending = true;
+                    _game.Message.Show(Str(a, 0), null, -1, _ => _game.SetPrompt(c, 0));
+                    return 0;
+                }
                 return AskChoice(c, Str(a, 0), cmds.Select(x => Convert.ToString(x)).ToList(), a.Count > 2 ? ToInt(a[2]) : 0);
             };
             Register("pbMessage", message);
