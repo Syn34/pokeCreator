@@ -671,6 +671,7 @@ namespace PokeCreator.Runtime
         {
             var rules = NextBattleRules; NextBattleRules = null;
             var end = setup.OnEnd;
+            b.Environment = BattleEnvironment();
             // Exp. All: Game Settings, the EXPALL key item or $player.has_exp_all
             b.ExpAll = Project.Settings.ExpAll || State.Bag.ContainsKey("EXPALL") || State.Flags.Contains("has_exp_all");
             // Safari Zone: wild battles are Safari battles
@@ -747,6 +748,28 @@ namespace PokeCreator.Runtime
             string time = h >= 20 || h < 6 ? "_night" : h >= 17 ? "_eve" : "";
             if (time != "" && Project.FindAsset("Graphics/Battlebacks", bd + time + "_bg") != null) bd += time;
             return bd;
+        }
+
+        /// <summary>The battle environment: the map's setting, else from what the player stands on (as Essentials).</summary>
+        public string BattleEnvironment()
+        {
+            var props = Map != null ? Map.Data.Properties : null;
+            if (props != null && !string.IsNullOrEmpty(props.Environment)) return props.Environment;
+            if (Map == null || Player == null) return "None";
+            if (Player.Diving) return "Underwater";
+            if (Player.Surfing) return "MovingWater";
+            switch (Map.TerrainTag(Player.X, Player.Y))
+            {
+                case GameMap.TagGrass: case GameMap.TagSootGrass: return "Grass";
+                case GameMap.TagTallGrass: return "TallGrass";
+                case 3: return "Sand";
+                case 4: return "Rock";
+                case 6: return "StillWater";
+                case 5: case 7: return "MovingWater";
+                case GameMap.TagPuddle: return "Puddle";
+                case GameMap.TagIce: return "Ice";
+            }
+            return "None";
         }
 
         // ------------------------------------------------------------------ trainers who spot the player

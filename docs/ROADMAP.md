@@ -118,6 +118,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Database → Import PBS Files: update the database from Essentials PBS text files (chosen files; same IDs replaced, new ones added, the rest kept)
 - [x] Battle transitions: two flashes, then bars (wild) or closing squares (trainers) wipe the map to black (Game Settings can turn them off)
 - [x] Tall grass (terrain tag 10): 30% of encounters are wild double battles when two party Pokémon can fight (Game Settings can turn it off)
+- [x] Battle environments (map setting, else the tile under the player: grass, tall grass, water, puddle, sand, rock, ice, underwater) drive Nature Power, Camouflage and Secret Power; soot grass and Soot Sack; puddle splashes
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

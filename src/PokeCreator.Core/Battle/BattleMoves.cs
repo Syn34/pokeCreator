@@ -522,7 +522,7 @@ namespace PokeCreator.Battles
                     }
                 case "UseMoveDependingOnEnvironment":
                     {
-                        string id = Terrain == "Electric" ? "THUNDERBOLT" : Terrain == "Grassy" ? "ENERGYBALL" : Terrain == "Misty" ? "MOONBLAST" : Terrain == "Psychic" ? "PSYCHIC" : "TRIATTACK";
+                        string id = Terrain == "Electric" ? "THUNDERBOLT" : Terrain == "Grassy" ? "ENERGYBALL" : Terrain == "Misty" ? "MOONBLAST" : Terrain == "Psychic" ? "PSYCHIC" : EnvironmentMove();
                         var m = Move(id);
                         if (m == null) { Say("But it failed!"); return true; }
                         Say("Nature Power turned into " + (m.Name ?? m.Id) + "!");

@@ -126,7 +126,7 @@ namespace PokeCreator.Battles
                     }
                 case "SetUserTypesBasedOnEnvironment":
                     {
-                        string t = Terrain == "Electric" ? "ELECTRIC" : Terrain == "Grassy" ? "GRASS" : Terrain == "Misty" ? "FAIRY" : Terrain == "Psychic" ? "PSYCHIC" : "NORMAL";
+                        string t = Terrain == "Electric" ? "ELECTRIC" : Terrain == "Grassy" ? "GRASS" : Terrain == "Misty" ? "FAIRY" : Terrain == "Psychic" ? "PSYCHIC" : EnvironmentType();
                         user.TypesOverride = new List<string> { t };
                         Say(n + " transformed into the " + TypeName(t) + " type!"); return true;
                     }
@@ -462,7 +462,7 @@ namespace PokeCreator.Battles
                         if (Terrain == "Grassy") { if (CanStatus(target, "SLEEP", false, user)) Inflict(target, "SLEEP", false, user); }
                         else if (Terrain == "Misty") ChangeStat(target, S.SpAtk, -1, user);
                         else if (Terrain == "Psychic") ChangeStat(target, S.Speed, -1, user);
-                        else if (CanStatus(target, "PARALYSIS", false, user)) Inflict(target, "PARALYSIS", false, user);
+                        else SecretPowerByEnvironment(user, target);
                     }
                     break;
                 case "NormalMovesBecomeElectric": _ionDeluge = true; break;

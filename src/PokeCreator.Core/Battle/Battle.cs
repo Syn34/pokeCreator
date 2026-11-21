@@ -603,6 +603,69 @@ namespace PokeCreator.Battles
 
         /// <summary>Inverse Battle (setBattleRule("inverseBattle")): weaknesses and resistances swap, immunities become weaknesses.</summary>
         public bool Inverse;
+        /// <summary>
+        /// Where the battle happens (Essentials' environments: Grass, TallGrass, MovingWater, StillWater, Puddle,
+        /// Underwater, Cave, Rock, Sand, Forest, ForestGrass, Snow, Ice, Volcano, Graveyard, Sky, Space, UltraSpace).
+        /// Nature Power, Camouflage and Secret Power depend on it.
+        /// </summary>
+        public string Environment;
+
+        string Env { get { return (Environment ?? "").Replace(" ", "").ToLowerInvariant(); } }
+
+        /// <summary>Nature Power's move for the environment (Gen 7 table).</summary>
+        string EnvironmentMove()
+        {
+            switch (Env)
+            {
+                case "grass": case "tallgrass": case "forest": case "forestgrass": return "ENERGYBALL";
+                case "movingwater": case "stillwater": case "underwater": return "HYDROPUMP";
+                case "puddle": return "MUDBOMB";
+                case "cave": return "POWERGEM";
+                case "rock": case "sand": return "EARTHPOWER";
+                case "snow": case "ice": return "ICEBEAM";
+                case "volcano": return "LAVAPLUME";
+                case "graveyard": return "SHADOWBALL";
+                case "sky": return "AIRSLASH";
+                case "space": case "ultraspace": return "DRACOMETEOR";
+            }
+            return "TRIATTACK";
+        }
+
+        /// <summary>Camouflage's type for the environment.</summary>
+        string EnvironmentType()
+        {
+            switch (Env)
+            {
+                case "grass": case "tallgrass": case "forestgrass": return "GRASS";
+                case "forest": return "BUG";
+                case "movingwater": case "stillwater": case "underwater": return "WATER";
+                case "puddle": case "rock": case "sand": return "GROUND";
+                case "cave": return "ROCK";
+                case "snow": case "ice": return "ICE";
+                case "volcano": return "FIRE";
+                case "graveyard": return "GHOST";
+                case "sky": return "FLYING";
+                case "space": case "ultraspace": return "DRAGON";
+            }
+            return "NORMAL";
+        }
+
+        /// <summary>Secret Power's added effect for the environment (30% chance already rolled).</summary>
+        void SecretPowerByEnvironment(Battler user, Battler target)
+        {
+            switch (Env)
+            {
+                case "grass": case "tallgrass": case "forest": case "forestgrass": if (CanStatus(target, "SLEEP", false, user)) Inflict(target, "SLEEP", false, user); return;
+                case "movingwater": case "stillwater": ChangeStat(target, PokeCreator.Pkmn.Stat.Attack, -1, user); return;
+                case "underwater": ChangeStat(target, PokeCreator.Pkmn.Stat.Defense, -1, user); return;
+                case "puddle": case "sand": ChangeStat(target, 6, -1, user); return;
+                case "cave": case "rock": if (!target.Pk.Fainted) target.Flinched = true; return;
+                case "snow": case "ice": if (CanStatus(target, "FROZEN", false, user)) Inflict(target, "FROZEN", false, user); return;
+                case "volcano": if (CanStatus(target, "BURN", false, user)) Inflict(target, "BURN", false, user); return;
+                case "graveyard": case "sky": case "space": case "ultraspace": ChangeStat(target, Env == "sky" ? PokeCreator.Pkmn.Stat.Speed : PokeCreator.Pkmn.Stat.SpAtk, -1, user); return;
+            }
+            if (CanStatus(target, "PARALYSIS", false, user)) Inflict(target, "PARALYSIS", false, user);
+        }
         /// <summary>Exp. All (key item EXPALL or Game Settings): Pokémon that didn't fight still get half the EXP.</summary>
         public bool ExpAll;
         static double InverseMod(TypeData td, string moveType)
