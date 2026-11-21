@@ -82,6 +82,11 @@ namespace PokeCreator.Studio.Editors
                         return "◆ Change Battleback: " + c.StrParam(1);
                     }
                 case 206: return "◆ Change Fog Opacity: " + c.IntParam(0) + ", @" + c.IntParam(1);
+                case 205: return "◆ Change Fog Color Tone, @" + c.IntParam(1);
+                case 203: return "◆ Scroll Map: " + (c.IntParam(0) == 2 ? "Down" : c.IntParam(0) == 4 ? "Left" : c.IntParam(0) == 6 ? "Right" : "Up") + ", " + c.IntParam(1) + ", speed " + c.IntParam(2);
+                case 221: return "◆ Prepare for Transition";
+                case 222: return "◆ Execute Transition";
+                case 131: return "◆ Change Windowskin: " + (string.IsNullOrEmpty(c.StrParam(0)) ? "(normal)" : c.StrParam(0));
                 case 247: return "◆ Memorize BGM";
                 case 248: return "◆ Restore BGM";
                 case 236:

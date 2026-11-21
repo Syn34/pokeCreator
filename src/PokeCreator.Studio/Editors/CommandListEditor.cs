@@ -317,6 +317,13 @@ namespace PokeCreator.Studio.Editors
             cmd(map, "Transfer Player (Warp)", AddTransfer);
             cmd(map, "Set Event Location", AddEventLocation);
             cmd(map, "Set Move Route", AddMoveRoute);
+            cmd(map, "Scroll Map", () =>
+            {
+                int d = ChoiceDialog.Ask(FindForm(), "Scroll toward", new[] { "Down", "Left", "Right", "Up" }); if (d < 0) return;
+                int n = NumberDialog.Ask(FindForm(), "Distance (tiles)", 4); if (n < 1) return;
+                int s = NumberDialog.Ask(FindForm(), "Speed (1 slowest - 6 fastest)", 4); if (s < 1) return;
+                Insert(new EventCommand(203, 0, new[] { 2, 4, 6, 8 }[d], n, Math.Min(6, s)));
+            });
             cmd(map, "Wait for Move's Completion", () => Insert(new EventCommand(210, 0)));
             cmd(map, "Player Transparent / Visible", () => { int k = ChoiceDialog.Ask(FindForm(), "Player is", new[] { "Transparent (hidden)", "Normal (visible)" }); if (k >= 0) Insert(new EventCommand(208, 0, k)); });
 
@@ -375,6 +382,17 @@ namespace PokeCreator.Studio.Editors
                 string n = AssetPick("Graphics/Panoramas", "Panorama picture (Cancel = none)") ?? "";
                 Insert(new EventCommand(204, 0, 0, n, 0));
             });
+            cmd(screen, "Change Fog Color Tone", () =>
+            {
+                var presets = new[] { "Normal", "Red", "Green", "Blue", "Gold" };
+                double[][] vals = { new[] { 0.0, 0, 0, 0 }, new[] { 136.0, 0, 0, 0 }, new[] { 0.0, 136, 0, 0 }, new[] { 0.0, 0, 136, 0 }, new[] { 136.0, 102, 0, 0 } };
+                int k = ChoiceDialog.Ask(FindForm(), "Fog tone", presets); if (k < 0) return;
+                int f = NumberDialog.Ask(FindForm(), "Change over (1/20 second units, 0 = instantly)", 20); if (f < 0) return;
+                var tone = new JsonObject(); tone["_class"] = "Tone"; tone["Values"] = vals[k].Select(v => (object)v).ToList();
+                Insert(new EventCommand(205, 0, tone, f * 2));
+            });
+            cmd(screen, "Fade In From Black (transition)", () => Insert(new EventCommand(221, 0), new EventCommand(222, 0, "")));
+            cmd(screen, "Change Menu Windowskin", () => { string n = AssetPick("Graphics/Windowskins", "Windowskin (Cancel = the normal one)") ?? ""; Insert(new EventCommand(131, 0, n)); });
             cmd(screen, "Change Fog Opacity", () =>
             {
                 int op = NumberDialog.Ask(FindForm(), "Opacity (0-255)", 64); if (op < 0) return;
