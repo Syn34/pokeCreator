@@ -83,6 +83,15 @@ Already have an Essentials game? **File → Import Pokémon Essentials Project**
 - **Pause menu** (Esc/X): Pokémon party (switch order), 3-page summary (info, stats with nature colours, moves), Bag with 8 pockets, trainer card, Save, Quit to Title
 - **Saving and loading** to `%AppData%\PokeCreator\Saves\<game title>\Game.json` (previous save kept as a backup)
 
+**Newer additions**
+- **Pokémon Storage System**: 40 boxes (configurable) with names and wallpapers, Organize Boxes with the party beside the box, pick up / swap / withdraw / store, held items, markings; Purify Chamber for Shadow Pokémon; Mail (write, read, PC mailbox)
+- **Summary** with Info, Memo (where met, characteristic), Stats, Moves (details and reordering) and Ribbons pages; level-up stat window; **Pokédex** with regional dexes, search / sort, Area (town map) and Forms pages
+- **Battle Frontier**: Battle Tower, Palace (Pokémon act by nature), Arena (judged after 3 turns), Factory (rentals and swaps), Essentials' `pbBattleChallenge` calls, battle recording and playback
+- **Smarter trainer AI** (damage estimates, immunities, status checks, healing, set-up, switching), `setBattleRule` options (weather, terrain, backdrop, no running, no EXP / money...)
+- **Random dungeons**, play statistics (`$stats`, Trainer Card back), seasons and time events, Shiny / Oval Charm, overworld ability effects (Stench, Synchronize, Static...), White / Black Flute, Pokégear Jukebox, form-changing items (Gracidea, Reveal Glass, Rotom Catalog, DNA Splicers...)
+- **Event scripts** run Ruby control flow (if / case / while / each / blocks / ternaries), and the Problems panel lists script calls the game doesn't understand
+- Grass rustle, landing dust, jump shadows, tall-grass bush depth, water reflections; BGS ambient sounds and music effects that pause the BGM; game controllers, key rebinding, screen size / full screen (Alt+Enter); F5 Ready menu; F9 debug menu in playtests
+
 **Sprites for Pokémon #899–1025 aren't included** (PokeCreator ships no Nintendo assets): add them to `Graphics/Pokemon/Front`, `Back`, `Icons` and so on, named like the others (e.g. `SPRIGATITO.png`).
 
  See [docs/ROADMAP.md](docs/ROADMAP.md).
