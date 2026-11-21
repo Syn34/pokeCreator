@@ -272,7 +272,9 @@ namespace PokeCreator.Runtime.Script
                 case 203:
                     if (_game.Scrolling) return false; // a scroll still going: wait for it first
                     _game.ScrollMap(c.IntParam(0), c.IntParam(1), c.IntParam(2)); return true;
-                case 221: case 222: return true;
+                case 221: return true; // Prepare for Transition
+                case 222: _game.FadeInFromBlack(); return true; // Execute Transition: a fade in from black
+                case 131: _game.State.Extras.Windowskin = c.StrParam(0); _game.LoadFrames(); return true;
                 case 236: _game.Weather.Set(WeatherType(c.Params.Count > 0 ? c.Params[0] : null), c.IntParam(1), c.IntParam(2)); return true;
                 case 208: _game.Player.Transparent = c.IntParam(0) == 0; return true;
                 case 209:

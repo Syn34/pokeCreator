@@ -304,6 +304,8 @@ namespace PokeCreator.Runtime
             var st = Project.Settings;
             string speech = Options != null && !string.IsNullOrEmpty(Options.SpeechFrame) ? Options.SpeechFrame : st.SpeechFrame;
             string menu = Options != null && !string.IsNullOrEmpty(Options.MenuFrame) ? Options.MenuFrame : st.MenuFrame;
+            // Change Windowskin (command 131) replaces the menu frame until changed back
+            if (State != null && !string.IsNullOrEmpty(State.Extras.Windowskin)) menu = State.Extras.Windowskin;
             MessageWindow.SpeechSkin = string.IsNullOrEmpty(speech) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", speech));
             MessageWindow.MenuSkin = string.IsNullOrEmpty(menu) ? null : WindowSkin.Load(Gfx, Project.FindAsset("Graphics/Windowskins", menu));
         }
@@ -815,6 +817,8 @@ namespace PokeCreator.Runtime
         }
 
         public void Flash(int frames) { _flash = Math.Max(1, frames); }
+        /// <summary>Execute Transition: the screen fades in from black.</summary>
+        public void FadeInFromBlack() { _fadeAlpha = 255; }
 
         // ------------------------------------------------------------------ update
         int _berryTimer;
