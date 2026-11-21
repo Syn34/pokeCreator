@@ -126,6 +126,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Studio script editor: monospace editing, searchable list of the script calls the game understands (double-click to insert), live warning for calls it won't understand
 - [x] Battle sprites placed with pokemon_metrics (front / back offsets, altitude, shadows) like Essentials; Database → Sprite Positions to adjust them on a battle scene; critical captures; wild held items
 - [x] Starter Pokémon choice quick event; item messages with portion names, TM moves and the pocket; Essentials type icons; Game Settings no longer opens as modified
+- [x] RPG Maker map animations: imported from Animations.rxdata (map_animations.json), played by Show Animation over characters or the screen (cells, hue, sounds, screen flashes); the trainer "!" uses animation 3; Studio Show Animation command
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

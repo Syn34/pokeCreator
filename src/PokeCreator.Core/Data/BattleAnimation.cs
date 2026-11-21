@@ -120,3 +120,36 @@ namespace PokeCreator.Data
         }
     }
 }
+
+namespace PokeCreator.Data
+{
+    /// <summary>
+    /// An RPG Maker map animation (Essentials' Data/Animations.rxdata): shown over a character or the screen with the
+    /// Show Animation command (grass rustle, "!" bubble...). Cells: pattern, x, y, zoom, angle, mirror, opacity, blend.
+    /// </summary>
+    public class MapAnimation
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        /// <summary>Picture in Graphics/Animations (192×192 cells, 5 per row).</summary>
+        public string Graphic { get; set; }
+        public int Hue { get; set; }
+        /// <summary>0 above the character, 1 on it, 2 at its feet, 3 the whole screen.</summary>
+        public int Position { get; set; }
+        public List<List<List<int>>> Frames { get; set; }
+        public List<MapAnimationTiming> Timings { get; set; }
+        public MapAnimation() { Frames = new List<List<List<int>>>(); Timings = new List<MapAnimationTiming>(); }
+    }
+
+    public class MapAnimationTiming
+    {
+        public int Frame { get; set; }
+        public string Se { get; set; }
+        public int Volume { get; set; }
+        public int Pitch { get; set; }
+        /// <summary>0 none, 1 the target, 2 the screen, 3 hide the target.</summary>
+        public int FlashScope { get; set; }
+        public List<int> FlashColor { get; set; }
+        public int FlashDuration { get; set; }
+    }
+}

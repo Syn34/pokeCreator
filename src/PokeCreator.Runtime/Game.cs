@@ -833,6 +833,8 @@ namespace PokeCreator.Runtime
         /// <summary>Shows a "!" over a character for a moment (trainers noticing the player).</summary>
         public void Exclaim(Character c, int frames)
         {
+            // Essentials' "!" bubble (map animation 3) when the project has it, else a drawn one
+            if (c != null && Effects != null && Effects.PlayAnimation(3, c)) { if (!Project.MapAnimations.First(a => a.Id == 3).Timings.Any(t => !string.IsNullOrEmpty(t.Se))) Audio.PlaySe("Exclaim"); return; }
             _exclaimOn = c; _exclaimTimer = frames;
             Audio.PlaySe("Exclaim");
         }

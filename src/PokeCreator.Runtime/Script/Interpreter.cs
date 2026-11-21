@@ -268,6 +268,8 @@ namespace PokeCreator.Runtime.Script
                     {
                         // Show Animation on a character: Essentials' overworld animations (1 grass, 2 dust, 3 "!")
                         var ch = GetCharacter(c.IntParam(0));
+                        // The project's own RPG Maker animations (imported Animations.rxdata) first
+                        if (ch != null && _game.Effects.PlayAnimation(c.IntParam(1), ch)) return true;
                         string kind = World.MapEffects.KindForAnimation(c.IntParam(1));
                         if (ch != null && kind != null) { if (kind == "exclaim") _game.Exclaim(ch, 30); else _game.Effects.Play(kind, ch.X, ch.Y); }
                         return true;

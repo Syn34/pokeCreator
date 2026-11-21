@@ -64,6 +64,7 @@ namespace PokeCreator.Import
             ImportTilesets();
             ImportMaps();
             ImportAnimations();
+            ImportMapAnimations();
 
             if (BaseDataFolder != null)
             {
@@ -519,6 +520,62 @@ namespace PokeCreator.Import
             if (sys.Str("windowskin_name").Length > 0) _p.Settings.Windowskin = sys.Str("windowskin_name");
             var titleBgm = sys.Obj("title_bgm");
             if (titleBgm != null) _p.Settings.TitleBGM = titleBgm.Str("name");
+        }
+
+        /// <summary>RPG Maker map animations (Data/Animations.rxdata) for Show Animation.</summary>
+        void ImportMapAnimations()
+        {
+            string f = RxPath("Animations.rxdata");
+            if (!File.Exists(f)) return;
+            try
+            {
+                _p.MapAnimations = ReadMapAnimations(f);
+                Log("  " + _p.MapAnimations.Count + " map animations");
+            }
+            catch (Exception ex) { Warn("Animations.rxdata: " + ex.Message); }
+        }
+
+        public static List<MapAnimation> ReadMapAnimations(string file)
+        {
+            var result = new List<MapAnimation>();
+            var list = MarshalReader.Load(file) as List<object>;
+            if (list == null) return result;
+            foreach (var o in list)
+            {
+                var ob = o as RObject;
+                if (ob == null || ob.Int("id") <= 0 || ob.Str("animation_name").Length == 0) continue;
+                var an = new MapAnimation { Id = ob.Int("id"), Name = ob.Str("name"), Graphic = ob.Str("animation_name"), Hue = ob.Int("animation_hue"), Position = ob.Int("position") };
+                foreach (var fo in ob.List("frames"))
+                {
+                    var fr = fo as RObject;
+                    var cells = new List<List<int>>();
+                    var ud = fr != null ? fr.Get("cell_data") as RUserData : null;
+                    if (ud != null)
+                    {
+                        var t = ud.AsTable();
+                        for (int c = 0; c < t.XSize; c++)
+                        {
+                            var cell = new List<int>();
+                            for (int k = 0; k < 8 && k < t.YSize; k++) cell.Add(t[c, k]);
+                            if (cell.Count == 8 && cell[0] >= 0) cells.Add(cell);
+                        }
+                    }
+                    an.Frames.Add(cells);
+                }
+                foreach (var to in ob.List("timings"))
+                {
+                    var ti = to as RObject;
+                    if (ti == null) continue;
+                    var se = ti.Obj("se");
+                    var tm = new MapAnimationTiming { Frame = ti.Int("frame"), FlashScope = ti.Int("flash_scope"), FlashDuration = ti.Int("flash_duration") };
+                    if (se != null && se.Str("name").Length > 0) { tm.Se = se.Str("name"); tm.Volume = se.Int("volume"); tm.Pitch = se.Int("pitch"); }
+                    var col = ti.Get("flash_color") as RUserData;
+                    if (col != null) tm.FlashColor = col.AsDoubles().Select(d => (int)d).ToList();
+                    an.Timings.Add(tm);
+                }
+                result.Add(an);
+            }
+            return result;
         }
 
         void ImportAnimations()

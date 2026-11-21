@@ -71,6 +71,8 @@ namespace PokeCreator.Projects
         public List<RegionalDex> RegionalDexes = new List<RegionalDex>();
         public List<BattleAnimation> Animations = new List<BattleAnimation>();
         public List<MysteryGiftData> MysteryGifts = new List<MysteryGiftData>();
+        /// <summary>RPG Maker map animations for Show Animation (map_animations.json).</summary>
+        public List<MapAnimation> MapAnimations = new List<MapAnimation>();
 
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
@@ -235,6 +237,7 @@ namespace PokeCreator.Projects
             p.Tilesets = LoadOr(p.DataFile("tilesets.json"), p.Tilesets);
             p.Connections = LoadOr(p.DataFile("map_connections.json"), p.Connections);
             p.CommonEvents = LoadOr(p.DataFile("common_events.json"), p.CommonEvents);
+            p.MapAnimations = LoadOr(p.DataFile("map_animations.json"), p.MapAnimations);
             PokeCreator.Pkmn.FormRules.EnsureGen9Forms(p);
             return p;
         }
@@ -268,6 +271,7 @@ namespace PokeCreator.Projects
             Json.Json.ToFile(DataFile("tilesets.json"), Tilesets);
             Json.Json.ToFile(DataFile("map_connections.json"), Connections);
             Json.Json.ToFile(DataFile("common_events.json"), CommonEvents);
+            if (MapAnimations.Count > 0) Json.Json.ToFile(DataFile("map_animations.json"), MapAnimations);
         }
 
         public CommonEventData GetCommonEvent(int id) { return CommonEvents.FirstOrDefault(c => c.Id == id); }

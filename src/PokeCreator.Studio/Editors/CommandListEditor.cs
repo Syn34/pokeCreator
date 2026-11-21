@@ -325,6 +325,15 @@ namespace PokeCreator.Studio.Editors
                 Insert(new EventCommand(203, 0, new[] { 2, 4, 6, 8 }[d], n, Math.Min(6, s)));
             });
             cmd(map, "Wait for Move's Completion", () => Insert(new EventCommand(210, 0)));
+            cmd(map, "Show Animation…", () =>
+            {
+                int who = PickCharacter("Show the animation on which character?", true); if (who < -1) return;
+                var anims = _p.MapAnimations.Count > 0 ? _p.MapAnimations.OrderBy(a => a.Id).Select(a => new KeyValuePair<int, string>(a.Id, a.Id.ToString("000") + ": " + a.Name)).ToList()
+                    : new List<KeyValuePair<int, string>> { new KeyValuePair<int, string>(1, "001: Grass rustle"), new KeyValuePair<int, string>(2, "002: Dust"), new KeyValuePair<int, string>(3, "003: Exclamation mark") };
+                int k = ChoiceDialog.Ask(FindForm(), "Which animation?", anims.Select(x => x.Value).ToArray(), true);
+                if (k < 0) return;
+                Insert(new EventCommand(207, 0, who, anims[k].Key));
+            });
             cmd(map, "Player Transparent / Visible", () => { int k = ChoiceDialog.Ask(FindForm(), "Player is", new[] { "Transparent (hidden)", "Normal (visible)" }); if (k >= 0) Insert(new EventCommand(208, 0, k)); });
 
             var screen = group("Screen");

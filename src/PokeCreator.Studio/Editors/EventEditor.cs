@@ -28,6 +28,7 @@ namespace PokeCreator.Studio.Editors
                 case 403: return ": When Cancel";
                 case 404: return ": Branch End";
                 case 106: return "◆ Wait: " + c.IntParam(0) + " frame(s)";
+                case 207: { var an = p.MapAnimations.FirstOrDefault(a => a.Id == c.IntParam(1)); return "◆ Show Animation: " + Who(c.IntParam(0)) + ", " + (an != null ? an.Name : c.IntParam(1) == 1 ? "Grass rustle" : c.IntParam(1) == 2 ? "Dust" : c.IntParam(1) == 3 ? "Exclamation mark" : "animation " + c.IntParam(1)); }
                 case 108: return "◆ Comment: " + c.StrParam(0);
                 case 408: return "    " + c.StrParam(0);
                 case 111: return "◆ If: " + Condition(c, p);
