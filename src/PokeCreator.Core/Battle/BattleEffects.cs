@@ -111,7 +111,17 @@ namespace PokeCreator.Battles
             return a != null && !string.IsNullOrEmpty(a.Name) ? a.Name : id;
         }
         /// <summary>"Gyarados's Intimidate!" (Essentials shows this as the ability splash).</summary>
-        void Splash(Battler b) { Say(Name(b) + "'s " + AbilityName(b) + "!"); }
+        /// <summary>
+        /// Shows whose Ability is acting. With UseAbilitySplash the battle screen shows a panel (as Essentials);
+        /// otherwise, and for screens that don't draw it, it's the message "Pokémon's Ability!".
+        /// </summary>
+        void Splash(Battler b)
+        {
+            if (UseAbilitySplash) _ev.Add(new BattleEvent { Kind = BattleEventKind.Ability, Side = b.Side, Party = b.PartyIndex, Slot = b.Slot, Text = Name(b) + "'s\n" + AbilityName(b) });
+            else Say(Name(b) + "'s " + AbilityName(b) + "!");
+        }
+        /// <summary>Set by battle screens that draw ability splashes.</summary>
+        public bool UseAbilitySplash;
 
         bool MoldBreaker(Battler user) { return _ignoreAbilityMove || HasAbility(user, "MOLDBREAKER") || HasAbility(user, "TERAVOLT") || HasAbility(user, "TURBOBLAZE"); }
         /// <summary>Moongeist Beam, Sunsteel Strike, Photon Geyser: the current move ignores the target's ability.</summary>

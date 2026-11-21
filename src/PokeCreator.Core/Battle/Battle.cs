@@ -14,7 +14,9 @@ namespace PokeCreator.Battles
         /// <summary>A common animation (Text = "StatUp", "Poison", "Rain"...) on Side/Slot; Side -1 = whole field.</summary>
         CommonAnim,
         /// <summary>A Pokémon changed form (Mega Evolution): its sprite and databox update.</summary>
-        FormChange }
+        FormChange,
+        /// <summary>Ability splash (as Essentials): Side/Slot = the Pokémon, Text = "Pokémon's Ability".</summary>
+        Ability }
 
     /// <summary>Something the battle screen shows, in order: a message, an HP bar change, a Pokémon fainting...</summary>
     public class BattleEvent

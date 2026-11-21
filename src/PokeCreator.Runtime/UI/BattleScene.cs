@@ -87,6 +87,7 @@ namespace PokeCreator.Runtime.UI
         public BattleScene(Game g, Battle battle, BattleSetup setup) : base(g)
         {
             Opaque = true; _b = battle; _setup = setup; _party = battle.Parties[0];
+            _b.UseAbilitySplash = true;
             if (setup.Replay == null) battle.PlayerHasMegaRing = Battle.MegaRings.Any(r => g.State.ItemCount(r) > 0);
             battle.BagHas = r => g.State.ItemCount(r) > 0;
             _trainerVisible = !setup.Wild;
@@ -264,6 +265,9 @@ namespace PokeCreator.Runtime.UI
                     if (!string.IsNullOrEmpty(e.Text)) StartCommon(StatusAnimName(e.Text), e.Side, SlotOf(e.Side, e.Party));
                     return _player != null;
                 case BattleEventKind.Faint: Game.Audio.PlaySe("Pkmn faint"); return true;
+                case BattleEventKind.Ability:
+                    _splashText = e.Text; _splashSide = e.Side; _splashTimer = 70;
+                    return true;
                 case BattleEventKind.StatChange:
                     Game.Audio.PlaySe(e.Value > 0 ? "Battle stat up" : "Battle stat down");
                     if (StartCommon(e.Value > 0 ? "StatUp" : "StatDown", e.Side, SlotOf(e.Side, e.Party))) return true;
@@ -336,6 +340,7 @@ namespace PokeCreator.Runtime.UI
                         return false;
                     }
                 case BattleEventKind.FormChange: return _anim >= 24;
+                case BattleEventKind.Ability: return _anim >= 20;
                 case BattleEventKind.SendOut:
                     if (_anim == 12 && _b.Parties[e.Side][e.Party].Shiny && StartCommon("Shiny", e.Side, e.Slot)) return false;
                     return _anim >= 12;
@@ -922,6 +927,7 @@ namespace PokeCreator.Runtime.UI
             DrawEffects(g);
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
+            DrawSplash(g);
             // Databoxes
             for (int slot = 0; slot < _b.SlotsPerSide; slot++)
             {
@@ -946,6 +952,24 @@ namespace PokeCreator.Runtime.UI
                     if (_briefText != null && _mode == Mode.Events) g.DrawText(26, g.Height - 86, _briefText, Color.TextBase, Color.TextShadow);
                 }
             }
+        }
+
+        // Ability splash: slides in from the Pokémon's side, stays a moment, then slides out
+        string _splashText; int _splashSide, _splashTimer;
+        void DrawSplash(Gfx g)
+        {
+            if (_splashTimer <= 0 || _splashText == null) return;
+            _splashTimer--;
+            const int w = 220, h = 50;
+            int t = 70 - _splashTimer;
+            double inF = Math.Min(1, t / 8.0), outF = Math.Min(1, _splashTimer / 8.0), f = Math.Min(inF, outF);
+            int y = _splashSide == 0 ? 168 : 72;
+            int x = _splashSide == 0 ? (int)(-w + w * f) : (int)(g.Width - w * f);
+            var fill = _splashSide == 0 ? new Color(80, 144, 232) : new Color(232, 88, 80);
+            Ui.Panel(g, x, y, w, h, new Color(fill.R, fill.G, fill.B, 235), new Color(255, 255, 255));
+            var parts = _splashText.Split('\n');
+            g.DrawText(x + 12, y + 4, parts[0], new Color(248, 248, 248), new Color(40, 40, 48));
+            if (parts.Length > 1) g.DrawText(x + 12, y + 25, parts[1], new Color(248, 248, 248), new Color(40, 40, 48));
         }
 
         static Color TypeColor(string type)
