@@ -51,6 +51,9 @@ namespace PokeCreator.Maps
         [Field("Battle environment")] public string Environment { get; set; }
         [Field("Wild battle BGM", Asset = "Audio/BGM")] public string WildBattleBGM { get; set; }
         [Field("Trainer battle BGM", Asset = "Audio/BGM")] public string TrainerBattleBGM { get; set; }
+        [Field("Wild victory music", Asset = "Audio/BGM", Help = "Instead of the game's wild victory music on this map.")] public string WildVictoryBGM { get; set; }
+        [Field("Trainer victory music", Asset = "Audio/BGM", Help = "Instead of the game's trainer victory music on this map.")] public string TrainerVictoryBGM { get; set; }
+        [Field("Wild capture ME", Asset = "Audio/ME", Help = "Instead of the game's capture jingle on this map.")] public string WildCaptureME { get; set; }
         [Field("Map size (width, squares)")] public string MapSize { get; set; }
         [Field("Flags")] public List<string> Flags { get; set; }
         public MapProperties() { HealingSpot = new List<int>(); MapPosition = new List<int>(); Flags = new List<string>(); }

@@ -324,6 +324,7 @@ namespace PokeCreator.Data
         [Field("Trainer battle BGM", Asset = "Audio/BGM", Group = "Music")] public string TrainerBattleBGM { get; set; }
         [Field("Wild victory ME", Asset = "Audio/BGM", Group = "Music")] public string WildVictoryBGM { get; set; }
         [Field("Trainer victory ME", Asset = "Audio/BGM", Group = "Music")] public string TrainerVictoryBGM { get; set; }
+        [Field("Wild capture ME", Asset = "Audio/ME", Group = "Music", Help = "Plays when a wild Pokémon is caught (default: Battle capture success).")] public string WildCaptureME { get; set; }
         [Field("Surf BGM", Asset = "Audio/BGM", Group = "Music")] public string SurfBGM { get; set; }
         [Field("Bicycle BGM", Asset = "Audio/BGM", Group = "Music")] public string BicycleBGM { get; set; }
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }

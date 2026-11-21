@@ -359,7 +359,7 @@ namespace PokeCreator.Runtime.UI
                         if (_anim > 30 && (_anim - 30) % 30 == 0 && (_anim - 30) / 30 <= _ballShakes) Game.Audio.PlaySe("Battle ball shake");
                         if (_anim >= end)
                         {
-                            if (_ballCaught) { Game.Audio.PlaySe("Battle catch click"); Game.Audio.PlayMe("Battle capture success"); }
+                            if (_ballCaught) { Game.Audio.PlaySe("Battle catch click"); Game.Audio.PlayMe(MapProp(mp => mp.WildCaptureME) ?? (string.IsNullOrEmpty(Game.Project.Settings.WildCaptureME) ? "Battle capture success" : Game.Project.Settings.WildCaptureME)); }
                             else { _ballVisible = false; _visible[k] = true; Game.Audio.PlaySe("Battle recall"); }
                             return true;
                         }
@@ -403,6 +403,14 @@ namespace PokeCreator.Runtime.UI
         }
 
         /// <summary>Autotest: plays a move's (or "Common:X") animation now, from userSide's first Pokémon.</summary>
+        /// <summary>A text property of the current map, or null when it's empty.</summary>
+        string MapProp(Func<PokeCreator.Maps.MapProperties, string> f)
+        {
+            var mp = Game.Map != null ? Game.Map.Data.Properties : null;
+            string v = mp != null ? f(mp) : null;
+            return string.IsNullOrEmpty(v) ? null : v;
+        }
+
         /// <summary>Autotests: throws a ball when the battle is waiting for a command.</summary>
         public bool DebugThrow(string ball)
         {
@@ -707,7 +715,7 @@ namespace PokeCreator.Runtime.UI
             var steps = new List<Action<Action>>();
             if (o == BattleOutcome.Win && !_setup.Wild)
             {
-                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : _setup.TrainerType != null && !string.IsNullOrEmpty(_setup.TrainerType.VictoryBGM) ? _setup.TrainerType.VictoryBGM : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : Game.Project.Settings.TrainerVictoryBGM;
+                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : _setup.TrainerType != null && !string.IsNullOrEmpty(_setup.TrainerType.VictoryBGM) ? _setup.TrainerType.VictoryBGM : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : MapProp(mp => mp.TrainerVictoryBGM) ?? Game.Project.Settings.TrainerVictoryBGM;
                 Game.State.Extras.NextBattleMe = null;
                 Game.Audio.PlayBgm(string.IsNullOrEmpty(victory) ? "Battle victory trainer" : victory);
                 _trainerVisible = true;
@@ -720,7 +728,7 @@ namespace PokeCreator.Runtime.UI
             }
             else if (o == BattleOutcome.Win)
             {
-                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : Game.Project.Settings.WildVictoryBGM;
+                string victory = !string.IsNullOrEmpty(Game.State.Extras.NextBattleMe) ? Game.State.Extras.NextBattleMe : !string.IsNullOrEmpty(Game.State.Extras.BattleEndMe) ? Game.State.Extras.BattleEndMe : MapProp(mp => mp.WildVictoryBGM) ?? Game.Project.Settings.WildVictoryBGM;
                 Game.State.Extras.NextBattleMe = null;
                 Game.Audio.PlayBgm(string.IsNullOrEmpty(victory) ? "Battle victory wild" : victory);
             }
