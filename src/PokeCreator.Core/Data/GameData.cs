@@ -479,6 +479,7 @@ namespace PokeCreator.Data
     {
         [Field("Name")] public string Name { get; set; }
         [Field("Species", Ref = "species")] public List<string> Species { get; set; }
+        [Field("Numbering starts at 0", Help = "The first species is #000 (Essentials' DEXES_WITH_OFFSETS), e.g. Victini in Unova.")] public bool StartsAtZero { get; set; }
         public RegionalDex() { Species = new List<string>(); }
         public override string DisplayName { get { return "Dex " + Id + (string.IsNullOrEmpty(Name) ? "" : ": " + Name); } }
     }

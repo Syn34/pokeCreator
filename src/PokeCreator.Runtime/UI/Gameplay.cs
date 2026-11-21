@@ -519,7 +519,8 @@ namespace PokeCreator.Runtime.UI
             }
             else _list = g.Project.Species.Where(s => s.Form == 0).ToList();
             _full = _list.ToList();
-            for (int k = 0; k < _full.Count; k++) _numbers[_full[k].Id] = k + 1;
+            int first = dex >= 0 && dex < g.Project.RegionalDexes.Count && g.Project.RegionalDexes[dex].StartsAtZero ? 0 : 1;
+            for (int k = 0; k < _full.Count; k++) _numbers[_full[k].Id] = k + first;
             // Start on the last species the player has seen
             int last = _list.FindLastIndex(s => g.State.Seen.Contains(s.Id));
             _index = Math.Max(0, last); _scroll = Math.Max(0, _index - Rows / 2);
