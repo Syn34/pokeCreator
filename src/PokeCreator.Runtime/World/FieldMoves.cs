@@ -82,6 +82,7 @@ namespace PokeCreator.Runtime.World
             foreach (var s in m.Slots) { if (roll < s.Chance) { slot = s; break; } roll -= s.Chance; }
             int level = g.Rng.Next(slot.MinLevel, Math.Max(slot.MinLevel, slot.MaxLevel) + 1);
             string kind = m.Type.EndsWith("Rod") ? "Fishing" : m.Type.StartsWith("Water") ? "Water" : m.Type.StartsWith("Cave") ? "Cave" : m.Type.StartsWith("Land") ? "Land" : m.Type;
+            g.EncounterKind = kind;   // the Lure Ball works on Pokémon hooked with a rod
             if (Roaming.TryEncounter(g, kind)) return true;
             g.StartWildBattle(slot.Species, level, null);
             return true;

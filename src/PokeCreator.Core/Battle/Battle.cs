@@ -2000,12 +2000,19 @@ namespace PokeCreator.Battles
                 case "ULTRABALL": return 2;
                 case "MASTERBALL": return 255;
                 case "NETBALL": return types.Contains("WATER") || types.Contains("BUG") ? 3.5 : 1;
-                case "DIVEBALL": return 1;
+                case "DIVEBALL": return b.Environment == "Underwater" ? 3.5 : 1;
+                case "LUREBALL": return b.Fishing ? 5 : 1;
+                case "DREAMBALL": return (foe.Status ?? "").ToUpperInvariant() == "SLEEP" ? 4 : 1;
+                case "FASTBALL": { var d = foe.Data(b.P); return d != null && d.BaseStats != null && d.BaseStats.Count > 3 && d.BaseStats[3] >= 100 ? 4 : 1; }
+                case "BEASTBALL": { var d = foe.Data(b.P); return d != null && d.Flags != null && d.Flags.Contains("UltraBeast") ? 5 : 0.1; }
+                case "LOVEBALL":
+                    return b.Live(0).Any(m => m.Pk.Species == foe.Species && (m.Pk.Gender == "M" && foe.Gender == "F" || m.Pk.Gender == "F" && foe.Gender == "M")) ? 8 : 1;
+                case "MOONBALL": return EvolvesWithItem(b.P, foe.Species, "MOONSTONE", 0) ? 4 : 1;
                 case "NESTBALL": return Math.Max(1, (41 - foe.Level) / 10.0);
                 case "REPEATBALL": return 1;
                 case "TIMERBALL": return Math.Min(4, 1 + b.Turn * 1229 / 4096.0);
                 case "QUICKBALL": return b.Turn <= 1 ? 5 : 1;
-                case "DUSKBALL": return DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20 ? 3 : 1;
+                case "DUSKBALL": return DateTime.Now.Hour < 6 || DateTime.Now.Hour >= 20 || b.Environment == "Cave" ? 3 : 1;
                 case "LEVELBALL":
                     {
                         int me = (b.Live(0).FirstOrDefault() ?? b.Field[0][0]).Pk.Level, them = foe.Level;
@@ -2014,6 +2021,22 @@ namespace PokeCreator.Battles
                 default: return 1;
             }
         }
+
+        /// <summary>True when the species (or a later stage) evolves with the item (Moon Ball).</summary>
+        static bool EvolvesWithItem(PokeCreator.Projects.Project p, string species, string item, int depth)
+        {
+            var d = p.Species.FirstOrDefault(s => s.Id == species);
+            if (d == null || d.Evolutions == null || depth > 4) return false;
+            foreach (var e in d.Evolutions)
+            {
+                if ((e.Method ?? "").StartsWith("Item") && e.Parameter == item) return true;
+                if (EvolvesWithItem(p, e.Species, item, depth + 1)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>The wild Pokémon was hooked with a fishing rod (Lure Ball).</summary>
+        public bool Fishing;
 
         /// <summary>For the Repeat Ball: species already caught.</summary>
         public Func<string, bool> AlreadyCaught = s => false;
@@ -2038,6 +2061,11 @@ namespace PokeCreator.Battles
             int rate = _catchRateOverride.HasValue ? _catchRateOverride.Value : fd != null && fd.CatchRate > 0 ? fd.CatchRate : 45;
             double mod = BallModifier(ball, this);
             if (ball == "REPEATBALL" && AlreadyCaught(foe.Species)) mod = 3.5;
+            if (ball == "HEAVYBALL")
+            {
+                double w = fd != null && fd.Weight > 0 ? fd.Weight : 30;
+                rate = Math.Max(1, rate + (w >= 300 ? 30 : w >= 200 ? 20 : w < 100 ? -20 : 0));
+            }
             int max = foe.TotalHP(P);
             string st = (foe.Status ?? "").ToUpperInvariant();
             double statusMod = st == "SLEEP" || st == "FROZEN" ? 2.5 : st.Length > 0 ? 1.5 : 1;
@@ -2082,6 +2110,8 @@ namespace PokeCreator.Battles
             {
                 Say("Gotcha! " + foe.Name(P) + " was caught!");
                 foe.Ball = ball;
+                if (ball == "HEALBALL") { foe.HP = foe.TotalHP(P); foe.Status = ""; foreach (var m in foe.Moves) { var md = Move(m.Id); if (md != null) m.PP = Pokemon.TotalPP(md, m.PPUps); } }
+                if (ball == "FRIENDBALL") foe.Happiness = 200;
                 foeB.Reset();
                 CaughtPokemon = foe;
                 Outcome = BattleOutcome.Caught;

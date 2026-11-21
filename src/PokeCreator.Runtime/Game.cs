@@ -462,6 +462,8 @@ namespace PokeCreator.Runtime
         public bool BattleJustStarted;
         /// <summary>A Yes/No field-move question is open for an event's Conditional Branch (see FieldMoves.Ask).</summary>
         public bool PromptPending;
+        /// <summary>How the next wild Pokémon was found ("Fishing", "Water", "Land"...), for the Lure Ball.</summary>
+        public string EncounterKind;
         object _promptResult, _promptOwner;
         public void SetPrompt(object owner, object result) { _promptOwner = owner; _promptResult = result; }
         public bool TakePrompt(object owner, out object result)
@@ -694,6 +696,7 @@ namespace PokeCreator.Runtime
             b.Environment = BattleEnvironment();
             b.CaughtCount = State.Caught.Count;
             b.CatchingCharm = State.Bag.ContainsKey("CATCHINGCHARM");
+            b.Fishing = setup.Wild && EncounterKind == "Fishing"; EncounterKind = null;
             // Obedience: traded Pokémon above the badge level may disobey (not in link or facility battles)
             if (!setup.Link && !setup.Facility && !Project.Settings.NoDisobedience)
             {
