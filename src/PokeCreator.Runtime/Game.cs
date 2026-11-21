@@ -1057,7 +1057,7 @@ namespace PokeCreator.Runtime
                 case "give": _g.Compat.RunScript("pbAddPokemonSilent(:" + p[1] + "," + p[2] + ")", null); break;
                 case "item": _g.State.AddItem(p[1], p.Length > 2 ? int.Parse(p[2]) : 1); break;
                 case "switch": _g.State.SetSwitch(int.Parse(p[1]), p.Length < 3 || p[2] == "on"); if (_g.Map != null) _g.Map.RefreshEvents(); break;
-                case "log": if (_g.Map == null) { Console.WriteLine("[autotest] (title screen) scenes=" + _g.SceneOpen); break; } Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
+                case "log": Console.WriteLine("[autotest] renderer=" + _g.Gfx.RendererName + " sw=" + _g.Gfx.SoftwareRenderer); if (_g.Map == null) { Console.WriteLine("[autotest] (title screen) scenes=" + _g.SceneOpen); break; } Console.WriteLine("[autotest] map=" + _g.Map.Id + " player=" + _g.Player.X + "," + _g.Player.Y + " dir=" + _g.Player.Direction + " msg=" + _g.MessageBusy + " interp=" + _g.InterpreterRunning); break;
                 case "flag": _g.State.Flags.Add(p[1]); break;
                 case "moves": // moves partyIndex MOVE1,MOVE2,...
                     {

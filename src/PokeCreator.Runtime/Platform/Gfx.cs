@@ -49,14 +49,34 @@ namespace PokeCreator.Runtime.Platform
             if (Renderer == IntPtr.Zero) throw new Exception("Could not create renderer: " + SDL.GetError());
             SDL.SDL_RenderSetLogicalSize(Renderer, width, height);
             SDL.SDL_SetRenderDrawBlendMode(Renderer, SDL.BLENDMODE_BLEND);
+            try
+            {
+                SDL.SDL_RendererInfo info;
+                if (SDL.SDL_GetRendererInfo(Renderer, out info) == 0)
+                {
+                    RendererName = Marshal.PtrToStringAnsi(info.name) ?? "";
+                    SoftwareRenderer = (info.flags & SDL.RENDERER_SOFTWARE) != 0 || RendererName == "software";
+                }
+            }
+            catch { }
         }
+
+        /// <summary>The SDL renderer in use ("direct3d", "opengl", "software"...).</summary>
+        public string RendererName = "";
+        public bool SoftwareRenderer;
 
         public void SetTitle(string t) { SDL.SDL_SetWindowTitle(Window, SDL.U8(t)); }
 
         /// <summary>Window size: scale 1-4 times the game size, or 0 for full screen (desktop resolution, letterboxed).</summary>
-        public void SetScreenSize(int scale)
+        int _pendingSize = -1;
+        public void SetScreenSize(int scale) { _pendingSize = scale; } // applied after the frame is shown
+
+        void ApplyScreenSize(int scale)
         {
             if (Window == IntPtr.Zero) return;
+            // Some Linux OpenGL drivers (Mesa under X without a window manager) crash when the window is resized
+            // from code; there the window can still be resized by hand.
+            if (Environment.OSVersion.Platform == PlatformID.Unix && RendererName == "opengl" && Environment.GetEnvironmentVariable("POKECREATOR_ALLOW_RESIZE") == null) return;
             if (scale <= 0) { SDL.SDL_SetWindowFullscreen(Window, 0x00001001); return; } // SDL_WINDOW_FULLSCREEN_DESKTOP
             SDL.SDL_SetWindowFullscreen(Window, 0);
             SDL.SDL_SetWindowSize(Window, Width * scale, Height * scale);
@@ -250,7 +270,11 @@ namespace PokeCreator.Runtime.Platform
             SDL.SDL_RenderClear(Renderer);
         }
 
-        public void Present() { SDL.SDL_RenderPresent(Renderer); }
+        public void Present()
+        {
+            SDL.SDL_RenderPresent(Renderer);
+            if (_pendingSize >= 0) { int s = _pendingSize; _pendingSize = -1; ApplyScreenSize(s); }
+        }
 
         // ------------------------------------------------------------ text
         Texture TextTexture(string text, Color c)
