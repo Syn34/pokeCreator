@@ -993,6 +993,10 @@ namespace PokeCreator.Runtime.UI
             if (bg != null) g.Draw(bg, 0, 0, bg.Width, bg.Height, 0, 0);
             else Ui.Gradient(g, 0, 0, g.Width, 288, new Color(160, 216, 248), new Color(232, 248, 200));
             g.FillRect(0, 288, g.Width, g.Height - 288, new Color(40, 48, 56));
+            // The bases can come from the environment (grass_base0, sand_base1, water_..., as Essentials) when those files exist
+            string env = (_b.Environment ?? "").ToLowerInvariant();
+            string envBase = env == "grass" || env == "tallgrass" ? "grass" : env == "sand" ? "sand" : env == "movingwater" || env == "stillwater" ? "water" : env == "puddle" ? "puddle" : env == "ice" ? "ice" : null;
+            if (envBase != null && Game.Project.FindAsset("Graphics/Battlebacks", envBase + "_base0") != null) bd = envBase;
             var b1 = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Battlebacks", bd + "_base1"));
             if (b1 != null) g.Draw(b1, 0, 0, b1.Width, b1.Height, 384 - b1.Width / 2, 176 - b1.Height / 2);
             else Ellipse(g, 384, 192, 120, 22, new Color(150, 200, 110));
