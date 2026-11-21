@@ -215,8 +215,10 @@ namespace PokeCreator.Pkmn
         public static List<string> Evolve(Project p, Pokemon pk, string newSpecies)
         {
             int oldMax = pk.TotalHP(p), damage = oldMax - pk.HP;
-            string oldSpecies = pk.Species;
+            string oldSpecies = pk.Species; int oldForm = pk.Form;
             pk.Species = newSpecies;
+            int ef = FormRules.EvolutionForm(p, pk, oldSpecies, oldForm);
+            if (ef >= 0) pk.Form = ef;
             if (pk.Form > 0 && !p.Species.Any(s => s.Id == newSpecies + "_" + pk.Form)) pk.Form = 0;
             if (pk.Data(p) == null) pk.Form = 0;
             pk.HP = Math.Max(pk.Fainted ? 0 : 1, pk.TotalHP(p) - damage);

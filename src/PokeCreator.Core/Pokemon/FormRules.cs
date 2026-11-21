@@ -37,6 +37,7 @@ namespace PokeCreator.Pkmn
                 int f = pk.Form;
                 if ((pk.Species == "DEERLING" || pk.Species == "SAWSBUCK") && HasForm(p, pk.Species, season)) f = season;
                 if (pk.Species == "SHAYMIN" && pk.Form == 1 && (hour >= 20 || hour < 5)) f = 0;
+                if (pk.Species == "KELDEO" && HasForm(p, "KELDEO", 1)) f = pk.Moves.Any(m => m.Id == "SECRETSWORD") ? 1 : 0;
                 if (f != pk.Form) { pk.Form = f; changed = true; }
             }
             return changed;
@@ -69,8 +70,47 @@ namespace PokeCreator.Pkmn
                     }
                 case "TOXTRICITY": return LowKeyNatures.Contains(pk.Nature) && HasForm(p, pk.Species, 1) ? 1 : 0;
                 case "MAUSHOLD": case "DUDUNSPARCE": return rng.Next(100) == 0 && HasForm(p, pk.Species, 1) ? 1 : 0;
+                case "BASCULIN": return HasForm(p, pk.Species, 1) ? rng.Next(2) : 0;
+                case "PUMPKABOO": case "GOURGEIST":
+                    {
+                        // Average 50%, Small 30%, Large 15%, Super Size 5%
+                        int r = rng.Next(20), f = r == 0 ? 3 : r <= 3 ? 2 : r <= 9 ? 1 : 0;
+                        return HasForm(p, pk.Species, f) ? f : 0;
+                    }
             }
             return pk.Form;
+        }
+
+        /// <summary>Species whose female form is a different form (Meowstic, Indeedee, Oinkologne, Basculegion).</summary>
+        public static int GenderForm(Project p, Pokemon pk)
+        {
+            switch (pk.Species)
+            {
+                case "MEOWSTIC": case "INDEEDEE": case "OINKOLOGNE": case "BASCULEGION":
+                    return pk.Gender == "F" && HasForm(p, pk.Species, 1) ? 1 : 0;
+            }
+            return -1;
+        }
+
+        /// <summary>The form a Pokémon takes when it evolves into this species (-1 = keep its form).</summary>
+        public static int EvolutionForm(Project p, Pokemon pk, string oldSpecies, int oldForm)
+        {
+            int g = GenderForm(p, pk);
+            if (g >= 0) return g;
+            if (pk.Species == "LYCANROC")
+            {
+                // Midday in the day, Midnight at night, Dusk from Own Tempo Rockruff in the evening
+                int h = DateTime.Now.Hour;
+                if (h >= 17 && h < 20 && (oldForm == 1 || pk.AbilityId(p) == "OWNTEMPO") && HasForm(p, "LYCANROC", 2)) return 2;
+                return (h < 6 || h >= 20) && HasForm(p, "LYCANROC", 1) ? 1 : 0;
+            }
+            return -1;
+        }
+
+        /// <summary>Keldeo's Resolute Form while it knows Secret Sword.</summary>
+        public static void UpdateMoveForm(Project p, Pokemon pk)
+        {
+            if (pk.Species == "KELDEO" && HasForm(p, "KELDEO", 1)) pk.Form = pk.Moves.Any(m => m.Id == "SECRETSWORD") ? 1 : 0;
         }
 
         /// <summary>The form a held item gives, or -1 if the item doesn't decide this species' form.</summary>

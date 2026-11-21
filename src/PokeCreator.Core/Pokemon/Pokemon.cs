@@ -307,6 +307,8 @@ namespace PokeCreator.Pkmn
             if (pk.Form == 0) { pk.Form = FormRules.FormOnCreation(p, pk, rng); d = pk.Data(p); }
             int fc = FemaleChance(d != null ? d.GenderRatio : "Female50Percent");
             pk.Gender = fc < 0 ? "" : rng.Next(256) < fc ? "F" : "M";
+            int gf = FormRules.GenderForm(p, pk);
+            if (gf >= 0 && pk.Form == 0) { pk.Form = gf; d = pk.Data(p); }
             pk.AbilityIndex = d != null && d.Abilities.Count > 1 ? rng.Next(d.Abilities.Count) : 0;
             pk.Shiny = rng.Next(4096) == 0;
             pk.Happiness = d != null ? d.Happiness : 70;
