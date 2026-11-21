@@ -350,6 +350,8 @@ namespace PokeCreator.Battles
                 if (FacilityRule == "palace") { orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : PalaceCommand(foe))); continue; }
                 var item = foe.Charging == null && !foe.MustRecharge && FacilityRule == null ? FoeItemChoice(foe) : null;
                 if (item != null) { FoeUseItem(foe, item); continue; }
+                var sw = foe.Charging == null && !foe.MustRecharge && foe.LockedMove == null ? AISwitch(foe, TrainerSkill) : null;
+                if (sw != null) { orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, sw)); continue; }
                 orders.Add(new KeyValuePair<Battler, BattleCommand>(foe, foe.Charging != null || foe.MustRecharge ? BattleCommand.Fight(foe.ChargingSlot) : ChooseAI(foe)));
             }
 
@@ -558,6 +560,7 @@ namespace PokeCreator.Battles
             if (usable.Count == 0) return BattleCommand.Fight(-1);
             int skill = IsPartner(me) ? PartnerSkill : TrainerSkill;
             if ((IsWild && me.Side == 1) || skill <= 0) return BattleCommand.Fight(usable[Rng.Next(usable.Count)]);
+            if (skill >= 32) return SmartAI(me, foe, usable, skill);
             // Smarter trainers: favour the move that does the most damage, with some variety and status moves now and then
             int best = usable[0]; double bestScore = -1;
             foreach (int i in usable)
