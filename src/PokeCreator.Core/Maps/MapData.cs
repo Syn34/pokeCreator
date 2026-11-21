@@ -48,7 +48,7 @@ namespace PokeCreator.Maps
         [Field("Dungeon floor tile", Help = "Tile ID for a random dungeon's floor (0 = the most common walkable tile painted on the map).")] public int DungeonFloor { get; set; }
         [Field("Dungeon wall tile", Help = "Tile ID for a random dungeon's walls (0 = the most common blocking tile painted on the map).")] public int DungeonWall { get; set; }
         [Field("Battle background", Help = "Name in Graphics/Battlebacks, e.g. field")] public string BattleBack { get; set; }
-        [Field("Battle environment")] public string Environment { get; set; }
+        [Field("Battle environment", Choices = new[] { "", "None", "Grass", "TallGrass", "MovingWater", "StillWater", "Puddle", "Underwater", "Cave", "Rock", "Sand", "Forest", "ForestGrass", "Snow", "Ice", "Volcano", "Graveyard", "Sky", "Space", "UltraSpace" }, Help = "Empty: from the tile the player stands on. Changes Nature Power, Camouflage, Secret Power and the battle bases.")] public string Environment { get; set; }
         [Field("Wild battle BGM", Asset = "Audio/BGM")] public string WildBattleBGM { get; set; }
         [Field("Trainer battle BGM", Asset = "Audio/BGM")] public string TrainerBattleBGM { get; set; }
         [Field("Wild victory music", Asset = "Audio/BGM", Help = "Instead of the game's wild victory music on this map.")] public string WildVictoryBGM { get; set; }
