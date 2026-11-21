@@ -683,6 +683,12 @@ namespace PokeCreator.Runtime
             b.Environment = BattleEnvironment();
             b.CaughtCount = State.Caught.Count;
             b.CatchingCharm = State.Bag.ContainsKey("CATCHINGCHARM");
+            // Obedience: traded Pokémon above the badge level may disobey (not in link or facility battles)
+            if (!setup.Link && !setup.Facility && !Project.Settings.NoDisobedience)
+            {
+                b.ObedienceBadges = State.Badges.Count; b.PlayerName = State.PlayerName; b.PlayerId = State.TrainerId;
+                b.AnyCanDisobey = Project.Settings.AnyHighLevelCanDisobey;
+            }
             // Exp. All: Game Settings, the EXPALL key item or $player.has_exp_all
             b.ExpAll = Project.Settings.ExpAll || State.Bag.ContainsKey("EXPALL") || State.Flags.Contains("has_exp_all");
             // Safari Zone: wild battles are Safari battles

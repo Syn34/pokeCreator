@@ -606,6 +606,61 @@ namespace PokeCreator.Battles
         /// <summary>Species the player has caught (critical captures) and whether they have the Catching Charm.</summary>
         public int CaughtCount;
         public bool CatchingCharm;
+        // Obedience (as Essentials): a Pokémon from another trainer above the badge level may ignore orders.
+        // -1 turns the checks off (link and facility battles)
+        public int ObedienceBadges = -1;
+        public int PlayerId;
+        public bool AnyCanDisobey;
+
+        public bool Foreign(Pokemon pk)
+        {
+            if (string.IsNullOrEmpty(pk.OTName)) return false;
+            return pk.OTName != PlayerName || (pk.OTId != 0 && PlayerId != 0 && pk.OTId != PlayerId);
+        }
+
+        /// <summary>Badge level a player's Pokémon obeys up to (10 per badge, any level with 8).</summary>
+        public static int ObedienceLevel(int badges) { return badges >= 8 ? GrowthRates.MaxLevel : 10 * (badges + 1); }
+
+        // True when the chosen move goes ahead (slot may change to another move); false when the turn is lost
+        bool Obeys(Battler user, ref int slot)
+        {
+            if (ObedienceBadges < 0 || user.Side != 0 || IsPartnerIndex(user.PartyIndex)) return true;
+            if (user.Charging != null || user.LockedMove != null || !HasUsableMove(user)) return true;
+            if (!AnyCanDisobey && !Foreign(user.Pk)) return true;
+            int cap = ObedienceLevel(ObedienceBadges), lvl = user.Pk.Level;
+            if (lvl <= cap || (lvl + cap) * Rng.Next(256) / 256 < cap) return true;
+            string n = Name(user);
+            user.Rage = false;
+            bool asleep = (user.Pk.Status ?? "").ToUpperInvariant() == "SLEEP";
+            if (asleep && UsableWhileAsleep(user, slot)) { Say(n + " ignored orders and kept sleeping!"); return false; }
+            if ((lvl + cap) * Rng.Next(256) / 256 < cap)
+            {
+                Say(n + " ignored orders!");
+                var others = new List<int>();
+                for (int i = 0; i < user.Pk.Moves.Count; i++) if (i != slot && CanSelect(user, i)) others.Add(i);
+                if (others.Count == 0) return false;
+                slot = others[Rng.Next(others.Count)];
+                return true;
+            }
+            int c = lvl - cap, r = Rng.Next(256);
+            if (r < c && CanStatus(user, "SLEEP", false))
+            {
+                user.Pk.Status = "SLEEP"; user.SleepTurns = 1 + Rng.Next(3); StatusEvent(user);
+                CommonAnim("Sleep", user); Say(n + " began to nap!");
+                return false;
+            }
+            r -= c;
+            if (r < c && !asleep)
+            {
+                int dmg = DamageFormula(user, user, 40, true, null, false, 1, false);
+                int from = user.Pk.HP; user.Pk.HP = Math.Max(0, user.Pk.HP - dmg); Hp(user, from);
+                Say(n + " won't obey! It hurt itself in its confusion!");
+                return false;
+            }
+            string[] refuse = { " won't obey!", " turned away!", " is loafing around!", " pretended not to notice!" };
+            Say(n + refuse[Rng.Next(4)]);
+            return false;
+        }
         /// <summary>
         /// Where the battle happens (Essentials' environments: Grass, TallGrass, MovingWater, StillWater, Puddle,
         /// Underwater, Cave, Rock, Sand, Forest, ForestGrass, Snow, Ice, Volcano, Graveyard, Sky, Space, UltraSpace).
@@ -722,6 +777,7 @@ namespace PokeCreator.Battles
                 if (Rng.Next(5) != 0) { CommonAnim("Frozen", user); Say(n + " is frozen solid!"); return; }
                 user.Pk.Status = ""; StatusEvent(user); Say(n + " thawed out!");
             }
+            if (!Obeys(user, ref slot)) { user.Charging = null; return; }
             if (user.Flinched)
             {
                 Say(n + " flinched and couldn't move!"); user.Charging = null;
