@@ -248,6 +248,7 @@ namespace PokeCreator.Studio
             {
                 Cursor = Cursors.WaitCursor;
                 var p = Project.Load(dir);
+                p.EnsureAnimatedFolders();   // Graphics/Pokemon/Animated for Gen 5 style sprites
                 // New images dropped into tileset folders become new areas
                 try { if (p.SyncTilesetFolders()) Json.Json.ToFile(p.DataFile("tilesets.json"), p.Tilesets); } catch { }
                 Project = p;

@@ -160,6 +160,12 @@ namespace PokeCreator.Projects
             if (missingTrainers > 0) Add(ProblemSeverity.Info, "Trainer Types", "db:trainer_types", missingTrainers + " trainer type(s) have no trainer picture. Use the Show filter to list them.");
             int missingFront = _p.Species.Count(s => { string sp = string.IsNullOrEmpty(s.Species) ? s.Id : s.Species; return !HasAsset("Graphics/Pokemon/Front", s.Form > 0 ? sp + "_" + s.Form : sp); });
             if (missingFront > 0) Add(ProblemSeverity.Info, "Pokémon", "db:species", missingFront + " Pokémon have no front sprite. Use the Show filter to list them.");
+            if (_p.Settings.UseAnimatedSprites)
+            {
+                // Only when the game uses animated sprites (Game Settings → Using animated sprites)
+                int missingAnim = _p.Species.Count(s => { string sp = string.IsNullOrEmpty(s.Species) ? s.Id : s.Species; return !HasAsset("Graphics/Pokemon/Animated/Front", s.Form > 0 ? sp + "_" + s.Form : sp); });
+                if (missingAnim > 0) Add(ProblemSeverity.Info, "Pokémon", "db:species", missingAnim + " Pokémon have no animated front sprite (they show their still sprite). Use the Show filter to list them.");
+            }
             int missingItems = _p.Items.Count(i => !HasAsset("Graphics/Items", i.Id));
             if (missingItems > 0) Add(ProblemSeverity.Info, "Items", "db:items", missingItems + " item(s) have no icon. Use the Show filter to list them.");
         }

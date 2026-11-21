@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.8";
+        public const string EngineVersion = "0.3.9";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
@@ -200,7 +200,7 @@ namespace PokeCreator.Projects
             var p = new Project { Root = Path.GetFullPath(root) };
             p.Info.Name = name;
             p.Settings.Title = name;
-            foreach (var d in new[] { "Data/Maps", "Graphics/Characters", "Graphics/Tilesets", "Graphics/Autotiles", "Graphics/Pokemon/Front", "Graphics/Pokemon/Back", "Graphics/Pokemon/Icons", "Graphics/Items", "Graphics/Trainers", "Graphics/Windowskins", "Graphics/Pictures", "Graphics/Battlebacks", "Audio/BGM", "Audio/BGS", "Audio/ME", "Audio/SE", "Fonts", "Scripts" })
+            foreach (var d in new[] { "Data/Maps", "Graphics/Characters", "Graphics/Tilesets", "Graphics/Autotiles", "Graphics/Pokemon/Front", "Graphics/Pokemon/Back", "Graphics/Pokemon/Icons", "Graphics/Pokemon/Animated/Front", "Graphics/Pokemon/Animated/Back", "Graphics/Pokemon/Animated/Front shiny", "Graphics/Pokemon/Animated/Back shiny", "Graphics/Items", "Graphics/Trainers", "Graphics/Windowskins", "Graphics/Pictures", "Graphics/Battlebacks", "Audio/BGM", "Audio/BGS", "Audio/ME", "Audio/SE", "Fonts", "Scripts" })
                 Directory.CreateDirectory(Path.Combine(p.Root, d));
             p.System.Switches.AddRange(new string[51]);
             p.System.Variables.AddRange(new string[51]);
@@ -266,6 +266,16 @@ namespace PokeCreator.Projects
             if (!File.Exists(path)) return fallback;
             try { return Json.Json.FromFile<T>(path); }
             catch (Exception ex) { throw new InvalidDataException("Could not read " + Path.GetFileName(path) + ": " + ex.Message, ex); }
+        }
+
+        /// <summary>Folders of animated (Gen 5 style) Pokémon sprites: horizontal strips of square frames named like the still sprites.</summary>
+        public static readonly string[] AnimatedSpriteFolders = { "Graphics/Pokemon/Animated/Front", "Graphics/Pokemon/Animated/Back", "Graphics/Pokemon/Animated/Front shiny", "Graphics/Pokemon/Animated/Back shiny" };
+
+        /// <summary>Creates the animated sprite folders if the project doesn't have them yet (projects made before they existed).</summary>
+        public void EnsureAnimatedFolders()
+        {
+            foreach (var d in AnimatedSpriteFolders)
+                try { Directory.CreateDirectory(Path.Combine(Root, d.Replace('/', Path.DirectorySeparatorChar))); } catch { }
         }
 
         public void Save()

@@ -146,12 +146,45 @@ namespace PokeCreator.Runtime.UI
             g.Draw(tex, f * fw, 0, fw, tex.Height, x, y);
         }
 
+        /// <summary>
+        /// A Pokémon's battle sprite: its animated sprite (Graphics/Pokemon/Animated/...) when the game uses them and it has one,
+        /// else the still sprite. frameW is the width of one picture (animated sprites are horizontal strips of square pictures).
+        /// </summary>
+        public static Texture PokemonSprite(Game game, Pokemon pk, bool back, out int frameW)
+        {
+            string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
+            string path = null;
+            if (game.Project.Settings.UseAnimatedSprites)
+            {
+                string af = "Graphics/Pokemon/Animated/" + (back ? "Back" : "Front");
+                path = (pk.Shiny ? game.Project.FindAsset(af + " shiny", id) : null) ?? game.Project.FindAsset(af, id)
+                    ?? (pk.Form > 0 ? (pk.Shiny ? game.Project.FindAsset(af + " shiny", pk.Species) : null) ?? game.Project.FindAsset(af, pk.Species) : null);
+                // A shiny Pokémon without a shiny animation keeps its still shiny sprite rather than the normal colours
+                if (path != null && pk.Shiny && !path.Replace('\\', '/').Contains("shiny/") && game.Project.FindAsset(back ? "Graphics/Pokemon/Back shiny" : "Graphics/Pokemon/Front shiny", id) != null) path = null;
+            }
+            if (path == null)
+            {
+                string folder = back ? (pk.Shiny ? "Graphics/Pokemon/Back shiny" : "Graphics/Pokemon/Back") : (pk.Shiny ? "Graphics/Pokemon/Front shiny" : "Graphics/Pokemon/Front");
+                path = game.Project.FindAsset(folder, id) ?? game.Project.FindAsset(back ? "Graphics/Pokemon/Back" : "Graphics/Pokemon/Front", pk.Species);
+            }
+            var tex = game.Gfx.Load(path);
+            frameW = tex == null ? 0 : tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width;
+            return tex;
+        }
+
+        /// <summary>Left edge of the picture to show now from a sprite strip (0 for still sprites).</summary>
+        public static int SpriteFrameX(Game game, Texture tex, int frameW)
+        {
+            if (tex == null || frameW <= 0 || tex.Width < frameW * 2) return 0;
+            int speed = game.Project.Settings.AnimatedSpriteSpeed > 0 ? game.Project.Settings.AnimatedSpriteSpeed : 3;
+            int frames = tex.Width / frameW;
+            return (game.FrameCount / speed) % frames * frameW;
+        }
+
         public static void PokemonFront(Gfx g, Game game, Pokemon pk, int cx, int bottom, int maxSize)
         {
-            string folder = pk.Shiny ? "Graphics/Pokemon/Front shiny" : "Graphics/Pokemon/Front";
-            string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
-            var path = game.Project.FindAsset(folder, id) ?? game.Project.FindAsset("Graphics/Pokemon/Front", pk.Species);
-            var tex = game.Gfx.Load(path);
+            int fw0;
+            var tex = PokemonSprite(game, pk, false, out fw0);
             if (tex == null)
             {
                 // No sprite yet: a grey placeholder so the screen isn't empty
@@ -160,9 +193,9 @@ namespace PokeCreator.Runtime.UI
                 g.DrawText(cx - g.TextWidth("?") / 2, bottom - sz / 2 - g.LineHeight / 2, "?", new Color(96, 96, 104), new Color(232, 232, 240));
                 return;
             }
-            int fw = tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width; // animated strips: first frame
+            int fw = fw0;
             int scale = Math.Max(1, maxSize / Math.Max(fw, tex.Height));
-            g.Draw(tex, 0, 0, fw, tex.Height, cx - fw * scale / 2, bottom - tex.Height * scale, fw * scale, tex.Height * scale);
+            g.Draw(tex, SpriteFrameX(game, tex, fw), 0, fw, tex.Height, cx - fw * scale / 2, bottom - tex.Height * scale, fw * scale, tex.Height * scale);
         }
 
         public static void ItemIcon(Gfx g, Game game, string item, int x, int y)

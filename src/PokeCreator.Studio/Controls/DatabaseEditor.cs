@@ -37,6 +37,8 @@ namespace PokeCreator.Studio.Controls
         readonly ComboBox _show = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
         readonly Panel _showRow = new Panel { Dock = DockStyle.Top, Height = 26, Padding = new Padding(0, 2, 0, 2) };
         readonly Label _legend = new Label { Dock = DockStyle.Top, Height = 20, ForeColor = Color.IndianRed, Padding = new Padding(0, 2, 0, 0) };
+        // Pokémon: whether animated sprites count as missing (Game Settings → Using animated sprites)
+        readonly CheckBox _useAnimated = new CheckBox { Text = "Using animated sprites", Dock = DockStyle.Top, Height = 22 };
         public bool Dirty { get; private set; }
         public string Title { get { return _table.Label; } }
         public event Action DirtyChanged;
@@ -65,11 +67,23 @@ namespace PokeCreator.Studio.Controls
                 _legend.Height = _images.Kinds.Length > 1 ? 54 : 20;
                 _showRow.Controls.Add(_show);
                 _showRow.Controls.Add(new Label { Text = "Show:", Dock = DockStyle.Left, Width = 44, TextAlign = ContentAlignment.MiddleLeft });
-                _show.Items.Add("All entries");
-                _show.Items.Add(_images.Kinds.Length > 1 ? "Entries missing any image" : "Entries missing an image");
-                if (_images.Kinds.Length > 1) foreach (var k in _images.Kinds) _show.Items.Add("Missing " + k.Label.ToLowerInvariant());
-                _show.SelectedIndex = 0;
+                FillShowChoices();
                 left.Controls.Add(_showRow); left.Controls.Add(_legend);
+                if (_images.HasAnimatedKinds)
+                {
+                    _useAnimated.Checked = p.Settings.UseAnimatedSprites;
+                    new ToolTip().SetToolTip(_useAnimated, "Ticked: the game shows animated sprites (Graphics/Pokemon/Animated) and Pokémon without them are listed as missing details.\nUnticked: animated sprites aren't used or checked for.");
+                    _useAnimated.CheckedChanged += (s, e) =>
+                    {
+                        p.Settings.UseAnimatedSprites = _useAnimated.Checked;
+                        try { Json.Json.ToFile(p.DataFile("settings.json"), p.Settings); } catch { }
+                        if (_useAnimated.Checked) p.EnsureAnimatedFolders();
+                        FillShowChoices();
+                        Refill(Selected);
+                        if (_sprites != null) _sprites.Show(Selected);
+                    };
+                    left.Controls.Add(_useAnimated);
+                }
             }
             left.Controls.Add(_search); left.Controls.Add(searchLabel); left.Controls.Add(bar);
 
@@ -102,6 +116,18 @@ namespace PokeCreator.Studio.Controls
             Refill(null);
         }
 
+        /// <summary>The Show filter: all, missing any image, then missing each kind the game checks for.</summary>
+        void FillShowChoices()
+        {
+            _show.Items.Clear();
+            _show.Items.Add("All entries");
+            _show.Items.Add(_images.Kinds.Length > 1 ? "Entries missing any image" : "Entries missing an image");
+            var active = _images.Active;
+            if (_images.Kinds.Length > 1) foreach (var k in active) _show.Items.Add("Missing " + k.Label.ToLowerInvariant());
+            _legend.Height = active.Length <= 1 ? 20 : active.Length <= 5 ? 54 : 54 + ((active.Length - 4) / 2) * 16;
+            _show.SelectedIndex = 0;
+        }
+
         IList Items { get { return _table.Items; } }
         GameRecord Selected { get { int i = _list.SelectedIndex; return i >= 0 && i < _view.Count ? _view[i] : null; } }
 
@@ -112,7 +138,7 @@ namespace PokeCreator.Studio.Controls
             string q = _search.Text.Trim().ToLowerInvariant();
             Func<GameRecord, bool> shown = r => true;
             if (_images != null && _show.SelectedIndex == 1) shown = r => _images.MissingAny(r);
-            else if (_images != null && _show.SelectedIndex >= 2) { var k = _images.Kinds[_show.SelectedIndex - 2]; shown = r => !_images.Has(r, k); }
+            else if (_images != null && _show.SelectedIndex >= 2 && _show.SelectedIndex - 2 < _images.Active.Length) { var k = _images.Active[_show.SelectedIndex - 2]; shown = r => !_images.Has(r, k); }
             _view = Items.Cast<GameRecord>().Where(r => (q == "" || (r.Id ?? "").ToLowerInvariant().Contains(q) || r.DisplayName.ToLowerInvariant().Contains(q)) && shown(r)).ToList();
             if (_images != null) UpdateLegend();
             _list.BeginUpdate();
@@ -157,14 +183,15 @@ namespace PokeCreator.Studio.Controls
         void UpdateLegend()
         {
             var all = Items.Cast<GameRecord>().ToList();
-            var parts = _images.Kinds.Select(k => new { k.Label, Count = all.Count(r => !_images.Has(r, k)) }).ToList();
+            var parts = _images.Active.Select(k => new { k.Label, Count = all.Count(r => !_images.Has(r, k)) }).ToList();
             if (parts.All(p => p.Count == 0)) { _legend.Text = "Nothing missing: every entry has all its images."; _legend.ForeColor = Color.SeaGreen; return; }
             _legend.ForeColor = Color.IndianRed;
             if (parts.Count == 1) { _legend.Text = "Missing images: " + parts[0].Count + " of " + all.Count; return; }
             // "Missing images:" then the counts, three then two per line so it fits under the search bar
             var lines = new List<string> { "Missing images (" + all.Count(r => _images.MissingAny(r)) + " entries):" };
             lines.Add(string.Join("  ·  ", parts.Take(3).Select(p => p.Label + " " + p.Count)));
-            if (parts.Count > 3) lines.Add(string.Join("  ·  ", parts.Skip(3).Select(p => p.Label + " " + p.Count)));
+            if (parts.Count > 3) lines.Add(string.Join("  ·  ", parts.Skip(3).Take(2).Select(p => p.Label + " " + p.Count)));
+            for (int i = 5; i < parts.Count; i += 2) lines.Add(string.Join("  ·  ", parts.Skip(i).Take(2).Select(p => p.Label.Replace("Animated ", "Anim. ") + " " + p.Count)));
             _legend.Text = string.Join("\n", lines);
         }
 
@@ -202,7 +229,7 @@ namespace PokeCreator.Studio.Controls
             RecordImages.Kind kind = _images.Main;
             if (_images.Kinds.Length > 1)
             {
-                int k = ChoiceDialog.Ask(FindForm(), "Which images are you importing?", _images.Kinds.Select(x => x.Label + "  (" + x.Folder + "/" + x.Prefix + "<ID>)").ToArray());
+                int k = ChoiceDialog.Ask(FindForm(), "Which images are you importing?", _images.Kinds.Select(x => x.Label + "  (" + x.Folder + "/" + x.Prefix + "<ID>)" + (x.Animated ? "  — GIFs or PNG strips" : "")).ToArray());
                 if (k < 0) return;
                 kind = _images.Kinds[k];
             }
@@ -243,7 +270,7 @@ namespace PokeCreator.Studio.Controls
             foreach (var x in plan)
             {
                 if (!replace && _images.Has(x.Value, kind)) { skipped.Add(Path.GetFileName(x.Key) + " (kept old image)"); continue; }
-                try { _images.SaveImage(x.Key, x.Value, kind); set++; }
+                try { SaveImageOf(x.Key, x.Value, kind); set++; }
                 catch (Exception ex) { errors.Add(Path.GetFileName(x.Key) + ": " + ex.Message); }
             }
             foreach (var c in create)
@@ -261,7 +288,7 @@ namespace PokeCreator.Studio.Controls
                         if (Items.Count > 0 && same(b)) { at = b + 1; while (at < Items.Count && same(at)) at++; }
                     }
                     if (at >= 0) Items.Insert(at, r); else Items.Add(r);
-                    _images.SaveImage(c.Key, r, kind);
+                    SaveImageOf(c.Key, r, kind);
                     made.Add(r);
                 }
                 catch (Exception ex) { errors.Add(Path.GetFileName(c.Key) + ": " + ex.Message); }
@@ -321,6 +348,13 @@ namespace PokeCreator.Studio.Controls
         }
 
         /// <summary>The image pane's Import Image button: any file becomes the selected entry's image.</summary>
+        /// <summary>Animated sprites are converted to strips (GIF frames side by side); other images saved as PNG.</summary>
+        void SaveImageOf(string file, GameRecord r, RecordImages.Kind kind)
+        {
+            if (kind.Animated) { int frames; _images.SaveAnimated(file, r, kind, out frames); }
+            else _images.SaveImage(file, r, kind);
+        }
+
         void ImportForSelected(RecordImages.Kind kind)
         {
             var r = Selected; if (r == null) return;
@@ -328,7 +362,7 @@ namespace PokeCreator.Studio.Controls
             {
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
                 if (_images.Has(r, kind) && MessageBox.Show(this, r.DisplayName + " already has " + A(kind.Label) + " image. Replace it?", "Import Image", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
-                try { _images.SaveImage(dlg.FileName, r, kind); }
+                try { SaveImageOf(dlg.FileName, r, kind); }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import Image", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             }
             Refill(r);

@@ -1089,15 +1089,7 @@ namespace PokeCreator.Runtime.UI
             }
         }
 
-        Texture BattlerTexture(Pokemon pk, bool back, out int frameW)
-        {
-            string folder = back ? (pk.Shiny ? "Graphics/Pokemon/Back shiny" : "Graphics/Pokemon/Back") : (pk.Shiny ? "Graphics/Pokemon/Front shiny" : "Graphics/Pokemon/Front");
-            string id = pk.Form > 0 ? pk.Species + "_" + pk.Form : pk.Species;
-            var path = Game.Project.FindAsset(folder, id) ?? Game.Project.FindAsset(back ? "Graphics/Pokemon/Back" : "Graphics/Pokemon/Front", pk.Species);
-            var tex = Game.Gfx.Load(path);
-            frameW = tex == null ? 0 : tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width; // animated strips: first frame
-            return tex;
-        }
+        Texture BattlerTexture(Pokemon pk, bool back, out int frameW) { return Ui.PokemonSprite(Game, pk, back, out frameW); }
 
         /// <summary>A Pokémon moved, zoomed, rotated or tinted by a battle animation.</summary>
         void DrawPokemonAnimated(Gfx g, Pokemon pk, bool back, AnimSpriteState st)
@@ -1106,7 +1098,7 @@ namespace PokeCreator.Runtime.UI
             int fw;
             var tex = BattlerTexture(pk, back, out fw);
             if (tex == null) { Ui.PokemonFront(g, Game, pk, (int)st.X, (int)st.Y + 48, 160); return; }
-            g.DrawEx(tex, 0, 0, fw, tex.Height, st.X, st.Y, st.ZoomX, st.ZoomY, st.Angle, st.Mirror, st.Opacity, st.Blend, st.Color);
+            g.DrawEx(tex, Ui.SpriteFrameX(Game, tex, fw), 0, fw, tex.Height, st.X, st.Y, st.ZoomX, st.ZoomY, st.Angle, st.Mirror, st.Opacity, st.Blend, st.Color);
         }
 
         /// <summary>
@@ -1161,12 +1153,13 @@ namespace PokeCreator.Runtime.UI
                 Ui.PokemonFront(g, Game, pk, cx, bottom, 160);
                 return;
             }
-            int fw = tex.Width > tex.Height * 3 / 2 ? tex.Height : tex.Width; // animated strips: first frame
+            int fw = fwUnused;
+            int sx = Ui.SpriteFrameX(Game, tex, fw);   // animated sprites cycle through their pictures
             // Clip what falls below the battle area (fainting slides down out of view)
             int h = Math.Min(tex.Height, Math.Max(0, 288 - (bottom - tex.Height)));
             if (h <= 0) return;
-            if (pk.ShadowPokemon) { g.DrawEx(tex, 0, 0, fw, h, cx, bottom - tex.Height + h / 2.0, 1, 1, 0, false, 255, 0, new Color(112, 40, 160, 120)); return; }
-            g.Draw(tex, 0, 0, fw, h, cx - fw / 2, bottom - tex.Height);
+            if (pk.ShadowPokemon) { g.DrawEx(tex, sx, 0, fw, h, cx, bottom - tex.Height + h / 2.0, 1, 1, 0, false, 255, 0, new Color(112, 40, 160, 120)); return; }
+            g.Draw(tex, sx, 0, fw, h, cx - fw / 2, bottom - tex.Height);
         }
 
         void DrawBall(Gfx g, int foeX, int foeBottom)
