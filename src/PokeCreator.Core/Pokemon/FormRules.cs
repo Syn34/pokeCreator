@@ -16,7 +16,7 @@ namespace PokeCreator.Pkmn
     {
         static readonly string[] LowKeyNatures = { "LONELY", "BOLD", "RELAXED", "TIMID", "SERIOUS", "MODEST", "MILD", "QUIET", "BASHFUL", "CALM", "GENTLE", "CAREFUL" };
 
-        static bool HasForm(Project p, string species, int form) { return form == 0 || p.Species.Any(s => s.Id == species + "_" + form); }
+        public static bool HasForm(Project p, string species, int form) { return form == 0 || p.Species.Any(s => s.Id == species + "_" + form); }
         static int FormCount(Project p, string species) { int n = 1; while (p.Species.Any(s => s.Id == species + "_" + n)) n++; return n; }
 
         /// <summary>The form a newly created Pokémon gets (before its held item is considered).</summary>

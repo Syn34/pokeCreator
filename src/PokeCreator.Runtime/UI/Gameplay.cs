@@ -107,6 +107,10 @@ namespace PokeCreator.Runtime.UI
             {
                 case "BICYCLE": case "MACHBIKE": case "ACROBIKE": FieldMoves.ToggleBike(g); return;
                 case "TOWNMAP": g.PushScene(new TownMapScene(g, false, null)); return;
+                case "GRACIDEA": case "REVEALGLASS": case "PRISONBOTTLE": case "ROTOMCATALOG": case "DNASPLICERS": case "NSOLARIZER": case "NLUNARIZER": case "REINSOFUNITY":
+                case "REDNECTAR": case "YELLOWNECTAR": case "PINKNECTAR": case "PURPLENECTAR":
+                    g.PushScene(new PartyScene(g, "Use on which Pokémon?", null, (i, close) => { close(); FormItems.Use(g, itemId, g.State.Party[i], refresh); }, null));
+                    return;
                 case "WHITEFLUTE": case "BLACKFLUTE":
                     {
                         bool white = itemId == "WHITEFLUTE";
@@ -1029,6 +1033,107 @@ namespace PokeCreator.Runtime.UI
             }
             Ui.Box(g, 4, g.Height - 50, g.Width - 8, 46);
             Ui.Text(g, 22, g.Height - 40, "A: change a key   B: back");
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>
+    /// Items that change a Pokémon's form (as Essentials): Gracidea (Shaymin), Reveal Glass (the forces of nature),
+    /// Prison Bottle (Hoopa), nectars (Oricorio), Rotom Catalog, and fusing with DNA Splicers / N-Solarizer /
+    /// N-Lunarizer / Reins of Unity (used again to separate them).
+    /// </summary>
+    public static class FormItems
+    {
+        static void Changed(Game g, Pokemon pk, Action done)
+        {
+            g.Audio.PlaySe("Use item in party");
+            g.Message.Show(pk.Name(g.Project) + " changed its form!", null, -1, _ => { if (done != null) done(); });
+        }
+
+        static void NoEffect(Game g, Action done) { g.Message.Show("It won't have any effect.", null, -1, _ => { if (done != null) done(); }); }
+
+        public static void Use(Game g, string item, Pokemon pk, Action done)
+        {
+            var p = g.Project;
+            if (pk.IsEgg) { NoEffect(g, done); return; }
+            switch (item)
+            {
+                case "GRACIDEA":
+                    {
+                        int h = DateTime.Now.Hour;
+                        if (pk.Species != "SHAYMIN" || pk.Form != 0 || h >= 20 || h < 5 || (pk.Status ?? "").ToUpperInvariant() == "FROZEN" || !FormRules.HasForm(p, "SHAYMIN", 1)) { NoEffect(g, done); return; }
+                        pk.Form = 1; Changed(g, pk, done); return;
+                    }
+                case "REVEALGLASS":
+                    if (Array.IndexOf(new[] { "TORNADUS", "THUNDURUS", "LANDORUS", "ENAMORUS" }, pk.Species) < 0 || !FormRules.HasForm(p, pk.Species, 1)) { NoEffect(g, done); return; }
+                    pk.Form = pk.Form == 0 ? 1 : 0; Changed(g, pk, done); return;
+                case "PRISONBOTTLE":
+                    if (pk.Species != "HOOPA" || !FormRules.HasForm(p, "HOOPA", 1)) { NoEffect(g, done); return; }
+                    pk.Form = pk.Form == 0 ? 1 : 0; Changed(g, pk, done); return;
+                case "REDNECTAR": case "YELLOWNECTAR": case "PINKNECTAR": case "PURPLENECTAR":
+                    {
+                        int f = item == "REDNECTAR" ? 0 : item == "YELLOWNECTAR" ? 1 : item == "PINKNECTAR" ? 2 : 3;
+                        if (pk.Species != "ORICORIO" || pk.Form == f || !FormRules.HasForm(p, "ORICORIO", f)) { NoEffect(g, done); return; }
+                        pk.Form = f; g.State.AddItem(item, -1); Changed(g, pk, done); return;
+                    }
+                case "ROTOMCATALOG":
+                    {
+                        if (pk.Species != "ROTOM") { NoEffect(g, done); return; }
+                        string[] names = { "Light bulb", "Microwave oven", "Washing machine", "Refrigerator", "Electric fan", "Lawn mower" };
+                        string[] moves = { "THUNDERSHOCK", "OVERHEAT", "HYDROPUMP", "BLIZZARD", "AIRSLASH", "LEAFSTORM" };
+                        var opts = names.Where((n, i) => FormRules.HasForm(p, "ROTOM", i)).ToList(); opts.Add("Cancel");
+                        g.Message.Show("Which appliance would you like to order?", opts, opts.Count - 1, k =>
+                        {
+                            if (k < 0 || k >= opts.Count - 1) { if (done != null) done(); return; }
+                            int f = Array.IndexOf(names, opts[k]);
+                            if (f == pk.Form) { NoEffect(g, done); return; }
+                            // The old appliance's move is replaced by the new one's
+                            string oldMove = pk.Form > 0 ? moves[pk.Form] : null, newMove = f > 0 ? moves[f] : null;
+                            int at = oldMove != null ? pk.Moves.FindIndex(m => m.Id == oldMove) : -1;
+                            if (at >= 0) pk.Moves.RemoveAt(at);
+                            pk.Form = f;
+                            var md = newMove != null ? p.Moves.FirstOrDefault(m => m.Id == newMove) : null;
+                            if (md != null && !pk.Moves.Any(m => m.Id == md.Id))
+                            {
+                                if (pk.Moves.Count >= 4) pk.Moves[at >= 0 && at < pk.Moves.Count ? at : 0] = new PokemonMove { Id = md.Id, PP = md.TotalPP };
+                                else pk.Moves.Insert(at >= 0 ? Math.Min(at, pk.Moves.Count) : pk.Moves.Count, new PokemonMove { Id = md.Id, PP = md.TotalPP });
+                            }
+                            if (pk.Moves.Count == 0) { var ts = p.Moves.FirstOrDefault(m => m.Id == "THUNDERSHOCK"); if (ts != null) pk.Moves.Add(new PokemonMove { Id = ts.Id, PP = ts.TotalPP }); }
+                            Changed(g, pk, done);
+                        });
+                        return;
+                    }
+                case "DNASPLICERS": Fuse(g, pk, "KYUREM", new[] { "RESHIRAM", "ZEKROM" }, done); return;
+                case "NSOLARIZER": Fuse(g, pk, "NECROZMA", new[] { "SOLGALEO" }, done); return;
+                case "NLUNARIZER": Fuse(g, pk, "NECROZMA", new[] { null, "LUNALA" }, done); return;
+                case "REINSOFUNITY": Fuse(g, pk, "CALYREX", new[] { "GLASTRIER", "SPECTRIER" }, done); return;
+            }
+            NoEffect(g, done);
+        }
+
+        /// <summary>partners[i] gives form i + 1 (Kyurem: White with Reshiram, Black with Zekrom).</summary>
+        static void Fuse(Game g, Pokemon pk, string baseSpecies, string[] partners, Action done)
+        {
+            var p = g.Project;
+            if (pk.Species != baseSpecies) { NoEffect(g, done); return; }
+            if (pk.Fused != null)
+            {
+                if (g.State.Party.Count >= GameState.MaxParty) { g.Message.Show("You have no room to separate the Pokémon.", null, -1, _ => { if (done != null) done(); }); return; }
+                var partner = pk.Fused; pk.Fused = null; pk.Form = 0;
+                g.State.Party.Add(partner);
+                Changed(g, pk, done); return;
+            }
+            g.PushScene(new PartyScene(g, "Fuse with which Pokémon?", null, (i, close) =>
+            {
+                var other = g.State.Party[i];
+                int idx = Array.IndexOf(partners, other.Species);
+                if (other == pk || idx < 0 || other.IsEgg || other.Fainted || !FormRules.HasForm(p, baseSpecies, idx + 1)) { g.Message.Show("It can't be fused with that Pokémon."); return; }
+                close();
+                g.State.Party.Remove(other); pk.Fused = other; pk.Form = idx + 1;
+                Changed(g, pk, done);
+            }, () => { if (done != null) done(); }));
         }
     }
 }

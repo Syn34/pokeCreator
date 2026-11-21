@@ -174,6 +174,8 @@ namespace PokeCreator.Pkmn
             Pokerus = (Pokerus & 0xF0) | Math.Max(0, (Pokerus & 15) - days);
         }
         public string Ball { get; set; }
+        /// <summary>The Pokémon fused into this one (Kyurem with Reshiram / Zekrom, Necrozma, Calyrex).</summary>
+        public Pokemon Fused { get; set; }
         /// <summary>The letter on held Mail (null when it holds none).</summary>
         public PokemonMail Mail { get; set; }
         /// <summary>Box markings (bits: circle, triangle, square, heart, star, diamond).</summary>
