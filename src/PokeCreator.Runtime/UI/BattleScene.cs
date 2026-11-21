@@ -276,7 +276,11 @@ namespace PokeCreator.Runtime.UI
                         Game.Audio.PlayMe("Pkmn level up");
                         _mode = Mode.Busy;
                         Game.Message.Show(e.Text, null, -1, _ =>
-                            ItemFlow.LearnMoves(Game, pk, new Queue<string>(e.Moves ?? new List<string>()), () => _mode = Mode.Events));
+                        {
+                            var stats = new LevelUpStatsScene(Game, pk);
+                            stats.OnClosed = () => ItemFlow.LearnMoves(Game, pk, new Queue<string>(e.Moves ?? new List<string>()), () => _mode = Mode.Events);
+                            Game.PushScene(stats);
+                        });
                         return false;
                     }
                 case BattleEventKind.Catch:
@@ -1115,6 +1119,43 @@ namespace PokeCreator.Runtime.UI
                     var t = Game.Project.Types.FirstOrDefault(x => x.Id == md.Type);
                     Ui.Text(g, 362, by + 50, "TYPE/" + (t != null && t.Name != null ? t.Name : md.Type));
                 }
+            }
+        }
+    }
+}
+
+namespace PokeCreator.Runtime.UI
+{
+    /// <summary>After "X grew to Lv. N!": the stat increases, then the new totals (as the games).</summary>
+    public class LevelUpStatsScene : Scene
+    {
+        readonly int[] _before, _after;
+        int _step;
+        public LevelUpStatsScene(Game g, PokeCreator.Pkmn.Pokemon pk) : base(g)
+        {
+            Opaque = false;
+            _after = pk.Stats(g.Project).ToArray();
+            var prev = PokeCreator.Json.Json.Deserialize<PokeCreator.Pkmn.Pokemon>(PokeCreator.Json.Json.Write(pk, false));
+            prev.Level = Math.Max(1, pk.Level - 1);
+            _before = prev.Stats(g.Project).ToArray();
+        }
+
+        protected override void Update()
+        {
+            if (Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel)) { Decide(); if (++_step >= 2) Close(); }
+        }
+
+        public override void Draw(Gfx g)
+        {
+            int w = 220, h = 6 * 30 + 20, x = g.Width - w - 8, y = 8;
+            Ui.Box(g, x, y, w, h);
+            int[] order = { Stat.HP, Stat.Attack, Stat.Defense, Stat.SpAtk, Stat.SpDef, Stat.Speed };
+            string[] names = { "Max. HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed" };
+            for (int i = 0; i < 6; i++)
+            {
+                int s = order[i], ty = y + 10 + i * 30;
+                Ui.Text(g, x + 16, ty, names[i]);
+                Ui.TextRight(g, x + w - 16, ty, _step == 0 ? "+" + (_after[s] - _before[s]) : _after[s].ToString());
             }
         }
     }
