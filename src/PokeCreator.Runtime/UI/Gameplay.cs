@@ -120,6 +120,16 @@ namespace PokeCreator.Runtime.UI
                         g.Message.Show(white ? "Wild Pokémon will be lured." : "Wild Pokémon will be repelled.");
                         return;
                     }
+                case "SACREDASH":
+                    {
+                        var fainted = g.State.Party.Where(x => !x.IsEgg && x.Fainted).ToList();
+                        if (fainted.Count == 0) { Say(g, "It won't have any effect.", refresh); return; }
+                        g.State.AddItem(itemId, -1);
+                        foreach (var x in fainted) { x.HP = x.TotalHP(g.Project); x.Status = ""; }
+                        g.Audio.PlaySe("Use item in party");
+                        Say(g, string.Join("\n", fainted.Select(x => x.Name(g.Project) + "'s HP was restored.")), refresh);
+                        return;
+                    }
                 case "ESCAPEROPE": FieldMoves.Escape(g, "\\PN used the " + (item != null ? item.Name : "Escape Rope") + "."); return;
                 case "POKERADAR": g.CloseAllScenes(); PokeRadar.Use(g); return;
                 case "JOYSCENT": case "EXCITESCENT": case "VIVIDSCENT":
@@ -175,6 +185,18 @@ namespace PokeCreator.Runtime.UI
         /// <summary>Uses an item on one Pokémon; calls done(true) if the item was used.</summary>
         public static void UseOn(Game g, Pokemon pk, ItemData item, ItemInfo info, Action<bool> done)
         {
+            if (info.NeedsStat)
+            {
+                var stats = Enumerable.Range(0, 6).Where(s => pk.IV[s] < 31).ToList();
+                if (stats.Count == 0) { Say(g, "It won't have any effect.", () => done(false)); return; }
+                var names = stats.Select(s => Stat.Names[s]).ToList(); names.Add("Cancel");
+                g.Message.Show("Which stat should be trained?", names, names.Count - 1, c =>
+                {
+                    if (c < 0 || c >= stats.Count) { done(false); return; }
+                    Apply(g, pk, item, info, stats[c], done);
+                });
+                return;
+            }
             if (info.NeedsMove)
             {
                 ChooseMove(g, pk, info.Kind == ItemKind.PPUp ? "Boost PP of which move?" : "Restore which move?", slot =>

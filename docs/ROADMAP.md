@@ -107,6 +107,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Trade animation; Continue panel with badges / Pokédex / party; Hall of Fame on the PC; Options → Send to Boxes (Manual asks which party Pokémon to send to the PC when catching with a full party); setBattleRule forceCatchIntoParty, noAnims / anims, inverseBattle
 - [x] Exp. Share (held: holders split half of the EXP, as Essentials) and Exp. All (EXPALL key item, $player.has_exp_all or Game Settings: Pokémon that didn't fight get half)
 - [x] Battle Bag: X items (+2, X Attack 2/3/6), Dire Hit, Guard Spec., Yellow / Red Flute, Poké Doll / Fluffy Tail / Poké Toy (escape), Ethers and Elixirs on a chosen move
+- [x] Field items: Ability Capsule, Ability Patch, Bottle Cap / Gold Bottle Cap (Hyper Training, level from Game Settings; add items with IDs BOTTLECAP / GOLDBOTTLECAP), Sacred Ash
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

@@ -7,7 +7,7 @@ using PokeCreator.Projects;
 namespace PokeCreator.Pkmn
 {
     /// <summary>What using an item outside battle does.</summary>
-    public enum ItemKind { None, HealHP, FullRestore, CureStatus, Revive, RestorePP, PPUp, RareCandy, ExpCandy, EVBoost, Mint, Repel, Evolution, TeachMove }
+    public enum ItemKind { None, HealHP, FullRestore, CureStatus, Revive, RestorePP, PPUp, RareCandy, ExpCandy, EVBoost, Mint, Repel, Evolution, TeachMove, AbilityCapsule, AbilityPatch, BottleCap, GoldBottleCap }
 
     public class ItemInfo
     {
@@ -22,6 +22,8 @@ namespace PokeCreator.Pkmn
         public bool Consumed = true;
         public bool NeedsPokemon { get { return Kind != ItemKind.Repel && Kind != ItemKind.None; } }
         public bool NeedsMove { get { return (Kind == ItemKind.RestorePP && !AllMoves) || Kind == ItemKind.PPUp; } }
+        /// <summary>Bottle Cap: the player chooses which stat to train (passed as the move slot).</summary>
+        public bool NeedsStat { get { return Kind == ItemKind.BottleCap; } }
     }
 
     /// <summary>The result of using an item on a Pokémon.</summary>
@@ -85,6 +87,10 @@ namespace PokeCreator.Pkmn
             else if (id == "PPUP") { info.Kind = ItemKind.PPUp; info.Amount = 1; }
             else if (id == "PPMAX") { info.Kind = ItemKind.PPUp; info.Amount = 3; }
             else if (id == "RARECANDY") info.Kind = ItemKind.RareCandy;
+            else if (id == "ABILITYCAPSULE") info.Kind = ItemKind.AbilityCapsule;
+            else if (id == "ABILITYPATCH") info.Kind = ItemKind.AbilityPatch;
+            else if (id == "BOTTLECAP") info.Kind = ItemKind.BottleCap;
+            else if (id == "GOLDBOTTLECAP") info.Kind = ItemKind.GoldBottleCap;
             else if (ExpCandies.TryGetValue(id, out n)) { info.Kind = ItemKind.ExpCandy; info.Amount = n; }
             else if (Vitamins.TryGetValue(id, out n)) { info.Kind = ItemKind.EVBoost; info.Stat = n; info.Amount = 10; }
             else if (Feathers.TryGetValue(id, out n)) { info.Kind = ItemKind.EVBoost; info.Stat = n; info.Amount = 1; }
@@ -207,6 +213,41 @@ namespace PokeCreator.Pkmn
                         o.Used = true; o.Message = name + "'s stats may have changed due to the effects of the " + (item.Name ?? item.Id) + "!";
                         break;
                     }
+                case ItemKind.AbilityCapsule:
+                    {
+                        // Swaps between the two regular abilities (not a hidden one)
+                        var d = pk.Data(p);
+                        if (d == null || d.Abilities.Count < 2 || !string.IsNullOrEmpty(pk.Ability) || d.Abilities[0] == d.Abilities[1]) break;
+                        pk.AbilityIndex = pk.AbilityIndex == 0 ? 1 : 0;
+                        o.Used = true; o.Message = name + "'s Ability changed! Its Ability is now " + AbilityName(p, pk.AbilityId(p)) + "!";
+                        break;
+                    }
+                case ItemKind.AbilityPatch:
+                    {
+                        // Regular → hidden ability; a hidden ability goes back to the first regular one
+                        var d = pk.Data(p);
+                        if (d == null || d.HiddenAbilities.Count == 0) break;
+                        if (!string.IsNullOrEmpty(pk.Ability) && d.HiddenAbilities.Contains(pk.Ability)) { pk.Ability = null; pk.AbilityIndex = 0; }
+                        else if (d.HiddenAbilities[0] == pk.AbilityId(p)) break;
+                        else pk.Ability = d.HiddenAbilities[0];
+                        o.Used = true; o.Message = name + "'s Ability changed! Its Ability is now " + AbilityName(p, pk.AbilityId(p)) + "!";
+                        break;
+                    }
+                case ItemKind.BottleCap:
+                case ItemKind.GoldBottleCap:
+                    {
+                        // Hyper Training: IVs become 31 (from Game Settings' level, max level by default)
+                        int need = p.Settings.HyperTrainingLevel > 0 ? p.Settings.HyperTrainingLevel : GrowthRates.MaxLevel;
+                        if (pk.Level < need) break;
+                        var stats = info.Kind == ItemKind.GoldBottleCap ? Enumerable.Range(0, 6).ToList() : new List<int> { moveSlot };
+                        stats = stats.Where(s => s >= 0 && s < 6 && pk.IV[s] < 31).ToList();
+                        if (stats.Count == 0) break;
+                        int hpDiff = max - pk.HP;
+                        foreach (int s in stats) pk.IV[s] = 31;
+                        if (!pk.Fainted) pk.HP = Math.Max(1, pk.TotalHP(p) - hpDiff);
+                        o.Used = true; o.Message = info.Kind == ItemKind.GoldBottleCap ? name + " became stronger through Hyper Training!" : name + "'s " + Stat.Names[stats[0]] + " became stronger through Hyper Training!";
+                        break;
+                    }
                 case ItemKind.Evolution:
                     {
                         string to = Growth.CheckItemEvolution(p, pk, item.Id, ctx);
@@ -248,6 +289,7 @@ namespace PokeCreator.Pkmn
             }
         }
 
+        public static string AbilityName(Project p, string id) { var a = p.Abilities.FirstOrDefault(x => x.Id == id); return a != null && !string.IsNullOrEmpty(a.Name) ? a.Name : id; }
         public static string MoveName(Project p, string id) { var md = p.Moves.FirstOrDefault(x => x.Id == id); return md != null && !string.IsNullOrEmpty(md.Name) ? md.Name : id; }
     }
 }
