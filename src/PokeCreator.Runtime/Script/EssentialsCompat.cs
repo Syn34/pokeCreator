@@ -64,6 +64,13 @@ namespace PokeCreator.Runtime.Script
             var r = h(ctx, args);
             bool startedBattle = _game.BattleJustStarted;
             _game.BattleJustStarted = battleBefore || startedBattle;
+            if (startedBattle && ctx != null && !_game.PromptPending)
+            {
+                // A battle started: the script continues after it, and this call then returns the battle's result
+                _game.ResumeOwner = ctx;
+                _game.PromptPending = true;
+                return r;
+            }
             if (!_game.PromptPending)
             {
                 _rec.Add(r); _recPos++;
