@@ -1172,7 +1172,45 @@ namespace PokeCreator.Runtime.Script
                 list.Add(new object[] { type, name, version });
             }
             if (list.Count == 0) return true;
+            // A second trainer who spotted the player at the same time joins in (double battle)
+            if (list.Count == 1 && _game.PairedTrainer != null && ctx != null && !(_game.ResumeOutcome.HasValue && _game.ResumeOwner == ctx))
+            {
+                var pair = _game.PairedTrainer; _game.PairedTrainer = null;
+                var other = pair.Id != ctx.EventId ? TrainerArgsOf(pair, ctx) : null;
+                if (other != null) { list.Add(other); _pairedEvent = pair.Id; }
+            }
+            if (_game.ResumeOutcome.HasValue && _game.ResumeOwner == ctx && _pairedEvent > 0)
+            {
+                // The partner trainer is beaten too: its self switch A (Essentials' trainer events) goes on
+                if (_game.ResumeOutcome.Value == PokeCreator.Battles.BattleOutcome.Win) { _game.State.SetSelf(_game.Map.Id, _pairedEvent, "A", true); _game.Map.RefreshEvents(); }
+                _pairedEvent = 0;
+                list = new List<object[]> { list[0], list[0] };
+            }
             return TrainerBattleList(list, ctx);
+        }
+
+        int _pairedEvent;
+
+        /// <summary>The trainer in another event's TrainerBattle.start(...) call (its current page), or null.</summary>
+        object[] TrainerArgsOf(World.GameEvent ev, Interpreter ctx)
+        {
+            if (ev.List == null) return null;
+            foreach (var cmd in ev.List)
+            {
+                string s = null;
+                if ((cmd.Code == 355 || cmd.Code == 655) && cmd.Params.Count > 0) s = Convert.ToString(cmd.Params[0]);
+                else if (cmd.Code == 111 && cmd.Params.Count > 1 && ToInt(cmd.Params[0]) == 12) s = Convert.ToString(cmd.Params[1]);
+                if (s == null) continue;
+                int at = s.IndexOf("TrainerBattle.start(", StringComparison.Ordinal);
+                if (at < 0) continue;
+                int open = at + "TrainerBattle.start".Length, depth = 0, close = -1;
+                for (int k = open; k < s.Length; k++) { if (s[k] == '(') depth++; else if (s[k] == ')') { depth--; if (depth == 0) { close = k; break; } } }
+                if (close < 0) continue;
+                var args = SplitTopLevel(s.Substring(open + 1, close - open - 1), ',').Select(x => Eval(x.Trim(), ctx)).ToList();
+                if (args.Count < 2 || (args.Count > 2 && args[2] is string)) return null; // already a two-trainer battle
+                return new object[] { Str(args, 0), Str(args, 1), args.Count > 2 && args[2] != null ? ToInt(args[2]) : 0 };
+            }
+            return null;
         }
 
         /// <summary>One trainer (a double battle if setBattleRule("double") was used), or two trainers in a double battle.</summary>

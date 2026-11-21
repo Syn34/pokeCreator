@@ -755,15 +755,25 @@ namespace PokeCreator.Runtime
         public bool CheckTrainerSight()
         {
             if (Map == null || !PartyCanBattle) return false;
+            var seen = new List<GameEvent>();
             foreach (var e in Map.Events)
             {
                 if (e.Erased || e.Starting || e.Trigger != Triggers.EventTouch || !e.HasCommands) continue;
                 var m = TrainerName.Match(e.Name ?? "");
                 if (!m.Success) continue;
-                if (InSight(e, int.Parse(m.Groups[1].Value))) { e.Start(); return true; }
+                if (InSight(e, int.Parse(m.Groups[1].Value))) seen.Add(e);
             }
-            return false;
+            if (seen.Count == 0) return false;
+            // Two trainers spotting the player at once team up for a double battle (as Essentials), if the player
+            // has two Pokémon that can fight
+            PairedTrainer = seen.Count > 1 && State.Party.Count(p => !p.IsEgg && !p.Fainted) > 1 ? seen[1] : null;
+            if (PairedTrainer != null) Exclaim(PairedTrainer, 40);
+            seen[0].Start();
+            return true;
         }
+
+        /// <summary>The second trainer who spotted the player together with the one whose event is running.</summary>
+        public GameEvent PairedTrainer;
 
         bool InSight(GameEvent e, int range)
         {
