@@ -618,11 +618,14 @@ namespace PokeCreator.Runtime.UI
 
         int _page; // 0 = info, 1 = area, 2 = forms
         int _form;
+        /// <summary>Shown after catching a new species: Action closes it too, and the cry plays when it opens.</summary>
+        public bool Registration;
         static readonly string[] PageNames = { "INFO", "AREA", "FORMS" };
 
         protected override void Update()
         {
-            if (Input.Trigger(Button.Cancel)) { Cancel(); Close(); if (_onClose != null) _onClose(_index); return; }
+            if (Registration && Frame == 1) Game.Audio.PlayCry(new Pokemon { Species = _list[_index].Id });
+            if (Input.Trigger(Button.Cancel) || (Registration && Input.Trigger(Button.Action))) { Cancel(); Close(); if (_onClose != null) _onClose(_index); return; }
             if (Input.Trigger(Button.Action))
             {
                 if (_page == 2 && Forms().Count > 1) { _form = (_form + 1) % Forms().Count; Cursor(); return; }

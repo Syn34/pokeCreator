@@ -738,7 +738,13 @@ namespace PokeCreator.Runtime.UI
                 pk.OTName = Game.State.PlayerName; pk.OTId = Game.State.TrainerId; pk.MetMap = Game.Map != null ? Game.Map.Id : 0; pk.MetLevel = pk.Level;
                 bool newEntry = !Game.State.Caught.Contains(pk.Species);
                 Game.State.Register(pk);
-                if (newEntry && Game.State.HasPokedex) steps.Add(next => Game.Message.Show(pk.Name(Game.Project) + "'s data was added to the Pokédex.", null, -1, _ => next()));
+                if (newEntry && Game.State.HasPokedex)
+                {
+                    steps.Add(next => Game.Message.Show(pk.Name(Game.Project) + "'s data was added to the Pokédex.", null, -1, _ => next()));
+                    // ...and its Pokédex entry is shown (as Essentials)
+                    var entry = Game.Project.Species.FirstOrDefault(s => s.Id == pk.Species && s.Form == 0);
+                    if (entry != null) steps.Add(next => Game.PushScene(new PokedexEntryScene(Game, new List<SpeciesData> { entry }, 0, _ => next()) { Registration = true }));
+                }
                 steps.Add(next => Game.Message.Show("Would you like to give a nickname to " + pk.Name(Game.Project) + "?", new List<string> { "Yes", "No" }, 1, c =>
                 {
                     if (c == 0) { Game.AskName(pk.Name(Game.Project) + "'s nickname?", "", 12, n => pk.Nickname = n, null); }
