@@ -115,6 +115,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Studio: Duplicate Map; Map Properties → shift contents (tiles, events, transfers inside the map and the player start move with them); party Item → Move
 - [x] Following Pokémon (Game Settings; sprites in Graphics/Characters/Followers and Followers shiny): the first healthy party Pokémon walks behind the player, hides while surfing / cycling, talk to it to see how it feels; walking into it turns to face it, then swaps places; Options row and FollowingPkmn.toggle / toggle_on / toggle_off / active?
 - [x] RPG Maker Timer command (on-screen countdown, timer conditions), variable operands party size / play time / timer / save count
+- [x] Database → Import PBS Files: update the database from Essentials PBS text files (chosen files; same IDs replaced, new ones added, the rest kept)
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

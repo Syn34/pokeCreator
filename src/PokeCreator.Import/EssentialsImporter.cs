@@ -89,6 +89,66 @@ namespace PokeCreator.Import
             return _p;
         }
 
+        /// <summary>The PBS files ImportPbsInto can read, in the order they're read.</summary>
+        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections" };
+
+        /// <summary>
+        /// Reads chosen PBS files into an existing project (Database → Import PBS Files): records with the same ID are
+        /// replaced, new ones added, and everything else (maps, PokeCreator-only records) is kept. Encounters are matched
+        /// by map and version; the town map, regional dexes and map connections are replaced whole.
+        /// </summary>
+        public string ImportPbsInto(Project target, string folder, ICollection<string> groups)
+        {
+            folder = Path.GetFullPath(folder);
+            _src = Path.GetFileName(folder).Equals("PBS", StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(folder) : folder;
+            if (!Directory.Exists(Path.Combine(_src, "PBS"))) throw new DirectoryNotFoundException("No PBS folder in " + folder);
+            _p = new Project();
+            // Records that other files point at (species for forms, trainer types for trainers) come from the target
+            Func<string, bool> want = g => groups.Contains(g);
+            if (!want("pokemon")) _p.Species.AddRange(target.Species);
+            if (!want("trainer_types")) _p.TrainerTypes.AddRange(target.TrainerTypes);
+            if (!want("types")) _p.Types.AddRange(target.Types);
+            if (want("types")) Step("types", ImportTypes);
+            if (want("abilities")) Step("abilities", ImportAbilities);
+            if (want("moves")) Step("moves", ImportMoves);
+            if (want("items")) Step("items", ImportItems);
+            if (want("pokemon")) { Step("pokemon", ImportSpecies); Step("pokemon_forms", ImportForms); Step("pokemon_metrics", ImportMetrics); }
+            if (want("trainer_types")) Step("trainer_types", ImportTrainerTypes);
+            if (want("trainers")) Step("trainers", ImportTrainers);
+            if (want("encounters")) Step("encounters", ImportEncounters);
+            if (want("town_map")) Step("town_map", ImportTownMap);
+            if (want("regional_dexes")) Step("regional_dexes", ImportDexes);
+            if (want("map_connections")) Step("map_connections", ImportConnections);
+            var report = new List<string>();
+            if (want("types")) report.Add("types " + MergeRecords(target.Types, _p.Types, x => x.Id));
+            if (want("abilities")) report.Add("abilities " + MergeRecords(target.Abilities, _p.Abilities, x => x.Id));
+            if (want("moves")) report.Add("moves " + MergeRecords(target.Moves, _p.Moves, x => x.Id));
+            if (want("items")) report.Add("items " + MergeRecords(target.Items, _p.Items, x => x.Id));
+            if (want("pokemon")) report.Add("Pokémon " + MergeRecords(target.Species, _p.Species, x => x.Id));
+            if (want("trainer_types")) report.Add("trainer types " + MergeRecords(target.TrainerTypes, _p.TrainerTypes, x => x.Id));
+            if (want("trainers")) report.Add("trainers " + MergeRecords(target.Trainers, _p.Trainers, x => x.TrainerType + "|" + x.Name + "|" + x.Version));
+            if (want("encounters")) report.Add("encounter tables " + MergeRecords(target.Encounters, _p.Encounters, x => x.Map + "|" + x.Version));
+            if (want("town_map") && _p.TownMaps.Count > 0) { target.TownMaps.Clear(); target.TownMaps.AddRange(_p.TownMaps); report.Add("town map regions " + _p.TownMaps.Count); }
+            if (want("regional_dexes") && _p.RegionalDexes.Count > 0) { target.RegionalDexes.Clear(); target.RegionalDexes.AddRange(_p.RegionalDexes); report.Add("regional dexes " + _p.RegionalDexes.Count); }
+            if (want("map_connections")) { target.Connections.Clear(); target.Connections.AddRange(_p.Connections); report.Add("map connections " + _p.Connections.Count); }
+            return string.Join(", ", report) + (Warnings.Count > 0 ? "\n" + Warnings.Count + " warning(s):\n" + string.Join("\n", Warnings.Take(20)) : "");
+        }
+
+        /// <summary>Replaces records with the same key and adds new ones; returns "N updated, M added".</summary>
+        static string MergeRecords<T>(List<T> dst, List<T> src, Func<T, string> key)
+        {
+            int upd = 0, add = 0;
+            var index = new Dictionary<string, int>();
+            for (int i = 0; i < dst.Count; i++) { string k = key(dst[i]); if (k != null && !index.ContainsKey(k)) index[k] = i; }
+            foreach (var r in src)
+            {
+                string k = key(r); int at;
+                if (k != null && index.TryGetValue(k, out at)) { dst[at] = r; upd++; }
+                else { dst.Add(r); if (k != null) index[k] = dst.Count - 1; add++; }
+            }
+            return upd + " updated, " + add + " added";
+        }
+
         void Step(string pbsName, Action<List<PbsSection>, List<PbsLine>> action)
         {
             string f = Path.Combine(_src, "PBS", pbsName + ".txt");

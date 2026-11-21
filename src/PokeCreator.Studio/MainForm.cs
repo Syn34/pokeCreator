@@ -146,6 +146,7 @@ namespace PokeCreator.Studio
                 db.DropDownItems.Add("Common Events", null, (a, b) => OpenDocument("sys:commonevents", () => new CommonEventsEditor(this, Project)));
                 db.DropDownItems.Add(new ToolStripSeparator());
                 db.DropDownItems.Add("Add Missing Pokémon && Data…", null, (a, b) => MergeBaseData());
+                db.DropDownItems.Add("Import PBS Files…", null, (a, b) => ImportPbsFiles());
             };
             db.DropDownItems.Add("(open a project)");
 
@@ -414,6 +415,47 @@ namespace PokeCreator.Studio
             RebuildTree();
             SetStatus(result.ToString());
             MessageBox.Show(this, result.ToString() + "\n\nYour project now has " + Project.Species.Count(sp => sp.Form == 0) + " Pokémon.", "Add missing Pokémon & data");
+        }
+
+        /// <summary>Database → Import PBS Files: updates the database from Essentials PBS text files (records with the same ID are replaced).</summary>
+        void ImportPbsFiles()
+        {
+            if (Project == null) return;
+            string folder;
+            using (var fb = new FolderBrowserDialog { Description = "Choose an Essentials project folder or its PBS folder" })
+            {
+                if (fb.ShowDialog(this) != DialogResult.OK) return;
+                folder = fb.SelectedPath;
+            }
+            string pbs = Path.GetFileName(folder).Equals("PBS", StringComparison.OrdinalIgnoreCase) ? folder : Path.Combine(folder, "PBS");
+            if (!Directory.Exists(pbs)) { MessageBox.Show(this, "There's no PBS folder there.", "Import PBS files"); return; }
+            var groups = PokeCreator.Import.EssentialsImporter.PbsGroups.Where(g => File.Exists(Path.Combine(pbs, g + ".txt"))).ToList();
+            if (groups.Count == 0) { MessageBox.Show(this, "No PBS files that PokeCreator reads were found.", "Import PBS files"); return; }
+            List<string> chosen;
+            using (var f = new Form { Text = "Import PBS files", Width = 420, Height = 420, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MinimizeBox = false, MaximizeBox = false })
+            {
+                var note = new Label { Text = "Records in the chosen files replace the ones with the same ID; new ones are added. Everything else stays as it is.", Dock = DockStyle.Top, Height = 48, Padding = new Padding(8) };
+                var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
+                foreach (var g in groups) list.Items.Add(g + ".txt" + (g == "pokemon" ? " (with pokemon_forms / pokemon_metrics)" : ""), g != "map_connections" && g != "town_map" && g != "regional_dexes");
+                var ok = new Button { Text = "Import", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom, Height = 32 };
+                f.Controls.Add(list); f.Controls.Add(note); f.Controls.Add(ok); f.AcceptButton = ok;
+                if (f.ShowDialog(this) != DialogResult.OK) return;
+                chosen = groups.Where((g, i) => list.GetItemChecked(i)).ToList();
+            }
+            if (chosen.Count == 0) return;
+            SaveAll();
+            foreach (TabPage tp in _tabs.TabPages.Cast<TabPage>().Where(t => (t.Name ?? "").StartsWith("db:")).ToList()) { _tabs.TabPages.Remove(tp); tp.Dispose(); }
+            try
+            {
+                var imp = new PokeCreator.Import.EssentialsImporter();
+                string report = imp.ImportPbsInto(Project, folder, chosen);
+                foreach (var t in Project.Tables) Json.Json.ToFile(Project.DataFile(t.FileName), t.Items);
+                Json.Json.ToFile(Project.DataFile("map_connections.json"), Project.Connections);
+                RebuildTree();
+                SetStatus("PBS import: " + report.Split('\n')[0]);
+                MessageBox.Show(this, report, "Import PBS files");
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import PBS files", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
         void OpenAppearance() { OpenDocument("sys:appearance", () => new AppearanceEditor(_settings, s => ApplyAppearance(s, true))); }
