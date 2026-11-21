@@ -92,8 +92,10 @@ namespace PokeCreator.Runtime.Render
 
         public MapRenderer(Gfx g, Project p) { _g = g; _p = p; Tiles = new TileDrawer(g, p); }
 
+        int _frame;
         public void Draw(GameMap map, int displayX, int displayY, IEnumerable<Character> characters, int frame)
         {
+            _frame = frame;
             Tiles.Frame = frame;
             _overlays.Clear();
             int order = 0;
@@ -159,7 +161,21 @@ namespace PokeCreator.Runtime.Render
             // Reflection on still water or puddles just below (as Essentials)
             int below = map.TerrainTag(c.X, c.Y + 1);
             if (!c.Jumping && (below == 6 || below == 16))
-                _g.DrawEx(tex, col * cw, row * ch, cw, ch, sx, sy + ch / 2.0, 1, -1, 0, false, c.Opacity * 90 / 255, 0);
+            {
+                bool still = map.Data.Properties != null && map.Data.Properties.StillReflections;
+                if (still) _g.DrawEx(tex, col * cw, row * ch, cw, ch, sx, sy + ch / 2.0, 1, -1, 0, false, c.Opacity * 90 / 255, 0);
+                else
+                {
+                    // Rippling: the flipped sprite drawn in 2-pixel strips that sway sideways
+                    double phase = _frame * 0.08;
+                    for (int yy = 0; yy < ch; yy += 2)
+                    {
+                        int h2 = Math.Min(2, ch - yy);
+                        double off = Math.Sin(phase + yy * 0.35) * 1.5;
+                        _g.DrawEx(tex, col * cw, row * ch + yy, cw, h2, sx + off, sy + (ch - yy - h2 / 2.0), 1, -1, 0, false, c.Opacity * 90 / 255, 0);
+                    }
+                }
+            }
             // Bush tiles (tall grass) hide the lower part of whoever stands in them
             if (!c.Jumping && map.IsBush(c.X, c.Y) && ch > 12)
             {

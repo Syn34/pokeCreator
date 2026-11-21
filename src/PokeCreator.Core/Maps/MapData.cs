@@ -44,6 +44,7 @@ namespace PokeCreator.Maps
         [Field("Dark (needs Flash)")] public bool DarkMap { get; set; }
         [Field("Safari Zone")] public bool SafariMap { get; set; }
         [Field("Snap edges", Help = "Camera stops at the map edge.")] public bool SnapEdges { get; set; }
+        [Field("Still reflections", Help = "Reflections in water and puddles don't ripple.")] public bool StillReflections { get; set; }
         [Field("Random dungeon", Help = "A new layout of rooms and corridors is made each time the player enters.")] public bool Dungeon { get; set; }
         [Field("Dungeon floor tile", Help = "Tile ID for a random dungeon's floor (0 = the most common walkable tile painted on the map).")] public int DungeonFloor { get; set; }
         [Field("Dungeon wall tile", Help = "Tile ID for a random dungeon's walls (0 = the most common blocking tile painted on the map).")] public int DungeonWall { get; set; }
