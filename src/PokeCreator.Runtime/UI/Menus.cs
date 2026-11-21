@@ -194,7 +194,7 @@ namespace PokeCreator.Runtime.UI
     /// <summary>Party screen: six panels, Summary / Switch.</summary>
     public class PartyScene : Scene
     {
-        int _index, _switchFrom = -1;
+        int _index, _switchFrom = -1, _moveItemFrom = -1;
         CommandList _popup;
         readonly Dictionary<string, string> _fieldMoves = new Dictionary<string, string>();
         string _help = "Choose a Pokémon.";
@@ -226,7 +226,8 @@ namespace PokeCreator.Runtime.UI
                 if (cmd == "Summary") Game.PushScene(new SummaryScene(Game, _index));
                 else if (_fieldMoves.ContainsKey(cmd)) FieldMoves.UseFromParty(Game, pk, _fieldMoves[cmd]);
                 else if (cmd == "Switch") { _switchFrom = _index; _help = "Move to where?"; }
-                else if (cmd == "Item") _popup = new CommandList(new[] { "Give", "Take", "Cancel" });
+                else if (cmd == "Item") _popup = new CommandList(string.IsNullOrEmpty(pk.Item) ? new[] { "Give", "Cancel" } : new[] { "Give", "Take", "Move", "Cancel" });
+                else if (cmd == "Move") { _moveItemFrom = _index; _help = "Give " + ItemName(pk.Item) + " to which Pokémon?"; }
                 else if (cmd == "Mail") _popup = new CommandList(new[] { "Read", "Take", "Cancel" });
                 else if (cmd == "Read") { if (pk.Mail != null) Game.PushScene(new MailScene(Game, pk.Mail)); }
                 else if (cmd == "Give") Game.PushScene(new BagScene(Game, id => ItemFlow.Give(Game, pk, id, null)));
@@ -242,6 +243,7 @@ namespace PokeCreator.Runtime.UI
             {
                 Cancel();
                 if (_switchFrom >= 0) { _switchFrom = -1; _help = "Choose a Pokémon."; }
+                else if (_moveItemFrom >= 0) { _moveItemFrom = -1; _help = "Choose a Pokémon."; }
                 else { Close(); if (_onCancel != null) _onCancel(); }
                 return;
             }
@@ -256,6 +258,7 @@ namespace PokeCreator.Runtime.UI
                     _switchFrom = -1; _help = "Choose a Pokémon.";
                     return;
                 }
+                if (_moveItemFrom >= 0) { MoveItemTo(_index); return; }
                 // Summary, the Pokémon's field moves (Cut, Fly, Surf...), Switch, Item
                 var cmds = new List<string> { "Summary" };
                 _fieldMoves.Clear();
@@ -271,6 +274,28 @@ namespace PokeCreator.Runtime.UI
             }
         }
 
+        string ItemName(string id) { var it = Game.Project.Items.FirstOrDefault(i => i.Id == id); return it != null && !string.IsNullOrEmpty(it.Name) ? it.Name : id; }
+
+        /// <summary>Party → Item → Move: hands the held item to another Pokémon (swapping if it holds one).</summary>
+        void MoveItemTo(int to)
+        {
+            var from = Party[_moveItemFrom]; var target = Party[to];
+            _moveItemFrom = -1; _help = "Choose a Pokémon.";
+            if (target == from) return;
+            if (target.IsEgg) { Game.Message.Show("Eggs can't hold items."); return; }
+            string item = from.Item, other = target.Item;
+            Action swap = () =>
+            {
+                target.Item = item; from.Item = other;
+                PokeCreator.Pkmn.FormRules.UpdateItemForm(Game.Project, target); PokeCreator.Pkmn.FormRules.UpdateItemForm(Game.Project, from);
+                Game.Message.Show(string.IsNullOrEmpty(other)
+                    ? target.Name(Game.Project) + " was given the " + ItemName(item) + " to hold."
+                    : target.Name(Game.Project) + " was given the " + ItemName(item) + " to hold, and " + from.Name(Game.Project) + " took the " + ItemName(other) + ".");
+            };
+            if (string.IsNullOrEmpty(other)) { swap(); return; }
+            Game.Message.Show(target.Name(Game.Project) + " is already holding the " + ItemName(other) + ". Would you like to switch the two items?", new List<string> { "Yes", "No" }, 1, c => { if (c == 0) swap(); });
+        }
+
         public override void Draw(Gfx g)
         {
             Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(56, 120, 104), new Color(24, 72, 64));
@@ -280,7 +305,7 @@ namespace PokeCreator.Runtime.UI
                 int w = g.Width / 2 - 8, h = 84;
                 if (i >= Party.Count) { Ui.Panel(g, x, y, w, h, new Color(40, 88, 80), new Color(32, 64, 56)); continue; }
                 var pk = Party[i];
-                bool sel = i == _index, swap = i == _switchFrom;
+                bool sel = i == _index, swap = i == _switchFrom || i == _moveItemFrom;
                 var fill = pk.Fainted ? new Color(200, 120, 112) : sel ? new Color(248, 224, 120) : new Color(120, 200, 248);
                 if (swap) fill = new Color(248, 160, 200);
                 Ui.Panel(g, x, y, w, h, fill, sel ? new Color(248, 64, 48) : new Color(40, 56, 80));
