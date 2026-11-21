@@ -112,6 +112,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Walking raises friendship (every 128 steps; Soothe Bell, Luxury Ball); optional field poison (Game Settings, Gen 1-4 style); "use another Repel?" when one wears off
 - [x] Friendship changes as Essentials: levelling up, fainting (more against a much stronger foe), vitamins / feathers, TMs, X items, bitter medicine; EV-lowering berries (Pomeg, Kelpsy, Qualot, Hondew, Grepa, Tamato)
 - [x] Options → Move Hints (battle move menu shows how effective a move is against a Pokémon already seen); Options list scrolls; per-map victory / capture music
+- [x] Studio: Duplicate Map; Map Properties → shift contents (tiles, events, transfers inside the map and the player start move with them); party Item → Move
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing

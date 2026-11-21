@@ -227,6 +227,23 @@ namespace PokeCreator.Maps
             Events.RemoveAll(e => e.X >= w || e.Y >= h);
         }
 
+        /// <summary>Moves every tile and event by (dx, dy); what falls off the map is dropped, new space is empty.</summary>
+        public void Shift(int dx, int dy)
+        {
+            foreach (var layer in Layers)
+            {
+                var old = layer.Select(r => new List<int>(r)).ToList();
+                for (int y = 0; y < Height; y++)
+                    for (int x = 0; x < Width; x++)
+                    {
+                        int sx = x - dx, sy = y - dy;
+                        layer[y][x] = sy >= 0 && sy < old.Count && sx >= 0 && sx < old[sy].Count ? old[sy][sx] : 0;
+                    }
+            }
+            foreach (var e in Events) { e.X += dx; e.Y += dy; }
+            Events.RemoveAll(e => e.X < 0 || e.Y < 0 || e.X >= Width || e.Y >= Height);
+        }
+
         public int NextEventId()
         {
             int max = 0; foreach (var e in Events) max = Math.Max(max, e.Id); return max + 1;

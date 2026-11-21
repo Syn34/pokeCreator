@@ -271,6 +271,8 @@ namespace PokeCreator.Studio.Editors
         {
             [Field("Width (tiles)")] public int Width { get; set; }
             [Field("Height (tiles)")] public int Height { get; set; }
+            [Field("Shift contents right", Help = "Moves every tile and event this many tiles right (negative = left), after resizing. To add space on the left, raise the width and shift right by the same amount. Warps from other maps aren't changed.")] public int ShiftX { get; set; }
+            [Field("Shift contents down", Help = "Moves every tile and event this many tiles down (negative = up), after resizing.")] public int ShiftY { get; set; }
             [Field("Tileset ID", Help = "See Game Settings → Tilesets")] public int TilesetId { get; set; }
             [Field("Play music automatically", Group = "Audio")] public bool AutoplayBgm { get; set; }
             [Field("Music", Asset = "Audio/BGM", Group = "Audio")] public string Bgm { get; set; }
@@ -297,6 +299,21 @@ namespace PokeCreator.Studio.Editors
             }
             Snapshot();
             if (s.Width != _map.Width || s.Height != _map.Height) _map.Resize(Math.Max(1, Math.Min(500, s.Width)), Math.Max(1, Math.Min(500, s.Height)));
+            if (s.ShiftX != 0 || s.ShiftY != 0)
+            {
+                _map.Shift(s.ShiftX, s.ShiftY);
+                // Transfers within this map and the player start follow the shift
+                foreach (var ev in _map.Events)
+                    foreach (var pg in ev.Pages)
+                        foreach (var c in pg.List)
+                            if (c.Code == 201 && c.Params.Count >= 4 && c.IntParam(0) == 0 && c.IntParam(1) == MapId)
+                            { c.Params[2] = c.IntParam(2) + s.ShiftX; c.Params[3] = c.IntParam(3) + s.ShiftY; }
+                if (_p.Settings.StartMap == MapId)
+                {
+                    _p.Settings.StartX += s.ShiftX; _p.Settings.StartY += s.ShiftY;
+                    Json.Json.ToFile(_p.DataFile("settings.json"), _p.Settings);
+                }
+            }
             if (s.TilesetId != _map.TilesetId)
             {
                 _map.TilesetId = s.TilesetId;
