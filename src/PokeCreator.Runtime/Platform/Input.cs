@@ -113,7 +113,7 @@ namespace PokeCreator.Runtime.Platform
 
         public static bool KeyTrigger(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h == 1; }
         public static bool KeyPress(int scancode) { int h; return _keyHeld.TryGetValue(scancode, out h) && h > 0; }
-        static readonly int[] WatchedKeys = { Scancode.F9, Scancode.F5, Scancode.F12, Scancode.LCtrl, 228 /* right Ctrl */, 226, 230 /* Alt */, Scancode.Return, Scancode.KpEnter, Scancode.Backspace, Scancode.Escape, Scancode.Up, Scancode.Down, Scancode.Left, Scancode.Right };
+        static readonly int[] WatchedKeys = { Scancode.F1, Scancode.F9, Scancode.F5, Scancode.F12, Scancode.LCtrl, 228 /* right Ctrl */, 226, 230 /* Alt */, Scancode.Return, Scancode.KpEnter, Scancode.Backspace, Scancode.Escape, Scancode.Up, Scancode.Down, Scancode.Left, Scancode.Right };
 
         public static bool Press(Button b) { return _held[(int)b] > 0; }
         public static bool Trigger(Button b) { return _held[(int)b] == 1; }

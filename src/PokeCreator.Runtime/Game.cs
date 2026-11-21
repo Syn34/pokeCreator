@@ -929,6 +929,8 @@ namespace PokeCreator.Runtime
                 Options.Apply(this); Options.Save(this);
             }
             if (Input.KeyTrigger(Scancode.F12) && !(_scenes.Count == 1 && _scenes[0] is TitleScene)) { SoftReset(); return; }
+            // F1: key bindings (as Essentials / mkxp), from anywhere except over another menu of the same kind
+            if (Input.KeyTrigger(Scancode.F1) && !Message.Busy && FindScene<ControlsScene>() == null) { PushScene(new ControlsScene(this)); return; }
             if (_flash > 0) _flash--; // fades over screens too (battles start with a flash)
             if (_scenes.Count > 0)
             {
