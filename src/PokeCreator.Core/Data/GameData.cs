@@ -123,6 +123,20 @@ namespace PokeCreator.Data
         public override string DisplayName { get { return Name ?? Id; } }
     }
 
+    /// <summary>
+    /// Phone conversation lines (PBS phone.txt): ID "Default" for everyone, or "TRAINERTYPE,Name" for one trainer.
+    /// Lines can use \TN (trainer's name), \TP (one of their Pokémon), \TM (where they are) and \TE (a wild Pokémon there).
+    /// </summary>
+    public class PhoneMessageData : GameRecord
+    {
+        [Field("Greetings", Multiline = true)] public List<string> Intro { get; set; }
+        [Field("Chat (first part)", Multiline = true)] public List<string> Body1 { get; set; }
+        [Field("Chat (second part)", Multiline = true)] public List<string> Body2 { get; set; }
+        [Field("Rematch request", Multiline = true)] public List<string> BattleRequest { get; set; }
+        [Field("Goodbyes", Multiline = true)] public List<string> End { get; set; }
+        public PhoneMessageData() { Intro = new List<string>(); Body1 = new List<string>(); Body2 = new List<string>(); BattleRequest = new List<string>(); End = new List<string>(); }
+    }
+
     /// <summary>A ribbon (PBS ribbons.txt): its name, description and position in the ribbon icon sheet.</summary>
     public class RibbonData : GameRecord
     {

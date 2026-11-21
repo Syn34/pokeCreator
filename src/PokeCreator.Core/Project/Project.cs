@@ -75,6 +75,8 @@ namespace PokeCreator.Projects
         public List<MapAnimation> MapAnimations = new List<MapAnimation>();
         /// <summary>Ribbon names and descriptions (ribbons.json, from PBS ribbons.txt).</summary>
         public List<RibbonData> Ribbons = new List<RibbonData>();
+        /// <summary>Phone conversations (phone_messages.json, from PBS phone.txt).</summary>
+        public List<PhoneMessageData> PhoneMessages = new List<PhoneMessageData>();
 
         public List<MapInfo> MapInfos = new List<MapInfo>();
         public List<TilesetData> Tilesets = new List<TilesetData>();
@@ -99,6 +101,7 @@ namespace PokeCreator.Projects
             AddTable("animations", "Battle Animations", typeof(BattleAnimation), "animations.json", () => Animations);
             AddTable("mystery_gifts", "Mystery Gifts", typeof(MysteryGiftData), "mystery_gifts.json", () => MysteryGifts);
             AddTable("ribbons", "Ribbons", typeof(RibbonData), "ribbons.json", () => Ribbons);
+            AddTable("phone_messages", "Phone Messages", typeof(PhoneMessageData), "phone_messages.json", () => PhoneMessages);
         }
 
         void AddTable(string key, string label, Type t, string file, Func<IList> get)
@@ -242,6 +245,7 @@ namespace PokeCreator.Projects
             p.CommonEvents = LoadOr(p.DataFile("common_events.json"), p.CommonEvents);
             p.MapAnimations = LoadOr(p.DataFile("map_animations.json"), p.MapAnimations);
             p.Ribbons = LoadOr(p.DataFile("ribbons.json"), p.Ribbons);
+            p.PhoneMessages = LoadOr(p.DataFile("phone_messages.json"), p.PhoneMessages);
             PokeCreator.Pkmn.FormRules.EnsureGen9Forms(p);
             return p;
         }

@@ -61,6 +61,7 @@ namespace PokeCreator.Import
             Step("berry_plants", ImportBerryPlants);
             Step("ribbons", ImportRibbons);
             Step("shadow_pokemon", ImportShadow);
+            Step("phone", ImportPhone);
 
             ImportSystem();
             ImportCommonEvents();
@@ -94,7 +95,7 @@ namespace PokeCreator.Import
         }
 
         /// <summary>The PBS files ImportPbsInto can read, in the order they're read.</summary>
-        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections", "berry_plants", "ribbons", "shadow_pokemon" };
+        public static readonly string[] PbsGroups = { "types", "abilities", "moves", "items", "pokemon", "trainer_types", "trainers", "encounters", "town_map", "regional_dexes", "map_connections", "berry_plants", "ribbons", "shadow_pokemon", "phone" };
 
         /// <summary>
         /// Reads chosen PBS files into an existing project (Database → Import PBS Files): records with the same ID are
@@ -127,9 +128,11 @@ namespace PokeCreator.Import
             if (want("berry_plants")) Step("berry_plants", ImportBerryPlants);
             if (want("ribbons")) Step("ribbons", ImportRibbons);
             if (want("shadow_pokemon")) Step("shadow_pokemon", ImportShadow);
+            if (want("phone")) Step("phone", ImportPhone);
             var report = new List<string>();
             if (want("berry_plants")) report.Add("berry plants");
             if (want("shadow_pokemon")) report.Add("Shadow Pokémon");
+            if (want("phone")) report.Add("phone messages " + MergeRecords(target.PhoneMessages, _p.PhoneMessages, x => x.Id));
             if (want("ribbons")) report.Add("ribbons " + MergeRecords(target.Ribbons, _p.Ribbons, x => x.Id));
             if (want("types")) report.Add("types " + MergeRecords(target.Types, _p.Types, x => x.Id));
             if (want("abilities")) report.Add("abilities " + MergeRecords(target.Abilities, _p.Abilities, x => x.Id));
@@ -513,6 +516,31 @@ namespace PokeCreator.Import
                 n++;
             }
             Log("  " + n + " Shadow Pokémon");
+        }
+
+        // PBS/phone.txt: what trainers say on the phone ([Default] and [TRAINERTYPE,Name] sections; keys can repeat)
+        void ImportPhone(List<PbsSection> secs, List<PbsLine> loose)
+        {
+            foreach (var s in secs)
+            {
+                string id = s.Header.Trim();
+                var parts = id.Split(',');
+                if (parts.Length >= 2) id = parts[0].Trim() + "," + parts[1].Trim();
+                var m = _p.PhoneMessages.FirstOrDefault(x => x.Id == id);
+                if (m == null) { m = new PhoneMessageData { Id = id }; _p.PhoneMessages.Add(m); }
+                foreach (var l in s.Lines)
+                {
+                    if (l.Key == null || string.IsNullOrEmpty(l.Value)) continue;
+                    string k = l.Key.ToLowerInvariant();
+                    if (k.StartsWith("intro") || k.StartsWith("greeting")) m.Intro.Add(l.Value.Trim());
+                    else if (k.StartsWith("body1") || k == "body") m.Body1.Add(l.Value.Trim());
+                    else if (k.StartsWith("body2")) m.Body2.Add(l.Value.Trim());
+                    else if (k.StartsWith("battlerequest")) m.BattleRequest.Add(l.Value.Trim());
+                    else if (k.StartsWith("end")) m.End.Add(l.Value.Trim());
+                    else Warn("phone.txt: unknown key " + l.Key);
+                }
+            }
+            Log("  " + _p.PhoneMessages.Count + " phone message sets");
         }
 
         // PBS/ribbons.txt: ribbon names and descriptions

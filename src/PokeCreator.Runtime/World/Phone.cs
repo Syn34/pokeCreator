@@ -105,8 +105,62 @@ namespace PokeCreator.Runtime.World
             var c = waiting[Rng.Next(waiting.Count)];
             c.RematchReady = true;
             g.Audio.PlaySe("Phone call");
+            var conv = Conversation(g, c, true);
             g.Message.Show("......\\n......", null, -1, _ =>
-                g.Message.Show(ContactLabel(g, c) + ": Hi, it's " + c.Name + "! My Pokémon are a lot stronger now. Come and battle me again at " + MapName(g, c.MapId) + "!"));
+            {
+                if (conv != null) Say(g, conv, 0);
+                else g.Message.Show(ContactLabel(g, c) + ": Hi, it's " + c.Name + "! My Pokémon are a lot stronger now. Come and battle me again at " + MapName(g, c.MapId) + "!");
+            });
+        }
+
+        /// <summary>Phone lines for this trainer (their own set, else Default), or null when the game has none.</summary>
+        static PokeCreator.Data.PhoneMessageData Lines(Game g, PhoneContact c)
+        {
+            var own = g.Project.PhoneMessages.FirstOrDefault(m => m.Id == c.TrainerType + "," + c.Name);
+            var def = g.Project.PhoneMessages.FirstOrDefault(m => m.Id.Equals("Default", StringComparison.OrdinalIgnoreCase));
+            return own ?? def;
+        }
+
+        static string Pick(Game g, List<string> own, List<string> fallback)
+        {
+            var list = own != null && own.Count > 0 ? own : fallback;
+            return list != null && list.Count > 0 ? list[Rng.Next(list.Count)] : null;
+        }
+
+        /// <summary>Fills in \TN, \TP, \TM and \TE.</summary>
+        static string Fill(Game g, PhoneContact c, string s)
+        {
+            if (s == null) return null;
+            var tr = g.Project.Trainers.FirstOrDefault(t => t.TrainerType == c.TrainerType && t.Name == c.Name && t.Version == Variant(g, c.TrainerType, c.Name))
+                  ?? g.Project.Trainers.FirstOrDefault(t => t.TrainerType == c.TrainerType && t.Name == c.Name);
+            string mon = "Pokémon";
+            if (tr != null && tr.Pokemon.Count > 0) { var sp = g.Project.Species.FirstOrDefault(x => x.Id == tr.Pokemon[Rng.Next(tr.Pokemon.Count)].Species); if (sp != null) mon = sp.Name; }
+            string wild = mon;
+            var table = g.Project.Encounters.FirstOrDefault(e => e.Map == c.MapId);
+            var slots = table != null ? table.Methods.SelectMany(m => m.Slots).ToList() : null;
+            if (slots != null && slots.Count > 0) { var sp = g.Project.Species.FirstOrDefault(x => x.Id == slots[Rng.Next(slots.Count)].Species); if (sp != null) wild = sp.Name; }
+            return s.Replace("\\TN", c.Name).Replace("\\TP", mon).Replace("\\TM", MapName(g, c.MapId)).Replace("\\TE", wild);
+        }
+
+        /// <summary>A conversation from the game's phone lines; null when it has none.</summary>
+        static List<string> Conversation(Game g, PhoneContact c, bool rematch)
+        {
+            var own = Lines(g, c);
+            if (own == null) return null;
+            var def = g.Project.PhoneMessages.FirstOrDefault(m => m.Id.Equals("Default", StringComparison.OrdinalIgnoreCase));
+            Func<Func<PokeCreator.Data.PhoneMessageData, List<string>>, string> part = sel => Fill(g, c, Pick(g, sel(own), def != null ? sel(def) : null));
+            var lines = new List<string> { part(m => m.Intro) };
+            if (rematch) lines.Add(part(m => m.BattleRequest));
+            else { lines.Add(part(m => m.Body1)); lines.Add(part(m => m.Body2)); }
+            lines.Add(part(m => m.End));
+            lines.RemoveAll(string.IsNullOrEmpty);
+            return lines.Count > 0 ? lines : null;
+        }
+
+        static void Say(Game g, List<string> lines, int i)
+        {
+            if (i >= lines.Count) return;
+            g.Message.Show(lines[i], null, -1, _ => Say(g, lines, i + 1));
         }
 
         /// <summary>Calling someone from the Pokégear.</summary>
@@ -119,6 +173,8 @@ namespace PokeCreator.Runtime.World
             }
             string who = ContactLabel(g, c);
             if (!c.IsTrainer) { g.Message.Show(who + ": Hello! How are you doing?"); return; }
+            var conv = Conversation(g, c, c.RematchReady);
+            if (conv != null) { Say(g, conv, 0); return; }
             if (c.RematchReady) { g.Message.Show(who + ": I'm waiting for you at " + MapName(g, c.MapId) + "! Let's battle!"); return; }
             string[] chat = { "My Pokémon and I are training hard. I'll call you when we're ready!", "How are your Pokémon doing? Mine are getting stronger!", "I've been battling a lot lately. Let's battle again soon!" };
             g.Message.Show(who + ": " + chat[Rng.Next(chat.Length)]);
