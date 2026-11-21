@@ -78,10 +78,33 @@ namespace PokeCreator.Runtime.World
         }
 
         /// <summary>Synchronize and Cute Charm on the wild Pokémon just made.</summary>
+        /// <summary>
+        /// Wild Pokémon hold items from their species' wild item lists: common 50%, uncommon 5%, rare 1% (60/20/5 with a
+        /// Compound Eyes or Super Luck lead); one item in all three lists is always held (as Essentials).
+        /// </summary>
+        static void WildItem(Game g, Pokemon wild, string leadAbility)
+        {
+            if (!string.IsNullOrEmpty(wild.Item)) return;
+            var d = wild.Data(g.Project);
+            if (d == null) return;
+            var common = d.WildItemCommon ?? new List<string>(); var uncommon = d.WildItemUncommon ?? new List<string>(); var rare = d.WildItemRare ?? new List<string>();
+            if (common.Count + uncommon.Count + rare.Count == 0) return;
+            Func<List<string>, string> pick = l => l.Count == 0 ? null : l[g.Rng.Next(l.Count)];
+            if (common.Count == 1 && uncommon.Count == 1 && rare.Count == 1 && common[0] == uncommon[0] && common[0] == rare[0]) { wild.Item = common[0]; return; }
+            bool boosted = leadAbility == "COMPOUNDEYES" || leadAbility == "SUPERLUCK";
+            int[] chances = boosted ? new[] { 60, 20, 5 } : new[] { 50, 5, 1 };
+            int roll = g.Rng.Next(100);
+            if (roll < chances[2] && rare.Count > 0) wild.Item = pick(rare);
+            else if (roll < chances[2] + chances[1] && uncommon.Count > 0) wild.Item = pick(uncommon);
+            else if (roll < chances[2] + chances[1] + chances[0] && common.Count > 0) wild.Item = pick(common);
+        }
+
         public static void ApplyToWild(Game g, Pokemon wild)
         {
             var lead = Lead(g); string ab = Ability(g, lead);
             ShinyCharm(g, wild);
+            WildItem(g, wild, ab);
+            if (!string.IsNullOrEmpty(wild.Item)) FormRules.UpdateItemForm(g.Project, wild);
             if (lead == null) return;
             if (ab == "SYNCHRONIZE" && g.Rng.Next(2) == 0) wild.Nature = lead.Nature;
             if (ab == "CUTECHARM" && (lead.Gender == "M" || lead.Gender == "F") && (wild.Gender == "M" || wild.Gender == "F") && g.Rng.Next(3) < 2)
