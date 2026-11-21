@@ -176,6 +176,10 @@ namespace PokeCreator.Pkmn
         public string Ball { get; set; }
         /// <summary>The Pokémon fused into this one (Kyurem with Reshiram / Zekrom, Necrozma, Calyrex).</summary>
         public Pokemon Fused { get; set; }
+        /// <summary>Essentials' cannot_store / cannot_release / cannot_trade: story Pokémon that must stay with the player.</summary>
+        public bool CannotStore { get; set; }
+        public bool CannotRelease { get; set; }
+        public bool CannotTrade { get; set; }
         /// <summary>The letter on held Mail (null when it holds none).</summary>
         public PokemonMail Mail { get; set; }
         /// <summary>Box markings (bits: circle, triangle, square, heart, star, diamond).</summary>

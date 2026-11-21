@@ -353,7 +353,13 @@ namespace PokeCreator.Runtime.Script
             var m = Regex.Match(e, @"^\$game_switches\[(.+)\]$");
             if (m.Success) return _game.SwitchOn(ToInt(Eval(m.Groups[1].Value, ctx)), ctx != null ? ctx.MapId : _curMap, ctx != null ? ctx.EventId : _curEvent);
             m = Regex.Match(e, @"^\$game_variables\[(.+)\]$");
-            if (m.Success) return _game.State.GetVar(ToInt(Eval(m.Groups[1].Value, ctx)));
+            if (m.Success)
+            {
+                int vid = ToInt(Eval(m.Groups[1].Value, ctx)); string vs; object vo;
+                if (_game.State.ObjectVars.TryGetValue(vid, out vo)) return vo;
+                if (_game.State.StringVars.TryGetValue(vid, out vs)) return vs;
+                return _game.State.GetVar(vid);
+            }
             m = Regex.Match(e, @"^\$game_self_switches\[\[(.+)\]\]$");
             if (m.Success)
             {
@@ -535,7 +541,9 @@ namespace PokeCreator.Runtime.Script
             if (m.Success)
             {
                 int vid = ToInt(Eval(m.Groups[1].Value, ctx));
-                if (val is string) _game.State.SetStr(vid, (string)val); else _game.State.SetVar(vid, ToInt(val));
+                if (val is string) _game.State.SetStr(vid, (string)val);
+                else if (val is System.Collections.IList || val is System.Collections.IDictionary) _game.State.SetObj(vid, val);
+                else _game.State.SetVar(vid, ToInt(val));
                 _game.Map.RefreshEvents(); return;
             }
             m = Regex.Match(lhs, @"^\$game_self_switches\[\[(.+)\]\]$");
@@ -1051,12 +1059,14 @@ namespace PokeCreator.Runtime.Script
             Register("pbSet", (c, a) =>
             {
                 if (Arg(a, 1) is string) _game.State.SetStr(ToInt(Arg(a, 0)), (string)Arg(a, 1));
+                else if (Arg(a, 1) is System.Collections.IList || Arg(a, 1) is System.Collections.IDictionary) _game.State.SetObj(ToInt(Arg(a, 0)), Arg(a, 1));
                 else _game.State.SetVar(ToInt(Arg(a, 0)), ToInt(Arg(a, 1)));
                 _game.Map.RefreshEvents(); return Arg(a, 1);
             });
             Register("pbGet", (c, a) =>
             {
-                int id = ToInt(Arg(a, 0)); string s;
+                int id = ToInt(Arg(a, 0)); string s; object o;
+                if (_game.State.ObjectVars.TryGetValue(id, out o)) return o;
                 return _game.State.StringVars.TryGetValue(id, out s) ? (object)s : _game.State.GetVar(id);
             });
             Register("$bag.remove", (c, a) => { bool had = _game.State.Bag.ContainsKey(Str(a, 0)); _game.State.AddItem(Str(a, 0), -(a.Count > 1 ? ToInt(a[1]) : 1)); return had; });
@@ -1071,6 +1081,8 @@ namespace PokeCreator.Runtime.Script
             Register("$player.able_party", (c, a) => _game.State.Party.Where(p => !p.IsEgg && !p.Fainted).ToList());
             Register("$player.party", (c, a) => _game.State.Party);
             Register("$player.soot", (c, a) => World.GameStats.Int(_game, "soot"));
+            Register("ButtonEventScene", (c, a) => null); // a class from Essentials' sample scripts (pbEventScreen does nothing here)
+            Register("$player.mystery_gift_unlocked", (c, a) => _game.State.Flags.Contains("mystery_gift_unlocked"));
             // $player passed as an argument (pkmn.foreign?($player), pkmn.owner = Owner.new_from_trainer($player))
             Register("$player", (c, a) => _game.State);
             Register("$Trainer", (c, a) => _game.State);
@@ -1629,6 +1641,9 @@ namespace PokeCreator.Runtime.Script
                     case "male?": return pk.Gender == "M";
                     case "female?": return pk.Gender == "F";
                     case "egg?": case "isEgg?": return pk.IsEgg;
+                    case "cannot_store": return pk.CannotStore;
+                    case "cannot_release": return pk.CannotRelease;
+                    case "cannot_trade": return pk.CannotTrade;
                     case "fainted?": return pk.Fainted;
                     case "able?": return !pk.Fainted && !pk.IsEgg;
                     case "hp": return pk.HP;
@@ -1667,6 +1682,7 @@ namespace PokeCreator.Runtime.Script
                     case "forget_move": { string id = Convert.ToString(args.Count > 0 ? args[0] : null); if (pk.Moves.Count > 1) pk.Moves.RemoveAll(x => x.Id == id); return true; }
                     case "moves": return pk.Moves;
                     case "calc_stats": return true;
+                    case "species_data": return pk.Data(P);
                     case "record_first_moves": case "reset_moves": return true;
                     case "giveRibbon": { string r = Convert.ToString(args.Count > 0 ? args[0] : ""); if (r.Length > 0 && !pk.Ribbons.Contains(r)) pk.Ribbons.Add(r); return true; }
                     case "hasRibbon?": return pk.Ribbons.Contains(Convert.ToString(args.Count > 0 ? args[0] : ""));
@@ -1771,6 +1787,9 @@ namespace PokeCreator.Runtime.Script
                 case "name": pk.Nickname = val == null || Convert.ToString(val).Length == 0 ? null : Convert.ToString(val); return;
                 case "shiny": pk.Shiny = Truthy(val); return;
                 case "nature": pk.Nature = Convert.ToString(val); return;
+                case "cannot_store": pk.CannotStore = Truthy(val); return;
+                case "cannot_release": pk.CannotRelease = Truthy(val); return;
+                case "cannot_trade": pk.CannotTrade = Truthy(val); return;
                 case "happiness": pk.Happiness = Math.Max(0, Math.Min(255, ToInt(val))); return;
                 case "cool": pk.Cool = Math.Max(0, Math.Min(255, ToInt(val))); return;
                 case "beauty": pk.Beauty = Math.Max(0, Math.Min(255, ToInt(val))); return;

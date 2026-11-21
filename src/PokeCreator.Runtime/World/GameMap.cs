@@ -65,10 +65,13 @@ namespace PokeCreator.Runtime.World
         public bool GetSwitch(int id) { bool v; return Switches.TryGetValue(id, out v) && v; }
         public void SetSwitch(int id, bool v) { Switches[id] = v; }
         public int GetVar(int id) { int v; return Variables.TryGetValue(id, out v) ? v : 0; }
-        public void SetVar(int id, int v) { Variables[id] = v; StringVars.Remove(id); }
+        public void SetVar(int id, int v) { Variables[id] = v; StringVars.Remove(id); ObjectVars.Remove(id); }
+        /// <summary>Variables holding a list or hash (Essentials scripts keep arrays in $game_variables). Not saved.</summary>
+        public readonly Dictionary<int, object> ObjectVars = new Dictionary<int, object>();
+        public void SetObj(int id, object o) { Variables[id] = 0; StringVars.Remove(id); ObjectVars[id] = o; }
         /// <summary>Variables holding text (Essentials scripts store names in variables, shown with \v[n]).</summary>
         public readonly Dictionary<int, string> StringVars = new Dictionary<int, string>();
-        public void SetStr(int id, string s) { Variables[id] = 0; StringVars[id] = s ?? ""; }
+        public void SetStr(int id, string s) { Variables[id] = 0; StringVars[id] = s ?? ""; ObjectVars.Remove(id); }
         /// <summary>A variable as text: its string if it holds one, otherwise its number.</summary>
         public string VarText(int id) { string s; return StringVars.TryGetValue(id, out s) ? s : GetVar(id).ToString(); }
         public bool GetSelf(int map, int ev, string ch) { return SelfSwitches.Contains(map + "," + ev + "," + ch); }

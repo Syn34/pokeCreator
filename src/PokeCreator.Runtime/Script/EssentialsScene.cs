@@ -147,6 +147,27 @@ namespace PokeCreator.Runtime.Script
                 return route;
             });
 
+            // follower_move_route(commands, wait): a move route for the first follower
+            Register("follower_move_route", (c, a) =>
+            {
+                var f = Followers.Characters.FirstOrDefault(x => !x.Hidden);
+                var cmds = Arg(a, 0) as List<object>;
+                if (f == null || cmds == null) return null;
+                var route = new MoveRoute { Repeat = false, Skippable = true };
+                for (int i = 0; i < cmds.Count; i++)
+                {
+                    int code = cmds[i] is string ? Array.IndexOf(MoveRouteNames, ((string)cmds[i]).Replace("PBMoveRoute::", "")) : ToInt(cmds[i]);
+                    if (code <= 0) continue;
+                    var ec = new EventCommand(code, 0);
+                    int np = MoveRouteParams(code);
+                    for (int k = 0; k < np && i + 1 < cmds.Count; k++) ec.Params.Add(cmds[++i]);
+                    route.List.Add(ec);
+                }
+                route.List.Add(new EventCommand(0, 0));
+                f.ForceMoveRoute(route);
+                return route;
+            });
+
             // Partner trainer
             Register("pbRegisterPartner", (c, a) => _game.RegisterPartner(Str(a, 0), Str(a, 1), a.Count > 2 ? ToInt(a[2]) : 0));
             Register("pbDeregisterPartner", (c, a) => { _game.State.Extras.Partner = null; return true; });
@@ -345,10 +366,10 @@ namespace PokeCreator.Runtime.Script
             Register("pbChoosePokemonForTrade", (c, a) =>
             {
                 string sp = Str(a, 2);
-                ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && (sp.Length == 0 || pk.Species == sp), c);
+                ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && !pk.CannotTrade && (sp.Length == 0 || pk.Species == sp), c);
                 return true;
             });
-            Register("pbChooseTradablePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon, c); return true; });
+            Register("pbChooseTradablePokemon", (c, a) => { ChoosePokemon(a, pk => !pk.IsEgg && !pk.ShadowPokemon && !pk.CannotTrade, c); return true; });
 
             // pbEnterNPCName(prompt, min, max, default, charset): asks, then the script runs again with the name
             Register("pbEnterNPCName", (c, a) =>

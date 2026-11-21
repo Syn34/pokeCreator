@@ -166,6 +166,7 @@ namespace PokeCreator.Runtime.UI
             else
             {
                 if (_held.Mail != null) { Game.Message.Show("Please remove the Mail first."); return; }
+                if (_held.CannotStore) { Game.Message.Show(_held.Name(Game.Project) + " refuses to go into storage!"); return; }
                 Box.Slots[_cursor] = _held; _held = target;
             }
             Game.Audio.PlaySe("GUI storage put down");
@@ -183,6 +184,7 @@ namespace PokeCreator.Runtime.UI
             var pk = Party[_party];
             if (Battle.Able(pk) && AbleInParty(pk) == 0) { Game.Message.Show("That's your last Pokémon!"); return; }
             if (pk.Mail != null) { Game.Message.Show("Please remove the Mail first."); return; }
+            if (pk.CannotStore) { Game.Message.Show(pk.Name(Game.Project) + " refuses to go into storage!"); return; }
             int at = Box.Slots.IndexOf(null);
             int boxNo = S.Current;
             if (at < 0) { boxNo = S.TryAdd(pk); if (boxNo < 0) { Game.Message.Show("The boxes are full."); return; } }
@@ -196,6 +198,7 @@ namespace PokeCreator.Runtime.UI
         void Release(Pokemon pk, bool inParty)
         {
             if (pk.IsEgg) { Game.Message.Show("You can't release an Egg."); return; }
+            if (pk.CannotRelease) { Game.Message.Show(pk.Name(Game.Project) + " refuses to leave you!"); return; }
             if (inParty && Battle.Able(pk) && AbleInParty(pk) == 0) { Game.Message.Show("That's your last Pokémon!"); return; }
             Game.Message.Show("Release this Pokémon?", new List<string> { "Yes", "No" }, 1, c =>
             {
