@@ -897,8 +897,9 @@ namespace PokeCreator.Runtime.UI
             if (!_textOn) { Input.TextInput(true); _textOn = true; }
             // Typing on the keyboard: letters go straight into the name (Enter = OK, Backspace = delete, arrows = back to the grid)
             // (keys that are also game buttons, like the Action key, keep working the grid until typing has started)
-            if (!_keyboard && Input.Typed.Length > 0 && !(Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel) || Input.Trigger(Button.Menu) || Input.Trigger(Button.Run)
-                || Input.Trigger(Button.Up) || Input.Trigger(Button.Down) || Input.Trigger(Button.Left) || Input.Trigger(Button.Right))) _keyboard = true;
+            // (letters bound to movement, like WASD, start typing; the Action / Cancel keys keep working the grid)
+            bool typing = !_keyboard && Input.Typed.Length > 0 && !(Input.Trigger(Button.Action) || Input.Trigger(Button.Cancel) || Input.Trigger(Button.Menu));
+            if (typing) _keyboard = true;
             if (_keyboard)
             {
                 foreach (char tc in Input.Typed)

@@ -122,6 +122,7 @@ PokeCreator's goal: everything Pokémon Essentials does, without RPG Maker XP, a
 - [x] Egg hatching scene (wobbling Egg from Graphics/Pokemon/Eggs, flash, the Pokémon appears); Pokédex entry shown for species new to the Pokédex after catching, hatching, evolving or receiving them
 - [x] Script questions wait for the answer: pbConfirmMessage (/Serious), pbMessage(text, commands, cancel), pbShowCommands; Ruby string interpolation ("#{x}"); Show Choices with no message shows only the choice box
 - [x] Event scripts wait for pbMessage, pbChoosePokemon and pbChooseMove like Essentials (several messages in one script show one after another); a resumed script doesn't repeat the calls it already made
+- [x] Name entry accepts typing on the keyboard (Enter = OK, Backspace = delete, arrows go back to the letter grid)
 - [x] Remaining script calls: pbWait, pbSEPlay/BGMPlay/MEPlay, pbExclaim, pbTurnTowardEvent, pbMoveRoute, bridges (pbBridgeOn/Off with Bridge terrain tag 15), pbStartOver
 
 ## v0.7: Sharing
