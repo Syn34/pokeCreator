@@ -1146,7 +1146,11 @@ namespace PokeCreator.Runtime.UI
         readonly Action<bool> _done;
         int _t;
         const int Window = 50;
-        public HookScene(Game g, Action<bool> done) : base(g) { Opaque = false; _done = done; }
+        public HookScene(Game g, Action<bool> done) : base(g)
+        {
+            Opaque = false; _done = done;
+            if (g.Player != null) g.Exclaim(g.Player, Window);
+        }
 
         protected override void Update()
         {
@@ -1161,8 +1165,6 @@ namespace PokeCreator.Runtime.UI
             int w = g.TextWidth(s) + 40, h = 56, x = (g.Width - w) / 2, y = g.Height - h - 24;
             Ui.Box(g, x, y, w, h);
             Ui.Text(g, x + 20, y + 12, s);
-            // The "!" above the player's head
-            if (Game.Player != null) Game.Exclaim(Game.Player, 2);
         }
     }
 }
