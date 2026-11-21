@@ -1212,6 +1212,7 @@ namespace PokeCreator.Runtime
                         case "storage": _g.PushScene(new StorageScene(_g, StorageScene.Mode.Organize)); break;
                         case "debug": DebugMenu.Open(_g); break;
                         case "options": _g.PushScene(new OptionsScene(_g)); break;
+                        case "phone": _g.PushScene(new World.PhoneScene(_g)); break;
                         case "hook": _g.PushScene(new HookScene(_g, ok => _g.Message.Show(ok ? "HOOKED" : "MISSED"))); break;
                         case "name": _g.AskName("Your name?", "", 10, n => _g.State.PlayerName = n, null); break;
                     }
