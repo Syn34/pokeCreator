@@ -158,6 +158,7 @@ namespace PokeCreator.Studio.Controls
             }
             finally { _renaming = false; }
             if (Selected != _shown || _shown == null) ShowSelected();
+            MainForm.NotifyCounts();
         }
 
         public void SelectById(string id)

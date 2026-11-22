@@ -104,7 +104,7 @@ namespace PokeCreator.Studio.Editors
             int id = _p.CommonEvents.Count == 0 ? 1 : _p.CommonEvents.Max(c => c.Id) + 1;
             var ce = new CommonEventData { Id = id, Name = "New common event" };
             _p.CommonEvents.Add(ce);
-            Mark(); Fill(ce);
+            Mark(); Fill(ce); MainForm.NotifyCounts();
         }
 
         void Duplicate()
@@ -113,7 +113,7 @@ namespace PokeCreator.Studio.Editors
             var copy = (CommonEventData)Json.Json.ConvertTo(Json.Json.Parse(Json.Json.Write(cur)), typeof(CommonEventData));
             copy.Id = _p.CommonEvents.Max(c => c.Id) + 1; copy.Name = cur.Name + " (copy)";
             _p.CommonEvents.Add(copy);
-            Mark(); Fill(copy);
+            Mark(); Fill(copy); MainForm.NotifyCounts();
         }
 
         void DeleteEvent()
@@ -121,7 +121,7 @@ namespace PokeCreator.Studio.Editors
             var cur = Current; if (cur == null) return;
             if (MessageBox.Show(this, "Delete common event " + cur + "? Events that call it will do nothing.", "Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             _p.CommonEvents.Remove(cur);
-            Mark(); Fill(null);
+            Mark(); Fill(null); MainForm.NotifyCounts();
         }
 
         public void Save()

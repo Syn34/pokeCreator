@@ -224,7 +224,10 @@ namespace PokeCreator.Pkmn
         {
             if (!string.IsNullOrEmpty(Ability)) return Ability;
             var d = Data(p);
-            if (d == null || d.Abilities.Count == 0) return null;
+            if (d == null) return null;
+            // As in Essentials: 0-1 are the normal abilities, 2 and up the hidden ones
+            if (AbilityIndex >= 2 && d.HiddenAbilities != null && AbilityIndex - 2 < d.HiddenAbilities.Count) return d.HiddenAbilities[AbilityIndex - 2];
+            if (d.Abilities.Count == 0) return null;
             return d.Abilities[Math.Min(AbilityIndex, d.Abilities.Count - 1)];
         }
 
@@ -347,8 +350,9 @@ namespace PokeCreator.Pkmn
             if (!string.IsNullOrEmpty(tp.Ability)) pk.Ability = tp.Ability;
             if (tp.AbilityIndex.HasValue) pk.AbilityIndex = tp.AbilityIndex.Value;
             if (!string.IsNullOrEmpty(tp.Item)) { pk.Item = tp.Item; FormRules.UpdateItemForm(p, pk); }
-            if (tp.IV.Count == 6) pk.IV = new List<int>(tp.IV);
-            if (tp.EV.Count == 6) pk.EV = new List<int>(tp.EV);
+            // One value = every stat (as in Essentials); otherwise one value per stat
+            if (tp.IV.Count > 0) pk.IV = Enumerable.Range(0, 6).Select(s => Math.Max(0, Math.Min(31, tp.IV[s < tp.IV.Count ? s : 0]))).ToList();
+            if (tp.EV.Count > 0) pk.EV = Enumerable.Range(0, 6).Select(s => Math.Max(0, Math.Min(252, tp.EV[s < tp.EV.Count ? s : 0]))).ToList();
             if (tp.Happiness.HasValue) pk.Happiness = tp.Happiness.Value;
             pk.Shiny = tp.Shiny || tp.SuperShiny;
             if (!string.IsNullOrEmpty(tp.Ball)) pk.Ball = tp.Ball;

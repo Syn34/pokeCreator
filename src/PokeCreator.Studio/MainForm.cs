@@ -27,8 +27,32 @@ namespace PokeCreator.Studio
         readonly Splitter _problemsSplit = new Splitter { Dock = DockStyle.Bottom, Height = 4, Visible = false };
         ToolStripButton _problemsButton;
 
+        /// <summary>Editors call this after adding or removing entries so the "(count)" in the project tree follows.</summary>
+        public static void NotifyCounts() { if (CountsChanged != null) CountsChanged(); }
+        public static event Action CountsChanged;
+
+        void UpdateTreeCounts()
+        {
+            var p = Project;
+            if (p == null) return;
+            var stack = new Stack<TreeNode>();
+            foreach (TreeNode n in _tree.Nodes) stack.Push(n);
+            while (stack.Count > 0)
+            {
+                var n = stack.Pop();
+                foreach (TreeNode c in n.Nodes) stack.Push(c);
+                string t = null;
+                var dt = n.Tag as DatabaseTable;
+                if (dt != null) t = dt.Label + " (" + dt.Items.Count + ")";
+                else if ("sys:commonevents".Equals(n.Tag)) t = "Common Events (" + p.CommonEvents.Count + ")";
+                else if ("maps".Equals(n.Tag)) t = "Maps (" + p.MapInfos.Count + ")";
+                if (t != null && n.Text != t) n.Text = t;
+            }
+        }
+
         public MainForm(string openPath)
         {
+            CountsChanged += () => { if (!IsDisposed) UpdateTreeCounts(); };
             WheelScroll.Install();
             ApplyAppearance(_settings, false);
             Text = "PokeCreator Studio";

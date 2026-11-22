@@ -167,6 +167,13 @@ namespace PokeCreator.Studio.Controls
                 var et = t.GetGenericArguments()[0];
                 var list = (IList)p.GetValue(target, null);
                 if (list == null) { list = (IList)Activator.CreateInstance(t); p.SetValue(target, list, null); }
+                if (et == typeof(TrainerPokemon))
+                {
+                    // a trainer's party: dropdowns filled from each Pokémon's own database entry
+                    var party = new TrainerPartyGrid((List<TrainerPokemon>)list);
+                    party.Changed += () => { if (Changed != null) Changed(); };
+                    return party;
+                }
                 Control ed = IsFlat(et) ? (Control)new ObjectGrid(list, et) : new ObjectListEditor(list, et);
                 if (ed is ObjectGrid) ((ObjectGrid)ed).Changed += () => { if (Changed != null) Changed(); };
                 else ((ObjectListEditor)ed).Changed += () => { if (Changed != null) Changed(); };
