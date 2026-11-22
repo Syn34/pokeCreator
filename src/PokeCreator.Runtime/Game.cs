@@ -25,6 +25,8 @@ namespace PokeCreator.Runtime
         /// <summary>Battle test from the Studio: party "SPECIES:LV,..." or "trainer:TYPE:Name:Version"; opponent trainer "TYPE:Name:Version" or wild "SPECIES:LV,...".</summary>
         public string TestParty, TestTrainer, TestWild, TestItems;
         public int TestSize = 1;
+        /// <summary>Playtest: start with World.TestParty at this level (0 = no).</summary>
+        public int GiveTestParty;
     }
 
     /// <summary>Top-level game: owns the window, the current map and the main loop.</summary>
@@ -142,7 +144,7 @@ namespace PokeCreator.Runtime
 
             Player = new Player(this);
             if (_opt.TestParty != null) { NewGame(); StartTestBattle(); }
-            else if (_opt.StartMap > 0 || _opt.SkipTitle) { NewGame(); Script.GameEvents.RaiseGameStarted(this); }
+            else if (_opt.StartMap > 0 || _opt.SkipTitle) { NewGame(); ApplyTestPartyOption(); Script.GameEvents.RaiseGameStarted(this); }
             else PushScene(new TitleScene(this));
             Autotest test = _opt.AutotestScript != null ? new Autotest(this, _opt.AutotestScript) : null;
             MessageWindow.Echo = test != null;
@@ -269,7 +271,18 @@ namespace PokeCreator.Runtime
                 Message.Show("The save file couldn't be loaded, so a new game was started.\\n(" + ex.Message + ")");
             }
             _fadeAlpha = 255;
+            ApplyTestPartyOption();
             Script.GameEvents.RaiseGameStarted(this);
+        }
+
+        bool _testPartyGiven;
+
+        /// <summary>Studio's "Playtests start with a test party": once per run, the party is swapped for a strong one.</summary>
+        void ApplyTestPartyOption()
+        {
+            if (_opt == null || _opt.GiveTestParty <= 0 || _testPartyGiven || State == null) return;
+            _testPartyGiven = true;
+            if (World.TestParty.Give(this, _opt.GiveTestParty) > 0) Console.WriteLine("Playtest: gave the test party (Lv. " + _opt.GiveTestParty + ")");
         }
 
         /// <summary>Opens the name entry screen; the running event waits until it's done.</summary>
@@ -831,7 +844,8 @@ namespace PokeCreator.Runtime
         /// </summary>
         public bool CheckTrainerSight()
         {
-            if (Map == null || !PartyCanBattle) return false;
+            // (as Essentials, trainers spot the player even without Pokémon; the battle itself is then skipped)
+            if (Map == null) return false;
             var seen = new List<GameEvent>();
             foreach (var e in Map.Events)
             {
@@ -1303,6 +1317,7 @@ namespace PokeCreator.Runtime
                 else if (a == "--test-wild" && i + 1 < args.Length) opt.TestWild = args[++i];
                 else if (a == "--test-items" && i + 1 < args.Length) opt.TestItems = args[++i];
                 else if (a == "--test-size" && i + 1 < args.Length) opt.TestSize = int.Parse(args[++i]);
+                else if (a == "--give-test-party") { int lv; opt.GiveTestParty = i + 1 < args.Length && int.TryParse(args[i + 1], out lv) ? lv : 100; if (i + 1 < args.Length && int.TryParse(args[i + 1], out lv)) i++; }
                 else if (!a.StartsWith("--")) opt.ProjectDir = a;
             }
             if (opt.ProjectDir == null)

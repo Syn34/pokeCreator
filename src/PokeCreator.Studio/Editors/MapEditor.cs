@@ -1148,11 +1148,20 @@ namespace PokeCreator.Studio.Editors
         {
             var list = _p.Trainers.OrderBy(t => t.TrainerType).ThenBy(t => t.Name).ToList();
             if (list.Count == 0) { MessageBox.Show(FindForm(), "There are no trainers yet. Add them under Database > Trainers first.", "New Trainer"); return; }
-            int k = ChoiceDialog.Ask(FindForm(), "New trainer: which trainer from the database?", list.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (version " + t.Version + ")" : "") + "  -  " + t.Pokemon.Count + " Pokémon").ToArray(), true);
+            int k = ChoiceDialog.Ask(FindForm(), "New trainer: which trainer from the database?", list.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (version " + t.Version + ")" : "") + "  -  " + (t.Pokemon.Count == 0 ? "NO POKÉMON YET" : t.Pokemon.Count + " Pokémon")).ToArray(), true);
             if (k < 0) return;
             var tr = list[k];
+            if (tr.Pokemon.Count == 0 && MessageBox.Show(FindForm(), tr.TrainerType + " " + tr.Name + " has no Pokémon in their party yet, so the battle would be skipped.\n\nAdd their Pokémon under Database → Trainers → Party. Place the trainer anyway?", "New Trainer", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             int range = NumberDialog.Ask(FindForm(), "How many tiles can they see? (0 = only when talked to)", 3);
             if (range < 0) return;
+            int facing = 2;
+            if (range > 0)
+            {
+                // They only see in the direction they face
+                int f = ChoiceDialog.Ask(FindForm(), "Which way does the trainer look?", new[] { "Down", "Left", "Right", "Up" });
+                if (f < 0) return;
+                facing = new[] { 2, 4, 6, 8 }[f];
+            }
             string before = Prompt.Ask(FindForm(), "New trainer", "What do they say before battling?", "Hey! You there! Let's battle!");
             if (before == null) return;
             string after = Prompt.Ask(FindForm(), "New trainer", "What do they say after you beat them?", "You're strong!");
@@ -1163,6 +1172,7 @@ namespace PokeCreator.Studio.Editors
             // Overworld sprites follow the trainer_<TYPE> naming
             string sprite = "trainer_" + tr.TrainerType;
             p1.Graphic.CharacterName = TemplateSprite(sprite);
+            p1.Graphic.Direction = facing;
             p1.Trigger = range > 0 ? Triggers.EventTouch : Triggers.Action;
             p1.List = new List<EventCommand>
             {

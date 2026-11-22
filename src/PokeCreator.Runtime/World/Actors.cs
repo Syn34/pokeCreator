@@ -383,8 +383,9 @@ namespace PokeCreator.Runtime.World
             foreach (var e in map.EventsAt(X, Y))
                 if (e.Trigger == Triggers.Action && e.OverTrigger) { e.Start(); return; }
             int fx = X + Dx(Direction), fy = Y + Dy(Direction);
+            // As RPG Maker XP: talking to an event in front also starts Player Touch / Event Touch pages (trainers)
             foreach (var e in map.EventsAt(fx, fy))
-                if (e.Trigger == Triggers.Action && !e.OverTrigger) { e.Start(); return; }
+                if ((e.Trigger == Triggers.Action || e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && !e.OverTrigger) { e.Start(); return; }
             foreach (var e in map.EventsAt(fx, fy))
                 if (FieldMoves.IsBoulder(e) && e.CharacterName.Length > 0) { FieldMoves.Strength(Game, null); return; }
             if (map.IsCounter(fx, fy))

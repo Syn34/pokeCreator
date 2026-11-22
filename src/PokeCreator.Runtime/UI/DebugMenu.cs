@@ -82,6 +82,11 @@ namespace PokeCreator.Runtime.UI
                 new KeyValuePair<string, Action>("Switches", () => Switches(g)),
                 new KeyValuePair<string, Action>("Variables", () => Variables(g)),
                 new KeyValuePair<string, Action>("Heal party", () => { foreach (var p in g.State.Party) p.Heal(g.Project); g.Message.Show("Your party was healed."); }),
+                new KeyValuePair<string, Action>("Give strong test party", () => g.AskNumber("Test party level?", Math.Min(100, g.Project.Settings.MaxLevel > 0 ? g.Project.Settings.MaxLevel : 100), 3, lv =>
+                {
+                    int n = TestParty.Give(g, lv);
+                    g.Message.Show(n == 0 ? "There are no Pokémon in the database to make a test party from." : "You got a test party of " + n + " strong Pokémon (Lv. " + g.State.Party[0].Level + "), plus Full Restores and Max Revives.\\nYour old party was sent to the PC.");
+                })),
                 new KeyValuePair<string, Action>("Add Pokémon", () => AddPokemon(g)),
                 new KeyValuePair<string, Action>("Edit party Pokémon", () => EditParty(g)),
                 new KeyValuePair<string, Action>("Add item", () => AddItem(g)),
@@ -227,6 +232,8 @@ namespace PokeCreator.Runtime.UI
             g.PushScene(new PickListScene(g, "Trainer battle", () => trs.Select(t => t.TrainerType + " " + t.Name + (t.Version > 0 ? " (" + t.Version + ")" : "")).ToList(), (i, s) =>
             {
                 g.CloseAllScenes();
+                if (trs[i].Pokemon.Count == 0) { g.Message.Show("That trainer has no Pokémon in their party (Database → Trainers → Party)."); return; }
+                if (!g.PartyCanBattle) { g.Message.Show("You have no Pokémon that can battle. Choose \"Give strong test party\" in this menu first."); return; }
                 g.StartTrainerBattle(trs[i].TrainerType, trs[i].Name, trs[i].Version, true, null);
             }));
         }

@@ -150,6 +150,23 @@ namespace PokeCreator.Studio
             game.DropDownItems.Add(new ToolStripMenuItem("&Playtest", null, (s, e) => Playtest(null)) { ShortcutKeys = Keys.F5 });
             game.DropDownItems.Add(new ToolStripMenuItem("Playtest from Current Map", null, (s, e) => PlaytestHere()) { ShortcutKeys = Keys.Shift | Keys.F5 });
             game.DropDownItems.Add(new ToolStripMenuItem("Test &Battle…", null, (s, e) => TestBattle()) { ShortcutKeys = Keys.Control | Keys.F5 });
+            var testParty = new ToolStripMenuItem("Playtests Start with a Strong Test Party") { Checked = _settings.TestPartyLevel > 0, ToolTipText = "Your party is swapped for six strong Pokémon (perfect IVs, best moves) plus Full Restores and Max Revives, to try out trainers. The old party goes to the PC. Also in the in-game Debug menu (F9)." };
+            testParty.Click += (s, e) =>
+            {
+                if (_settings.TestPartyLevel > 0) _settings.TestPartyLevel = 0;
+                else
+                {
+                    int lv = NumberDialog.Ask(this, "Test party level (1-100)?", 100, 1);
+                    if (lv <= 0) return;
+                    _settings.TestPartyLevel = Math.Min(100, lv);
+                }
+                testParty.Checked = _settings.TestPartyLevel > 0;
+                testParty.Text = _settings.TestPartyLevel > 0 ? "Playtests Start with a Strong Test Party (Lv. " + _settings.TestPartyLevel + ")" : "Playtests Start with a Strong Test Party";
+                _settings.Save();
+                SetStatus(_settings.TestPartyLevel > 0 ? "Playtests will start with a Lv. " + _settings.TestPartyLevel + " test party" : "Playtests start with your normal party");
+            };
+            if (_settings.TestPartyLevel > 0) testParty.Text += " (Lv. " + _settings.TestPartyLevel + ")";
+            game.DropDownItems.Add(testParty);
             game.DropDownItems.Add(new ToolStripSeparator());
             game.DropDownItems.Add(new ToolStripMenuItem("&Build Game…", null, (s, e) => BuildGame()) { ShortcutKeys = Keys.Control | Keys.B });
             game.DropDownItems.Add(new ToolStripSeparator());
@@ -987,6 +1004,7 @@ namespace PokeCreator.Studio
             if (!File.Exists(game)) { MessageBox.Show(this, "Game.exe was not found next to the Studio:\n" + game, "Playtest"); return; }
             var args = new List<string> { Quote(Project.Root), "--debug" };
             if (extra != null) args.AddRange(extra);
+            if (_settings.TestPartyLevel > 0) { args.Add("--give-test-party"); args.Add(_settings.TestPartyLevel.ToString()); }
             try
             {
                 var psi = new ProcessStartInfo(game, string.Join(" ", args)) { WorkingDirectory = exeDir, UseShellExecute = false };
@@ -1052,6 +1070,8 @@ namespace PokeCreator.Studio
         /// <summary>Where the last new project was stored; the New Project dialog starts there.</summary>
         public string LastProjectLocation { get; set; }
         public string LastBuildFolder { get; set; }
+        /// <summary>Game → Playtests start with a strong test party (its level; 0 = off).</summary>
+        public int TestPartyLevel { get; set; }
         public Settings() { Recent = new List<string>(); Accent = "200,48,48"; Guides = "Rainbow"; ShowIcons = true; FontSize = 9; }
         static string FilePath { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PokeCreator", "studio.json"); } }
         public static Settings Load() { try { return File.Exists(FilePath) ? Json.Json.FromFile<Settings>(FilePath) : new Settings(); } catch { return new Settings(); } }

@@ -1354,6 +1354,8 @@ namespace PokeCreator.Runtime.Script
                 var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
                 return o == PokeCreator.Battles.BattleOutcome.Win;
             }
+            var blocked = CheckBattleCanStart(trainers, ctx);
+            if (blocked != null) return blocked;
             bool canLose = TakeRule("canLose");
             int outcomeVar = OutcomeVar();
             HandOffRules();
@@ -1404,6 +1406,8 @@ namespace PokeCreator.Runtime.Script
                 var o = _game.ResumeOutcome.Value; _game.ResumeOutcome = null;
                 return o == PokeCreator.Battles.BattleOutcome.Win;
             }
+            var blocked = CheckBattleCanStart(new List<object[]> { new object[] { type, name, version } }, ctx);
+            if (blocked != null) return blocked;
             bool canLose = TakeRule("canLose");
             int outcomeVar = OutcomeVar();
             HandOffRules();
@@ -1416,6 +1420,32 @@ namespace PokeCreator.Runtime.Script
         }
 
         int OutcomeVar() { object v; return _battleRules.TryGetValue("outcomeVar", out v) ? ToInt(v) : 1; }
+
+        /// <summary>
+        /// Before a trainer battle: null if it can start. Otherwise the battle is skipped and counts as won (as Essentials);
+        /// in a playtest the reason is shown, and with no Pokémon that can fight the player is offered a test party.
+        /// </summary>
+        object CheckBattleCanStart(List<object[]> trainers, Interpreter ctx)
+        {
+            foreach (var t in trainers)
+            {
+                string type = (string)t[0], name = (string)t[1]; int version = (int)t[2];
+                var tr = _game.Project.Trainers.FirstOrDefault(x => x.TrainerType == type && x.Name == name && x.Version == version)
+                      ?? _game.Project.Trainers.FirstOrDefault(x => x.TrainerType == type && x.Name == name);
+                string why = tr == null ? "there's no trainer " + type + " \"" + name + "\"" + (version > 0 ? " (version " + version + ")" : "") + " in Database → Trainers."
+                           : tr.Pokemon.Count == 0 ? "the trainer " + type + " \"" + name + "\" has no Pokémon in their party (Database → Trainers → Party)." : null;
+                if (why == null) continue;
+                WarnOnce("Trainer battle skipped: " + why);
+                if (_game.DebugMode && ctx != null) AskChoice(ctx, "Playtest: the battle was skipped because " + why, new List<string> { "OK" }, 0);
+                return true;
+            }
+            if (_game.PartyCanBattle) return null;
+            if (!_game.DebugMode || ctx == null) { WarnOnce("Trainer battle skipped: no Pokémon that can battle"); return true; }
+            object r = AskChoice(ctx, "Playtest: you have no Pokémon that can battle.\\nGive yourself a strong test party and battle?", new List<string> { "Give a test party and battle", "Skip the battle" }, 1);
+            if (_game.PromptPending) return false;          // waiting for the answer; the line runs again then
+            if (r is int && (int)r == 0 && World.TestParty.Give(_game, Math.Min(100, _game.Project.Settings.MaxLevel > 0 ? _game.Project.Settings.MaxLevel : 100)) > 0 && _game.PartyCanBattle) return null;
+            return true;
+        }
 
         /// <summary>Starts a wild battle, or returns its outcome (1 won, 2 lost, 3 ran, 4 caught) when re-checked.</summary>
         object WildBattle(string species, int level, bool asBool, Interpreter ctx)
