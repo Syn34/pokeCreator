@@ -940,12 +940,13 @@ namespace PokeCreator.Runtime.UI
             // Bottom box
             if (!Game.Message.Busy)
             {
-                if (_mode == Mode.Command) DrawCommands(g);
-                if (ExternalWait && !Game.Message.Busy)
+                // (one box only: the empty box below used to be drawn over the Fight / Bag / Pokémon / Run menu)
+                if (ExternalWait)
                 {
                     MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
                     Ui.Text(g, 24, g.Height - 86, "Waiting for " + (_setup.LinkOpponent ?? "the other player") + "...");
                 }
+                else if (_mode == Mode.Command) DrawCommands(g);
                 else if (_mode == Mode.Fight) DrawFight(g);
                 else if (_mode == Mode.Target) DrawTarget(g);
                 else
