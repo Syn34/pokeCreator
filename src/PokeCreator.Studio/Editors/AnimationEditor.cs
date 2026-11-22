@@ -114,7 +114,7 @@ namespace PokeCreator.Studio.Editors
 
             // ---- events
             _filter.TextChanged += (s, e) => FillList();
-            _list.SelectedIndexChanged += (s, e) => { var a = _list.SelectedItem as BattleAnimation; if (a != null) Select(a); };
+            _list.SelectedIndexChanged += (s, e) => { if (_loading) return; var a = _list.SelectedItem as BattleAnimation; if (a != null) Select(a); };
             _scrub.ValueChanged += (s, e) => { if (_loading) return; _frame = _scrub.Value; ShowFrame(); };
             _play.Click += (s, e) => TogglePlay();
             _timer.Tick += (s, e) =>
@@ -169,18 +169,24 @@ namespace PokeCreator.Studio.Editors
         {
             string f = _filter.Text.Trim();
             var keep = _list.SelectedItem;
-            _list.BeginUpdate();
-            _list.Items.Clear();
-            foreach (var a in _p.Animations.OrderBy(x => x.Id, StringComparer.OrdinalIgnoreCase))
-                if (f.Length == 0 || (a.Id ?? "").IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0) _list.Items.Add(a);
-            _list.EndUpdate();
-            if (keep != null && _list.Items.Contains(keep)) _list.SelectedItem = keep;
+            bool was = _loading; _loading = true;   // the shown animation stays as it is while filtering
+            try
+            {
+                _list.BeginUpdate();
+                _list.Items.Clear();
+                foreach (var a in _p.Animations.OrderBy(x => x.Id, StringComparer.OrdinalIgnoreCase))
+                    if (f.Length == 0 || (a.Id ?? "").IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0) _list.Items.Add(a);
+                if (keep != null && _list.Items.Contains(keep)) _list.SelectedItem = keep;
+                _list.EndUpdate();
+            }
+            finally { _loading = was; }
+            if (keep == null && _list.SelectedItem == null && _a != null && _list.Items.Contains(_a)) { _loading = true; _list.SelectedItem = _a; _loading = was; }
         }
 
         void RefreshListItem()
         {
             int i = _list.SelectedIndex;
-            if (i >= 0) { _loading = true; _list.Items[i] = _list.Items[i]; _loading = false; }
+            if (i >= 0) { _loading = true; try { ListUtil.Rename(_list, i, _list.Items[i]); } finally { _loading = false; } }
         }
 
         void Select(BattleAnimation a)

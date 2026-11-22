@@ -640,7 +640,10 @@ namespace PokeCreator.Studio
             foreach (TabPage tp in _tabs.TabPages)
             {
                 var d = tp.Tag as IDocument;
-                if (d != null) tp.Text = d.Title + (d.Dirty ? " •" : "") + "   ";
+                if (d == null) continue;
+                // Setting a tab's text (even to the same text) redraws the whole page and can take the focus
+                string t = d.Title + (d.Dirty ? " •" : "") + "   ";
+                if (tp.Text != t) tp.Text = t;
             }
         }
 

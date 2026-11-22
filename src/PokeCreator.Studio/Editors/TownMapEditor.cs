@@ -101,7 +101,11 @@ namespace PokeCreator.Studio.Editors
         {
             int i = _region.SelectedIndex;
             _loading = true;
-            if (i >= 0 && i < _p.TownMaps.Count) _region.Items[i] = _p.TownMaps[i].Id + ": " + (_p.TownMaps[i].Name ?? "");
+            if (i >= 0 && i < _p.TownMaps.Count)
+            {
+                string t = _p.TownMaps[i].Id + ": " + (_p.TownMaps[i].Name ?? "");
+                if (!Equals(_region.Items[i], t)) { _region.Items[i] = t; _region.SelectedIndex = i; }
+            }
             _loading = false;
         }
 
@@ -127,7 +131,7 @@ namespace PokeCreator.Studio.Editors
             _view.UpdateSize();
         }
 
-        void MarkDirty() { Dirty = true; if (DirtyChanged != null) DirtyChanged(); _view.Invalidate(); }
+        void MarkDirty() { if (!Dirty) { Dirty = true; if (DirtyChanged != null) DirtyChanged(); } _view.Invalidate(); }
 
         public void Save()
         {

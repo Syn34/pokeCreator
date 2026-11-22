@@ -35,7 +35,7 @@ namespace PokeCreator.Studio.Editors
             left.Controls.Add(new Label { Text = "Called from events with Call Common Event, or run while a switch is ON.", Dock = DockStyle.Top, Height = 34, ForeColor = Color.DimGray });
             left.Controls.Add(bar);
             Controls.Add(_detail); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(left);
-            _list.SelectedIndexChanged += (s, e) => ShowSelected();
+            _list.SelectedIndexChanged += (s, e) => { if (!_renaming) ShowSelected(); };
             Fill(null);
         }
 
@@ -58,6 +58,8 @@ namespace PokeCreator.Studio.Editors
             else if (_list.Items.Count > 0) _list.SelectedIndex = 0;
             else ShowSelected();
         }
+
+        bool _renaming;
 
         void ShowSelected()
         {
@@ -82,7 +84,13 @@ namespace PokeCreator.Studio.Editors
             head.Controls.Add(trigger);
             head.Controls.Add(new Label { Text = "Switch", Left = 350, Top = 43, AutoSize = true });
             head.Controls.Add(sw);
-            name.TextChanged += (s, e) => { ce.Name = name.Text; Mark(); _list.Items[_list.SelectedIndex] = ce; };
+            name.TextChanged += (s, e) =>
+            {
+                ce.Name = name.Text; Mark();
+                // Refresh the entry's text without rebuilding this panel (which would take the focus away)
+                int i = _list.SelectedIndex;
+                if (i >= 0) { _renaming = true; try { ListUtil.Rename(_list, i, ce); } finally { _renaming = false; } }
+            };
             trigger.SelectedIndexChanged += (s, e) => { ce.Trigger = trigger.SelectedIndex; sw.Enabled = ce.Trigger != 0; Mark(); };
             sw.IdChanged += n => { ce.SwitchId = n; Mark(); };
             var cmds = new CommandListEditor(_p, ce.List, null);

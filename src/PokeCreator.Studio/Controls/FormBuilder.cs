@@ -355,6 +355,7 @@ namespace PokeCreator.Studio.Controls
         readonly ListBox _box = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
         readonly Panel _form = new Panel { Dock = DockStyle.Fill };
         public event Action Changed;
+        bool _renaming;
 
         public ObjectListEditor(IList list, Type type)
         {
@@ -368,7 +369,7 @@ namespace PokeCreator.Studio.Controls
             add.Click += (s, e) => { _list.Add(Activator.CreateInstance(_type)); Reload(_list.Count - 1); Fire(); };
             del.Click += (s, e) => { int i = _box.SelectedIndex; if (i >= 0) { _list.RemoveAt(i); Reload(Math.Min(i, _list.Count - 1)); Fire(); } };
             up.Click += (s, e) => Swap(-1); dn.Click += (s, e) => Swap(1);
-            _box.SelectedIndexChanged += (s, e) => ShowItem();
+            _box.SelectedIndexChanged += (s, e) => { if (!_renaming) ShowItem(); };
             Reload(0);
         }
 
@@ -395,7 +396,14 @@ namespace PokeCreator.Studio.Controls
             int i = _box.SelectedIndex;
             if (i < 0 || i >= _list.Count) return;
             var fb = new FormBuilder();
-            fb.Changed += () => { _box.Items[i] = _list[i].ToString(); Fire(); };
+            fb.Changed += () =>
+            {
+                // Updating the entry's text re-selects it; don't rebuild the form being typed in
+                string text = _list[i].ToString();
+                if (i < _box.Items.Count && (_box.Items[i] == null || _box.Items[i].ToString() != text))
+                { _renaming = true; try { ListUtil.Rename(_box, i, text); } finally { _renaming = false; } }
+                Fire();
+            };
             _form.Controls.Add(fb.Build(_list[i]));
         }
     }

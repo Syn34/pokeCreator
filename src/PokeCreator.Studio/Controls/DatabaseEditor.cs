@@ -107,7 +107,7 @@ namespace PokeCreator.Studio.Controls
             Controls.Add(right); Controls.Add(new Splitter { Dock = DockStyle.Left }); Controls.Add(left);
 
             _search.TextChanged += (s, e) => Refill(null);
-            _list.SelectedIndexChanged += (s, e) => ShowSelected();
+            _list.SelectedIndexChanged += (s, e) => { if (!_renaming) ShowSelected(); };
             add.Click += (s, e) => AddRecord(null);
             dup.Click += (s, e) => { var r = Selected; if (r != null) AddRecord(r); };
             del.Click += (s, e) => DeleteSelected();
@@ -128,6 +128,9 @@ namespace PokeCreator.Studio.Controls
             _show.SelectedIndex = 0;
         }
 
+        bool _renaming;
+        GameRecord _shown;
+
         IList Items { get { return _table.Items; } }
         GameRecord Selected { get { int i = _list.SelectedIndex; return i >= 0 && i < _view.Count ? _view[i] : null; } }
 
@@ -141,12 +144,20 @@ namespace PokeCreator.Studio.Controls
             else if (_images != null && _show.SelectedIndex >= 2 && _show.SelectedIndex - 2 < _images.Active.Length) { var k = _images.Active[_show.SelectedIndex - 2]; shown = r => !_images.Has(r, k); }
             _view = Items.Cast<GameRecord>().Where(r => (q == "" || (r.Id ?? "").ToLowerInvariant().Contains(q) || r.DisplayName.ToLowerInvariant().Contains(q)) && shown(r)).ToList();
             if (_images != null) UpdateLegend();
-            _list.BeginUpdate();
-            _list.Items.Clear();
-            foreach (var r in _view) _list.Items.Add(r.DisplayName);
-            _list.EndUpdate();
             int idx = select != null ? _view.IndexOf(select) : (_view.Count > 0 ? 0 : -1);
-            if (idx >= 0) _list.SelectedIndex = idx; else ShowSelected();
+            // Refill quietly and only rebuild the form if a different entry ends up shown
+            // (rebuilding on every letter typed in the search box made the screen flash)
+            _renaming = true;
+            try
+            {
+                _list.BeginUpdate();
+                _list.Items.Clear();
+                foreach (var r in _view) _list.Items.Add(r.DisplayName);
+                if (idx >= 0) _list.SelectedIndex = idx;
+                _list.EndUpdate();
+            }
+            finally { _renaming = false; }
+            if (Selected != _shown || _shown == null) ShowSelected();
         }
 
         public void SelectById(string id)
@@ -162,6 +173,7 @@ namespace PokeCreator.Studio.Controls
             foreach (Control c in _formHost.Controls) c.Dispose();
             _formHost.Controls.Clear();
             var r = Selected;
+            _shown = r;
             _heading.Text = r == null ? _table.Label + " (" + Items.Count + ")" : r.DisplayName;
             ShowPreview(r);
             if (r != null)
@@ -171,7 +183,8 @@ namespace PokeCreator.Studio.Controls
                 {
                     MarkDirty();
                     int i = _list.SelectedIndex;
-                    if (i >= 0 && _list.Items[i].ToString() != r.DisplayName) _list.Items[i] = r.DisplayName;
+                    // Renaming the list entry re-selects it, which must not rebuild the form you're typing in
+                    if (i >= 0 && _list.Items[i].ToString() != r.DisplayName) { _renaming = true; try { ListUtil.Rename(_list, i, r.DisplayName); } finally { _renaming = false; } }
                     _heading.Text = r.DisplayName;
                 };
                 _formHost.Controls.Add(fb.Build(r));
