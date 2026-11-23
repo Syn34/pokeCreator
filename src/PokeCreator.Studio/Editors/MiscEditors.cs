@@ -366,7 +366,34 @@ namespace PokeCreator.Studio.Editors
         readonly ImageList _images = new ImageList { ImageSize = new Size(64, 64), ColorDepth = ColorDepth.Depth32Bit };
         readonly PictureBox _preview = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(230, 230, 235) };
         readonly Label _details = new Label { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(6) };
-        public string Title { get { return Path.GetFileName(_dir); } }
+        public string Title { get { return DisplayName(_dir); } }
+
+        /// <summary>
+        /// What a folder is called in the Studio. The Audio folders keep their Essentials names on disk (BGM, BGS, ME, SE)
+        /// so imported games and events still find them, but are shown by what they hold.
+        /// </summary>
+        public static string DisplayName(string dir)
+        {
+            string name = Path.GetFileName((dir ?? "").TrimEnd('/', '\\'));
+            string parent = Path.GetFileName(Path.GetDirectoryName((dir ?? "").TrimEnd('/', '\\')) ?? "");
+            if (!parent.Equals("Audio", StringComparison.OrdinalIgnoreCase)) return name;
+            switch (name.ToUpperInvariant())
+            {
+                case "BGM": return "Music";
+                case "BGS": return "Background Sounds";
+                case "ME": return "Music Effects";
+                case "SE": return "Sound Effects";
+                default: return name;
+            }
+        }
+
+        /// <summary>The folder as the Studio shows it, e.g. "Audio › Music".</summary>
+        string ShownPath(string dir)
+        {
+            var parts = Relative(dir).Replace('\\', '/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && parts[0].Equals("Audio", StringComparison.OrdinalIgnoreCase)) parts[1] = DisplayName(Path.Combine(_p.AudioDir, parts[1]));
+            return string.Join(" › ", parts);
+        }
         public bool Dirty { get { return false; } }
         public void Save() { }
 
@@ -378,7 +405,13 @@ namespace PokeCreator.Studio.Editors
             var imp = new Button { Text = "Import Files…", AutoSize = true }; imp.Click += (s, e) => ImportFiles();
             var open = new Button { Text = "Open Folder", AutoSize = true }; open.Click += (s, e) => MainForm.OpenInShell(_dir);
             var refresh = new Button { Text = "Refresh", AutoSize = true }; refresh.Click += (s, e) => Fill();
-            bar.Controls.AddRange(new Control[] { imp, open, refresh, new Label { Text = Relative(dir), AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 0, 0) } });
+            _moveTo.Click += (s, e) => ShowMoveMenu();
+            if (IsContainer) bar.Controls.AddRange(new Control[] { open, refresh, _moveTo });   // files go in the folders below, not here
+            else bar.Controls.Add(imp);
+            if (!IsContainer) bar.Controls.AddRange(new Control[] { open, refresh });
+            var where = new Label { Text = ShownPath(dir), AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 0, 0) };
+            new ToolTip().SetToolTip(where, "Folder on disk: " + Relative(dir));
+            bar.Controls.Add(where);
             var right = new Panel { Dock = DockStyle.Right, Width = 320 };
             right.Controls.Add(_preview); right.Controls.Add(_details);
             Controls.Add(_view); Controls.Add(new Splitter { Dock = DockStyle.Right }); Controls.Add(right); Controls.Add(bar);
@@ -393,15 +426,94 @@ namespace PokeCreator.Studio.Editors
                 };
                 Controls.Add(formats);
             }
+            if (IsContainer) Controls.Add(BuildFolderPicker());
             _view.SelectedIndexChanged += (s, e) => ShowSelected();
             _view.DoubleClick += (s, e) => { if (_view.SelectedItems.Count > 0) MainForm.OpenInShell((string)_view.SelectedItems[0].Tag); };
             AllowDrop = true; _view.AllowDrop = true;
-            _view.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
-            _view.DragDrop += (s, e) => CopyIn((string[])e.Data.GetData(DataFormats.FileDrop));
+            _view.DragEnter += (s, e) => { if (!IsContainer && e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; else e.Effect = DragDropEffects.None; };
+            _view.DragDrop += (s, e) => { if (!IsContainer) CopyIn((string[])e.Data.GetData(DataFormats.FileDrop)); };
             Fill();
         }
 
         string Relative(string d) { return d.StartsWith(_p.Root) ? d.Substring(_p.Root.Length).TrimStart(Path.DirectorySeparatorChar) : d; }
+
+        readonly Button _moveTo = new Button { Text = "Move To…", AutoSize = true, Visible = false };
+        Label _strayNote;
+
+        /// <summary>Opens another asset folder in its own tab (set by the main window).</summary>
+        public static Action<string> OpenFolder;
+
+        /// <summary>Folders that only hold other folders: the game never reads files placed directly in them.</summary>
+        static readonly string[] Containers = { "Audio", "Graphics", "Graphics/Pokemon", "Graphics/Pokemon/Animated" };
+        bool IsContainer { get { string rel = Relative(_dir).Replace('\\', '/').TrimEnd('/'); return Containers.Any(c => c.Equals(rel, StringComparison.OrdinalIgnoreCase)); } }
+
+        static string FolderHint(string name)
+        {
+            switch (name.ToUpperInvariant())
+            {
+                case "BGM": return "songs that loop on maps and in battles";
+                case "BGS": return "rain, wind, waves";
+                case "ME": return "short jingles: item get, healing, level up";
+                case "SE": return "menu sounds, attacks, cries";
+                default: return null;
+            }
+        }
+
+        Control BuildFolderPicker()
+        {
+            var panel = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 6, 6, 4), WrapContents = true };
+            panel.Controls.Add(new Label
+            {
+                AutoSize = true, MaximumSize = new Size(900, 0), ForeColor = Theme.SubText, Margin = new Padding(2, 4, 2, 6),
+                Text = ShownPath(_dir) + " only holds folders; the game doesn't look for files here. Open the folder the files belong in to import them:"
+            });
+            panel.SetFlowBreak(panel.Controls[0], true);
+            Button last = null;
+            if (Directory.Exists(_dir))
+                foreach (var sub in Directory.GetDirectories(_dir).OrderBy(d => DisplayName(d), StringComparer.OrdinalIgnoreCase))
+                {
+                    string hint = FolderHint(Path.GetFileName(sub));
+                    var b = new Button { Text = DisplayName(sub) + (hint != null ? "  –  " + hint : ""), AutoSize = true, Tag = sub };
+                    b.Click += (s, e) => { if (OpenFolder != null) OpenFolder((string)((Button)s).Tag); };
+                    panel.Controls.Add(b);
+                    last = b;
+                }
+            if (last != null) panel.SetFlowBreak(last, true);
+            _strayNote = new Label { AutoSize = true, MaximumSize = new Size(900, 0), ForeColor = Color.OrangeRed, Margin = new Padding(2, 8, 2, 2), Visible = false };
+            panel.Controls.Add(_strayNote);
+            panel.SetFlowBreak(_strayNote, true);
+            return panel;
+        }
+
+        void ShowMoveMenu()
+        {
+            var subs = Directory.Exists(_dir) ? Directory.GetDirectories(_dir).OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList() : new List<string>();
+            if (subs.Count == 0) return;
+            var menu = new ContextMenuStrip();
+            foreach (var sub in subs.OrderBy(d => DisplayName(d), StringComparer.OrdinalIgnoreCase))
+            {
+                string target = sub, hint = FolderHint(Path.GetFileName(sub));
+                menu.Items.Add(DisplayName(sub) + (hint != null ? "  (" + hint + ")" : ""), null, (s, e) => MoveFiles(target));
+            }
+            menu.Show(_moveTo, new Point(0, _moveTo.Height));
+        }
+
+        /// <summary>Moves the selected files (or all of them) from this group folder into one of its folders.</summary>
+        void MoveFiles(string target)
+        {
+            var files = _view.SelectedItems.Count > 0 ? _view.SelectedItems.Cast<ListViewItem>().Select(i => (string)i.Tag).ToList()
+                                                      : _view.Items.Cast<ListViewItem>().Select(i => (string)i.Tag).ToList();
+            int moved = 0;
+            foreach (var f in files)
+            {
+                string dst = Path.Combine(target, Path.GetFileName(f));
+                if (File.Exists(dst) && MessageBox.Show(this, Path.GetFileName(f) + " is already in " + ShownPath(target) + ". Replace it?", "Move To", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) continue;
+                try { if (File.Exists(dst)) File.Delete(dst); File.Move(f, dst); moved++; }
+                catch (Exception ex) { MessageBox.Show(this, ex.Message, "Move To", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            }
+            Fill();
+            if (moved > 0 && OpenFolder != null) OpenFolder(target);
+        }
 
         bool IsAudioFolder
         {
@@ -435,6 +547,16 @@ namespace PokeCreator.Studio.Editors
                 }
             }
             _view.EndUpdate();
+            if (IsContainer)
+            {
+                int n = _view.Items.Count;
+                _moveTo.Visible = n > 0;
+                if (_strayNote != null)
+                {
+                    _strayNote.Visible = n > 0;
+                    _strayNote.Text = n == 0 ? "" : (n == 1 ? "1 file is" : n + " files are") + " sitting here where the game won't find " + (n == 1 ? "it" : "them") + ". Select " + (n == 1 ? "it" : "them") + " (or none for all) and use Move To… to put " + (n == 1 ? "it" : "them") + " in the right folder.";
+                }
+            }
         }
 
         static Image Thumb(Image img)
@@ -464,7 +586,7 @@ namespace PokeCreator.Studio.Editors
 
         void ImportFiles()
         {
-            using (var d = new OpenFileDialog { Multiselect = true, Title = "Import into " + Relative(_dir) })
+            using (var d = new OpenFileDialog { Multiselect = true, Title = "Import into " + ShownPath(_dir) })
             {
                 if (IsAudioFolder) d.Filter = "Audio files (OGG, WAV, MP3, MP4, M4A, MIDI, FLAC, Opus)|*.ogg;*.wav;*.mp3;*.mp4;*.m4a;*.mid;*.midi;*.flac;*.opus|All files|*.*";
                 if (d.ShowDialog(this) == DialogResult.OK) CopyIn(d.FileNames);

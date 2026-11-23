@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.16";
+        public const string EngineVersion = "0.3.17";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
@@ -274,7 +274,8 @@ namespace PokeCreator.Projects
         /// <summary>Creates the animated sprite folders if the project doesn't have them yet (projects made before they existed).</summary>
         public void EnsureAnimatedFolders()
         {
-            foreach (var d in AnimatedSpriteFolders)
+            // (the four audio folders too, so Studio always shows where music and sounds go)
+            foreach (var d in AnimatedSpriteFolders.Concat(new[] { "Audio/BGM", "Audio/BGS", "Audio/ME", "Audio/SE" }))
                 try { Directory.CreateDirectory(Path.Combine(Root, d.Replace('/', Path.DirectorySeparatorChar))); } catch { }
         }
 

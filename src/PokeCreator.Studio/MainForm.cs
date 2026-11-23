@@ -53,6 +53,7 @@ namespace PokeCreator.Studio
         public MainForm(string openPath)
         {
             CountsChanged += () => { if (!IsDisposed) UpdateTreeCounts(); };
+            AssetBrowser.OpenFolder = dir => { if (Project != null && !IsDisposed) OpenDocument("assets:" + dir, () => new AssetBrowser(Project, dir)); };
             WheelScroll.Install();
             ApplyAppearance(_settings, false);
             Text = "PokeCreator Studio";
@@ -538,8 +539,9 @@ namespace PokeCreator.Studio
 
         void AddAssetDir(TreeNodeCollection parent, string dir, int depth)
         {
-            var n = Node(parent, Path.GetFileName(dir), "folder", "assets:" + dir);
-            if (depth < 2) foreach (var sub in Directory.GetDirectories(dir).OrderBy(x => x)) AddAssetDir(n.Nodes, sub, depth + 1);
+            var n = Node(parent, AssetBrowser.DisplayName(dir), "folder", "assets:" + dir);
+            n.ToolTipText = "Folder on disk: " + dir.Substring(Math.Min(dir.Length, Project.Root.Length)).TrimStart('/', '\\');
+            if (depth < 2) foreach (var sub in Directory.GetDirectories(dir).OrderBy(x => AssetBrowser.DisplayName(x), StringComparer.OrdinalIgnoreCase)) AddAssetDir(n.Nodes, sub, depth + 1);
         }
 
         void LazyFiles(object s, TreeViewCancelEventArgs e)
