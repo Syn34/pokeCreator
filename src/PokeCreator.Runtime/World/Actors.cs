@@ -107,8 +107,25 @@ namespace PokeCreator.Runtime.World
             return Page != null && !_locked && !Starting && !Moving && !Jumping && !Game.MessageBusy;
         }
 
+        double _lookTimer = -1;
+
+        /// <summary>"Facing: random": turns to a new direction every 1-3 seconds while standing (even with Direction Fix).</summary>
+        void UpdateLookAround()
+        {
+            if (Page == null || !Page.RandomFacing || RouteForced || Moving) return;
+            if (_lookTimer < 0) _lookTimer = 60 + Game.Rng.Next(120);
+            _lookTimer -= 1;
+            if (_lookTimer > 0) return;
+            _lookTimer = 60 + Game.Rng.Next(120);
+            var dirs = new[] { 2, 4, 6, 8 }.Where(d => d != Direction).ToArray();
+            Direction = dirs[Game.Rng.Next(dirs.Length)];
+            // A trainer who turns to face the player spots them (as Essentials)
+            if (!Game.InterpreterRunning && !Game.Player.Moving) Game.CheckTrainerSight();
+        }
+
         protected override void UpdateSelfMovement()
         {
+            UpdateLookAround();
             int threshold = (int)((40 - MoveFrequency * 2) * (6 - MoveFrequency) * 1.5);
             if (StopCount <= threshold) return;
             switch (Page.MoveType)

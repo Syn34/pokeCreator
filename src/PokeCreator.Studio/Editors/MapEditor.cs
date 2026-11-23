@@ -634,6 +634,7 @@ namespace PokeCreator.Studio.Editors
             int c = CellPx;
             if (ShowPassability) DrawPassability(g, c);
             DrawEvents(g, c);
+            if (_ed.Layer == 3) DrawTrainerSight(g, c);
             // Player start marker
             if (_p.Settings.StartMap == _map.Id)
             {
@@ -747,6 +748,80 @@ namespace PokeCreator.Studio.Editors
                         if (active && c >= 24) g.DrawString(ev.Id.ToString(), font, Brushes.White, r.X + 1, r.Y + 1);
                     }
                 }
+        }
+
+        static readonly System.Text.RegularExpressions.Regex TrainerName = new System.Text.RegularExpressions.Regex(@"trainer\((\d+)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// The selected trainer's line of sight (event named "Trainer(n)" with an Event Touch page): the tiles in the
+        /// direction it faces (all four when it looks around), up to where something blocks the view — as the game checks it.
+        /// </summary>
+        void DrawTrainerSight(Graphics g, int c)
+        {
+            var ev = _selectedEvent;
+            if (ev == null) return;
+            var m = TrainerName.Match(ev.Name ?? "");
+            if (!m.Success) return;
+            int range = int.Parse(m.Groups[1].Value);
+            var pg = ev.Pages.FirstOrDefault(p => p.Trigger == Triggers.EventTouch) ?? ev.Pages.FirstOrDefault();
+            if (pg == null || range <= 0) return;
+            int[] dirs = pg.RandomFacing ? new[] { 2, 4, 6, 8 } : new[] { pg.Graphic.Direction == 0 ? 2 : pg.Graphic.Direction };
+            using (var seen = new SolidBrush(Color.FromArgb(130, 255, 190, 30)))
+            using (var edge = new Pen(Color.FromArgb(220, 255, 200, 40), 1))
+            using (var cut = new Pen(Color.FromArgb(160, 255, 80, 80), 1) { DashStyle = DashStyle.Dot })
+            using (var font = new Font("Segoe UI", Math.Max(7f, 8f * Scale), FontStyle.Bold))
+            {
+                foreach (int d in dirs)
+                {
+                    int dx = d == 4 ? -1 : d == 6 ? 1 : 0, dy = d == 8 ? -1 : d == 2 ? 1 : 0;
+                    int x = ev.X, y = ev.Y;
+                    bool blocked = false;
+                    for (int i = 1; i <= range; i++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if (!_map.Valid(nx, ny)) break;
+                        if (!blocked && !CanSee(x, y, d)) blocked = true;
+                        var r = new Rectangle(nx * c, ny * c, c - 1, c - 1);
+                        if (blocked) g.DrawRectangle(cut, r);       // out of view: something is in the way
+                        else { g.FillRectangle(seen, r); g.DrawRectangle(edge, r); }
+                        x = nx; y = ny;
+                    }
+                }
+                string label = "sees " + range + (range == 1 ? " tile" : " tiles") + (pg.RandomFacing ? " (looks around)" : "");
+                var sz = g.MeasureString(label, font);
+                float lx = ev.X * c + c / 2f - sz.Width / 2, ly = ev.Y * c - sz.Height - 2;
+                if (ly < 0) ly = ev.Y * c + c + 2;
+                g.FillRectangle(new SolidBrush(Color.FromArgb(200, 0, 0, 0)), lx - 3, ly, sz.Width + 6, sz.Height);
+                g.DrawString(label, font, Brushes.Gold, lx, ly);
+            }
+        }
+
+        /// <summary>Whether a trainer's view passes from (x, y) to the next tile in direction d (tiles and solid events).</summary>
+        bool CanSee(int x, int y, int d)
+        {
+            int nx = x + (d == 4 ? -1 : d == 6 ? 1 : 0), ny = y + (d == 8 ? -1 : d == 2 ? 1 : 0);
+            if (!_map.Valid(nx, ny)) return false;
+            if (!TilePass(x, y, d) || !TilePass(nx, ny, 10 - d)) return false;
+            foreach (var e in _map.Events)
+            {
+                if (e == _selectedEvent || e.X != nx || e.Y != ny || e.Pages.Count == 0) continue;
+                var p = e.Pages[0];
+                if (!p.Through && (!string.IsNullOrEmpty(p.Graphic.CharacterName) || p.Graphic.TileId > 0)) return false;
+            }
+            return true;
+        }
+
+        bool TilePass(int x, int y, int d)
+        {
+            int bit = d == 2 ? 1 : d == 4 ? 2 : d == 6 ? 4 : 8;
+            for (int z = 2; z >= 0; z--)
+            {
+                int id = _map.GetTile(x, y, z);
+                if (id <= 0) continue;
+                if ((_tiles.Tileset.Passage(id) & bit) != 0) return false;
+                if (_tiles.Tileset.Priority(id) == 0) return true;
+            }
+            return true;
         }
 
         static Rectangle CellRect(Point a, Point b)

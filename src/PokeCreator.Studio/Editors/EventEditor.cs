@@ -314,8 +314,9 @@ namespace PokeCreator.Studio.Editors
             _sprite.Left = 220; _sprite.Top = y;
             left.Controls.Add(charCombo); left.Controls.Add(_sprite);
             var dirCombo = new ComboBox { Left = 8, Top = y + 30, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
-            dirCombo.Items.AddRange(new object[] { "Facing down", "Facing left", "Facing right", "Facing up" });
-            dirCombo.SelectedIndex = g.Direction == 4 ? 1 : g.Direction == 6 ? 2 : g.Direction == 8 ? 3 : 0;
+            dirCombo.Items.AddRange(new object[] { "Facing down", "Facing left", "Facing right", "Facing up", "Random (looks around)" });
+            dirCombo.SelectedIndex = pg.RandomFacing ? 4 : g.Direction == 4 ? 1 : g.Direction == 6 ? 2 : g.Direction == 8 ? 3 : 0;
+            new ToolTip().SetToolTip(dirCombo, "Random: turns to a different direction every 1-3 seconds. A trainer spots the player in whichever direction they're facing.");
             left.Controls.Add(dirCombo);
             // Without a graphic, Action Button events are stood on (RPG Maker's rule); say so, since it surprises people
             var hint = new Label { Left = 8, Top = y + 56, Width = 206, Height = 46, ForeColor = Color.FromArgb(200, 140, 30), Font = new Font("Segoe UI", 8f) };
@@ -328,7 +329,12 @@ namespace PokeCreator.Studio.Editors
             };
             _updateHint();
             charCombo.TextChanged += (s, e) => { g.CharacterName = charCombo.Text == "(none)" ? "" : charCombo.Text; g.TileId = 0; UpdateSprite(); _updateHint(); };
-            dirCombo.SelectedIndexChanged += (s, e) => { g.Direction = new[] { 2, 4, 6, 8 }[dirCombo.SelectedIndex]; UpdateSprite(); };
+            dirCombo.SelectedIndexChanged += (s, e) =>
+            {
+                pg.RandomFacing = dirCombo.SelectedIndex == 4;
+                if (dirCombo.SelectedIndex < 4) g.Direction = new[] { 2, 4, 6, 8 }[dirCombo.SelectedIndex];
+                UpdateSprite();
+            };
             y += 104;
 
             left.Controls.Add(Head("Behaviour", ref y));

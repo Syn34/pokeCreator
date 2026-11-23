@@ -127,6 +127,8 @@ namespace PokeCreator.Maps
         public bool DirectionFix { get; set; }
         public bool Through { get; set; }
         public bool AlwaysOnTop { get; set; }
+        /// <summary>Looks around: turns to a random direction every few seconds (trainers can spot the player when they turn to face them).</summary>
+        public bool RandomFacing { get; set; }
         public int Trigger { get; set; }
         public List<EventCommand> List { get; set; }
         public EventPage()
