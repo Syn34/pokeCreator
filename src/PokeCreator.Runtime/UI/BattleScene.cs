@@ -78,6 +78,16 @@ namespace PokeCreator.Runtime.UI
         bool _trainerVisible, _ballVisible, _ballCaught;
         int _ballShakes, _ballSlot;
         int _introSlide = 120;
+        // Battle start (Game Settings → Appearance (Game UI) → Battle start)
+        int _introFade;                       // "Fade in" intro: frames of black left
+        bool _playerTrainerVisible;           // your trainer's back sprite, until your first Pokémon comes out
+        Texture _playerBack;
+        readonly int[] _exit = new int[2];     // frames into a trainer leaving (0 = not leaving)
+        readonly double[] _appear = { 1, 1, 1, 1, 1, 1 };   // per field place: 1 = fully out
+        string _sendStyle = "Appear";
+        int _exitFrames;
+        string ExitStyle { get { var s = Skin.U.TrainerExit; return string.IsNullOrEmpty(s) ? "Slide off the screen" : s; } }
+        string SendStyle { get { var s = Skin.U.SendOutStyle; return string.IsNullOrEmpty(s) ? "Poké Ball" : s; } }
         readonly List<Pokemon> _party;
         // Commands chosen this turn (double battles: one per Pokémon)
         int _cmdSlot;
@@ -91,6 +101,16 @@ namespace PokeCreator.Runtime.UI
             if (setup.Replay == null) battle.PlayerHasMegaRing = Battle.MegaRings.Any(r => g.State.ItemCount(r) > 0);
             battle.BagHas = r => g.State.ItemCount(r) > 0;
             _trainerVisible = !setup.Wild;
+            // Your trainer (Graphics/Trainers/<type>_back) stands there until your first Pokémon comes out
+            if (!Skin.U.HidePlayerTrainer && setup.Replay == null && !setup.Link)
+            {
+                var pc = g.Project.Players.Count > 0 && g.State.PlayerCharacter >= 0 ? g.Project.Players[Math.Min(g.State.PlayerCharacter, g.Project.Players.Count - 1)] : null;
+                if (pc != null && !string.IsNullOrEmpty(pc.TrainerType)) _playerBack = g.Gfx.Load(g.Project.FindAsset("Graphics/Trainers", pc.TrainerType + "_back"));
+                _playerTrainerVisible = _playerBack != null;
+            }
+            string intro = Skin.U.IntroStyle;
+            if (intro == "Appear") _introSlide = 0;
+            else if (intro == "Fade in") { _introSlide = 0; _introFade = 32; }
             foreach (var e in battle.Start()) _queue.Enqueue(e);
             // Seen in the Pokédex as soon as it appears
             foreach (var pk in battle.Parties[1]) if (setup.Wild) g.State.Seen.Add(pk.Species);
@@ -129,6 +149,7 @@ namespace PokeCreator.Runtime.UI
         {
             if (_setup.LinkUpdate != null) _setup.LinkUpdate();
             if (_introSlide > 0) { _introSlide -= 6; return; }
+            if (_introFade > 0) { _introFade -= 2; return; }
             switch (_mode)
             {
                 case Mode.Intro: _mode = Mode.Events; break;
@@ -214,13 +235,17 @@ namespace PokeCreator.Runtime.UI
                 case BattleEventKind.SendOut:
                     {
                         _lineupGone[e.Side] = true;
-                        if (e.Side == 1) _trainerVisible = false;
                         int k = Key(e.Side, e.Slot);
                         _shownParty[k] = e.Party; _visible[k] = true; _faintDrop[k] = 0;
                         _shownHp[k] = _b.Parties[e.Side][e.Party].HP;
                         if (e.Side == 0) _shownExp[Math.Min(2, e.Slot)] = ExpFraction(_party[e.Party]);
-                        Game.Audio.PlaySe("Battle recall");
-                        Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
+                        // The trainer leaves first (slides off / fades out / disappears), then the Pokémon comes out
+                        bool trainerThere = e.Side == 1 ? _trainerVisible : _playerTrainerVisible;
+                        _exitFrames = trainerThere && ExitStyle != "Disappear" ? 18 : 0;
+                        if (trainerThere && _exitFrames == 0) { if (e.Side == 1) _trainerVisible = false; else _playerTrainerVisible = false; }
+                        _sendStyle = e.Side == 0 || !_setup.Wild ? SendStyle : "Appear";
+                        _appear[k] = _sendStyle == "Appear" ? 1 : 0;
+                        if (_sendStyle == "Appear" && _exitFrames == 0) PokemonOut(e);
                         return true;
                     }
                 case BattleEventKind.Withdraw: _visible[Key(e.Side, e.Slot)] = false; Game.Audio.PlaySe("Battle recall"); return true;
@@ -324,6 +349,8 @@ namespace PokeCreator.Runtime.UI
                 _player.Update();
                 if (!_player.Done) return false;
                 _player = null;
+                // A send-out animation finished: now the Pokémon is out
+                if (e.Kind == BattleEventKind.SendOut && _appear[Key(e.Side, e.Slot)] < 1) { _appear[Key(e.Side, e.Slot)] = 1; PokemonOut(e); }
                 return true;
             }
             switch (e.Kind)
@@ -350,9 +377,7 @@ namespace PokeCreator.Runtime.UI
                     }
                 case BattleEventKind.FormChange: return _anim >= 24;
                 case BattleEventKind.Ability: return _anim >= 20;
-                case BattleEventKind.SendOut:
-                    if (_anim == 12 && _b.Parties[e.Side][e.Party].Shiny && StartCommon("Shiny", e.Side, e.Slot)) return false;
-                    return _anim >= 12;
+                case BattleEventKind.SendOut: return StepSendOut(e);
                 case BattleEventKind.Withdraw: return _anim >= 10;
                 case BattleEventKind.StatChange: return _anim >= 24;
                 case BattleEventKind.Exp:
@@ -402,6 +427,100 @@ namespace PokeCreator.Runtime.UI
         }
 
         /// <summary>Starts "Common:name" on a Pokémon (side -1 = the field, e.g. weather). False if there is no such animation.</summary>
+        /// <summary>The Pokémon is out: its sound and cry.</summary>
+        void PokemonOut(BattleEvent e)
+        {
+            var u = Skin.U;
+            Game.Audio.PlaySe(string.IsNullOrEmpty(u.SendOutSE) ? "Battle recall" : u.SendOutSE);
+            Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
+        }
+
+        int _sendT;   // frames into the Pokémon coming out (after its trainer left)
+
+        bool StepSendOut(BattleEvent e)
+        {
+            int k = Key(e.Side, e.Slot);
+            // 1. the trainer leaving
+            if (_anim <= _exitFrames)
+            {
+                _exit[e.Side] = _anim;
+                if (_anim == _exitFrames) { if (e.Side == 1) _trainerVisible = false; else _playerTrainerVisible = false; _exit[e.Side] = 0; }
+                _sendT = 0;
+                return false;
+            }
+            // 2. the Pokémon coming out
+            int t = ++_sendT;
+            bool done;
+            switch (_sendStyle)
+            {
+                case "Poké Ball":
+                    if (t == 1) Game.Audio.PlaySe("Battle throw");
+                    if (t == 20) PokemonOut(e);
+                    if (t > 20) _appear[k] = Math.Min(1, (t - 20) / 10.0);
+                    done = t >= 32;
+                    break;
+                case "Fade in":
+                    if (t == 1) PokemonOut(e);
+                    _appear[k] = Math.Min(1, t / 20.0);
+                    done = t >= 20;
+                    break;
+                case "Flash of light":
+                    if (t == 10) { _appear[k] = 1; PokemonOut(e); }
+                    done = t >= 20;
+                    break;
+                case "Battle animation":
+                    if (t == 1)
+                    {
+                        var anim = Game.Project.Animations.FirstOrDefault(a => a.Id == Skin.U.SendOutAnimation);
+                        var at = Battler(e.Side, e.Slot);
+                        if (anim != null && AnimsOn && at != null) { _player = new BattleAnimPlayer(Game, anim, at, at); return false; }
+                        _appear[k] = 1; PokemonOut(e);
+                    }
+                    done = t >= 4;
+                    break;
+                default:
+                    if (_appear[k] < 1) { _appear[k] = 1; PokemonOut(e); }
+                    done = t >= 12;
+                    break;
+            }
+            if (!done) return false;
+            _appear[k] = 1;
+            if (_b.Parties[e.Side][e.Party].Shiny && t < 1000 && StartCommon("Shiny", e.Side, e.Slot)) { _sendT = 1000; return false; }
+            return true;
+        }
+
+        /// <summary>The ball / flash while a Pokémon comes out.</summary>
+        void DrawSendOut(Gfx g)
+        {
+            var e = _current;
+            if (e == null || e.Kind != BattleEventKind.SendOut || _anim <= _exitFrames || _sendT >= 1000) return;
+            int x, bottom; Pos(e.Side, e.Slot, out x, out bottom);
+            int t = _sendT;
+            if (_sendStyle == "Poké Ball" && t <= 20)
+            {
+                // Thrown from the trainer's side in an arc to where the Pokémon will stand
+                double f = t / 20.0;
+                int sx = e.Side == 0 ? 40 : x + 60, sy = e.Side == 0 ? 250 : 110, ex = x, ey = bottom - 40;
+                int bx = (int)(sx + (ex - sx) * f), by = (int)(sy + (ey - sy) * f - Math.Sin(f * Math.PI) * 70);
+                var pk = _b.Parties[e.Side][e.Party];
+                var icon = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Items", string.IsNullOrEmpty(pk.Ball) ? "POKEBALL" : pk.Ball) ?? Game.Project.FindAsset("Graphics/Items", "POKEBALL"));
+                if (icon != null) g.Draw(icon, 0, 0, icon.Width, icon.Height, bx - icon.Width / 2, by - icon.Height / 2);
+                else
+                {
+                    g.FillRect(bx - 7, by - 7, 14, 14, new Color(32, 32, 40));
+                    g.FillRect(bx - 6, by - 6, 12, 6, new Color(232, 64, 56));
+                    g.FillRect(bx - 6, by, 12, 6, new Color(240, 240, 240));
+                    g.FillRect(bx - 6, by - 1, 12, 2, new Color(32, 32, 40));
+                }
+            }
+            else if (_sendStyle == "Poké Ball" && t <= 26) Ellipse(g, x, bottom - 40, 10 + (t - 20) * 8, 6 + (t - 20) * 6, new Color(255, 255, 255, (byte)(240 - (t - 20) * 30)));
+            else if (_sendStyle == "Flash of light" && t <= 18)
+            {
+                int r = t <= 10 ? t * 6 : (18 - t) * 7;
+                Ellipse(g, x, bottom - 44, r, r, new Color(255, 255, 240, 220));
+            }
+        }
+
         bool StartCommon(string name, int side, int slot)
         {
             if (!AnimsOn || string.IsNullOrEmpty(name)) return false;
@@ -905,14 +1024,28 @@ namespace PokeCreator.Runtime.UI
             if (_b.IsDouble) tx = 384 + Math.Max(0, _introSlide) * 2;
             if (_trainerVisible && _setup.TrainerType != null)
             {
+                // Leaving: slides off to the right, or fades out
+                int off = 0, alpha = 255;
+                if (_exit[1] > 0) { if (ExitStyle == "Fade out") alpha = Math.Max(0, 255 - _exit[1] * 14); else off = _exit[1] * 18; }
                 bool two = _setup.TrainerType2 != null;
                 var tex = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Trainers", _setup.TrainerType.Id));
-                if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, (two ? tx - 56 : tx) - tex.Width / 2, 200 - tex.Height);
+                if (tex != null) g.Draw(tex, 0, 0, tex.Width, tex.Height, (two ? tx - 56 : tx) - tex.Width / 2 + off, 200 - tex.Height, -1, -1, alpha);
                 if (two)
                 {
                     var tex2 = Game.Gfx.Load(Game.Project.FindAsset("Graphics/Trainers", _setup.TrainerType2.Id));
-                    if (tex2 != null) g.Draw(tex2, 0, 0, tex2.Width, tex2.Height, tx + 56 - tex2.Width / 2, 200 - tex2.Height);
+                    if (tex2 != null) g.Draw(tex2, 0, 0, tex2.Width, tex2.Height, tx + 56 - tex2.Width / 2 + off, 200 - tex2.Height, -1, -1, alpha);
                 }
+            }
+            if (_playerTrainerVisible && _playerBack != null)
+            {
+                // Your trainer's back sprite (frames side by side: the throw plays while leaving)
+                int frames = Math.Max(1, _playerBack.Width / Math.Max(1, _playerBack.Height));
+                int fw = _playerBack.Width / frames, frame = _exit[0] > 0 ? Math.Min(frames - 1, _exit[0] * frames / 18) : 0;
+                int px, pb; Pos(0, 0, out px, out pb);
+                if (_b.IsDouble) px = 128 - Math.Max(0, _introSlide) * 2;
+                int off = 0, alpha = 255;
+                if (_exit[0] > 0) { if (ExitStyle == "Fade out") alpha = Math.Max(0, 255 - _exit[0] * 14); else off = -_exit[0] * 18; }
+                g.Draw(_playerBack, frame * fw, 0, fw, _playerBack.Height, px - fw / 2 + off, 288 - _playerBack.Height, -1, -1, alpha);
             }
             if (_player != null) _player.Draw(g, true);
             // Opponents (back row first), then the player's Pokémon
@@ -926,24 +1059,30 @@ namespace PokeCreator.Runtime.UI
                     var pk = _b.Parties[side][_shownParty[k]];
                     // Lunge toward the other side
                     if (_lunge[k] > 0) { int t = _lunge[k]--; int off = (int)(Math.Sin((12 - t) / 12.0 * Math.PI) * 24); x += side == 0 ? off : -off; bottom += side == 0 ? -off / 3 : off / 3; }
+                    if (_appear[k] <= 0) continue;   // not out yet
                     var st = _player != null ? _player.BattlerState(k) : null;
-                    if (st != null) { DrawPokemonAnimated(g, pk, side == 0, st); continue; }
+                    if (st != null && _appear[k] >= 1) { DrawPokemonAnimated(g, pk, side == 0, st); continue; }
+                    _drawAppear = _appear[k];
                     DrawPokemon(g, pk, side == 0, x, bottom + _faintDrop[k]);
+                    _drawAppear = 1;
                     if (_mode == Mode.Target && _targets.Count > _target && _targets[_target].Side == side && _targets[_target].Slot == slot && (Frame / 8) % 2 == 0)
                         Ellipse(g, x, bottom - 2, 30, 6, new Color(248, 232, 80));
                 }
             if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
+            DrawSendOut(g);
             DrawEffects(g);
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
             DrawSplash(g);
             DrawLineups(g);
+            if (_introFade > 0) g.FillRect(0, 0, g.Width, g.Height, new Color(0, 0, 0, (byte)Math.Min(255, _introFade * 8)));
             // Databoxes
             for (int slot = 0; slot < _b.SlotsPerSide; slot++)
             {
                 int kf = Key(1, slot), km = Key(0, slot);
-                if (_visible[kf] && _shownParty[kf] >= 0) DrawFoeBox(g, _b.Parties[1][_shownParty[kf]], kf, slot);
-                if (_visible[km] && _shownParty[km] >= 0) DrawPlayerBox(g, _party[_shownParty[km]], km, slot);
+                // (a box shows once its Pokémon is out)
+                if (_visible[kf] && _shownParty[kf] >= 0 && _appear[kf] >= 1) DrawFoeBox(g, _b.Parties[1][_shownParty[kf]], kf, slot);
+                if (_visible[km] && _shownParty[km] >= 0 && _appear[km] >= 1) DrawPlayerBox(g, _party[_shownParty[km]], km, slot);
             }
             // Bottom box
             if (!Game.Message.Busy)
@@ -1143,6 +1282,8 @@ namespace PokeCreator.Runtime.UI
             return bottom - 14 + Math.Min(pad, tex.Height / 2) - altitude * 2;
         }
 
+        double _drawAppear = 1;
+
         void DrawPokemon(Gfx g, Pokemon pk, bool back, int cx, int bottom)
         {
             int fwUnused;
@@ -1171,6 +1312,14 @@ namespace PokeCreator.Runtime.UI
             // Clip what falls below the battle area (fainting slides down out of view)
             int h = Math.Min(tex.Height, Math.Max(0, 288 - (bottom - tex.Height)));
             if (h <= 0) return;
+            if (_drawAppear < 1)
+            {
+                // Coming out: grows from the ground (Poké Ball) or fades in
+                double z = _sendStyle == "Poké Ball" ? Math.Max(0.05, _drawAppear) : 1;
+                int op = _sendStyle == "Fade in" ? (int)(255 * _drawAppear) : 255;
+                g.DrawEx(tex, sx, 0, fw, h, cx, bottom - tex.Height + h - h * z / 2.0, z, z, 0, false, op, 0);
+                return;
+            }
             if (pk.ShadowPokemon) { g.DrawEx(tex, sx, 0, fw, h, cx, bottom - tex.Height + h / 2.0, 1, 1, 0, false, 255, 0, new Color(112, 40, 160, 120)); return; }
             g.Draw(tex, sx, 0, fw, h, cx - fw / 2, bottom - tex.Height);
         }

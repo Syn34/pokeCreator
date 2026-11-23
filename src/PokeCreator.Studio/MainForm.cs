@@ -145,6 +145,8 @@ namespace PokeCreator.Studio
             file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add("Open Project Folder in Explorer", null, (s, e) => { if (Project != null) OpenInShell(Project.Root); });
             file.DropDownItems.Add(new ToolStripSeparator());
+            file.DropDownItems.Add("&Appearance (Studio)…", null, (s, e) => OpenAppearance());
+            file.DropDownItems.Add(new ToolStripSeparator());
             file.DropDownItems.Add("E&xit", null, (s, e) => Close());
 
             var game = new ToolStripMenuItem("&Game");
@@ -402,7 +404,6 @@ namespace PokeCreator.Studio
             Node(settings.Nodes, "Tilesets", "tilesets", "sys:tilesets");
             Node(settings.Nodes, "Map Connections (list)", "connections", "sys:connections");
             Node(settings.Nodes, "Appearance (Game UI)", "appearance", "sys:gameui");
-            Node(settings.Nodes, "Appearance (Studio)", "appearance", "sys:appearance");
 
             var db = Node(_tree.Nodes, "Database", "database", null);
             foreach (var t in p.Tables) Node(db.Nodes, t.Label + " (" + t.Items.Count + ")", t.Key, t);
@@ -523,7 +524,26 @@ namespace PokeCreator.Studio
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "Import PBS files", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
-        void OpenAppearance() { OpenDocument("sys:appearance", () => new AppearanceEditor(_settings, s => ApplyAppearance(s, true))); }
+        Form _appearanceDialog;
+
+        /// <summary>The Studio's own look (theme, colours, sizes) in a small window of its own.</summary>
+        void OpenAppearance()
+        {
+            if (_appearanceDialog != null && !_appearanceDialog.IsDisposed) { _appearanceDialog.Activate(); return; }
+            var dlg = new Form
+            {
+                Text = "Appearance (Studio)", Width = 760, Height = 740, StartPosition = FormStartPosition.CenterParent,
+                ShowInTaskbar = false, MinimizeBox = false, MaximizeBox = false, FormBorderStyle = FormBorderStyle.SizableToolWindow
+            };
+            var editor = new AppearanceEditor(_settings, st => { ApplyAppearance(st, true); Theme.Apply(dlg); });
+            var close = new Button { Text = "Close", Dock = DockStyle.Bottom, Height = 34, DialogResult = DialogResult.OK };
+            close.Click += (s, e) => dlg.Close();
+            dlg.Controls.Add(editor); dlg.Controls.Add(close);
+            dlg.CancelButton = close;
+            Theme.Apply(dlg);
+            _appearanceDialog = dlg;
+            dlg.Show(this);
+        }
 
         /// <summary>Applies the Studio appearance settings (and saves them when 'live').</summary>
         void ApplyAppearance(Settings s, bool live)

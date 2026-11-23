@@ -20,6 +20,24 @@ namespace PokeCreator.Data
         [Field("Text shadow colour", Group = "General", Help = "#RRGGBB (empty = light grey).")]
         public string TextShadow { get; set; }
 
+        // ------------------------------------------------------------------ battle start
+        public static readonly string[] IntroStyles = { "Slide in", "Fade in", "Appear" };
+        public static readonly string[] ExitStyles = { "Slide off the screen", "Fade out", "Disappear" };
+        public static readonly string[] SendOutStyles = { "Poké Ball", "Fade in", "Flash of light", "Battle animation", "Appear" };
+
+        [Field("Battle intro", Group = "Battle start", Choices = new[] { "Slide in", "Fade in", "Appear" }, Help = "How the Pokémon / trainers come on screen when a battle starts (empty = Slide in).")]
+        public string IntroStyle { get; set; }
+        [Field("Hide your trainer", Group = "Battle start", Help = "Ticked: your trainer isn't shown at the start. Unticked: your trainer's back sprite (Graphics/Trainers/<trainer type>_back, frames side by side) stands on your side until your first Pokémon comes out.")]
+        public bool HidePlayerTrainer { get; set; }
+        [Field("Trainers leave by", Group = "Battle start", Choices = new[] { "Slide off the screen", "Fade out", "Disappear" }, Help = "How the opposing trainer and your trainer leave before their Pokémon come out: Slide off the screen (Gen 3-4), Fade out (Gen 5) or Disappear (empty = Slide off the screen).")]
+        public string TrainerExit { get; set; }
+        [Field("Pokémon come out with", Group = "Battle start", Choices = new[] { "Poké Ball", "Fade in", "Flash of light", "Battle animation", "Appear" }, Help = "Poké Ball: its own ball (item icon, if there is one) is thrown and opens; Fade in; Flash of light; Battle animation (pick it below); Appear (empty = Poké Ball). Wild Pokémon just appear.")]
+        public string SendOutStyle { get; set; }
+        [Field("Send-out animation", Ref = "animations", Group = "Battle start", Help = "With \"Battle animation\": the animation played on the place the Pokémon comes out (Database → Battle Animations).")]
+        public string SendOutAnimation { get; set; }
+        [Field("Send-out sound", Asset = "Audio/SE", Group = "Battle start", Help = "Plays as each Pokémon comes out (empty = Battle recall).")]
+        public string SendOutSE { get; set; }
+
         // ------------------------------------------------------------------ data boxes
         [Field("Foe data box", Asset = "Graphics/UI", Group = "Battle: data boxes", Help = "Picture behind the opposing Pokémon's name, level and HP bar.")]
         public string FoeBox { get; set; }
