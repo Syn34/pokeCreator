@@ -150,8 +150,30 @@ namespace PokeCreator.Studio.Controls
                 info.Hooked = true;
                 c.ControlAdded += (s, e) => Apply(e.Control);
                 if (c is Form) ((Form)c).HandleCreated += (s, e) => NativeDark((Form)c);
+                if (c is ComboBox) NoStraySelection((ComboBox)c);
             }
             foreach (Control child in c.Controls) Apply(child);
+        }
+
+        /// <summary>
+        /// Windows highlights the whole text of an editable dropdown when it's resized or its text is set, even when
+        /// you aren't in it (every picker in a form looked selected). Clear that unless the dropdown has the focus.
+        /// </summary>
+        static void NoStraySelection(ComboBox cb)
+        {
+            Action clear = () =>
+            {
+                if (cb.IsDisposed || !cb.IsHandleCreated || cb.Focused || cb.DropDownStyle == ComboBoxStyle.DropDownList) return;
+                try { if (cb.SelectionLength > 0 || cb.SelectionStart > 0) { cb.SelectionStart = 0; cb.SelectionLength = 0; } } catch (Exception) { }
+            };
+            EventHandler now = (s, e) => clear();
+            EventHandler later = (s, e) => { if (cb.IsHandleCreated && !cb.IsDisposed) cb.BeginInvoke(clear); };
+            cb.Resize += now; cb.Resize += later;
+            cb.TextChanged += now;
+            cb.LostFocus += now;
+            cb.VisibleChanged += later;
+            cb.HandleCreated += later;
+            cb.SelectedIndexChanged += later;
         }
 
         static void StyleSpecial(Control c)

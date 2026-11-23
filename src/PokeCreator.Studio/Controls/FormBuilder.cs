@@ -110,7 +110,7 @@ namespace PokeCreator.Studio.Controls
             if (editor is CheckBox) { editor.Width = 24; return; }
             bool number = editor.Controls.Count == 1 && editor.Controls[0] is NumericUpDown;
             var tb = editor as TextBox;
-            bool list = editor is Panel && editor.Controls.OfType<Button>().Any(b => b.Text == "Pick…");   // lists of types, abilities...
+            bool list = editor is Panel && (editor.Controls.OfType<Button>().Any(b => b.Text == "Pick…") || "wide".Equals(editor.Tag));   // lists of types, abilities; UI picture names
             editor.Width = number ? 130 : (tb != null && tb.Multiline) || list ? FieldWidth + 180 : FieldWidth;
         }
 
@@ -279,6 +279,7 @@ namespace PokeCreator.Studio.Controls
                         if (!combo.Items.Contains(f)) combo.Items.Add(f);
             }
             panel.Controls.Add(combo);
+            if (folder == "Graphics/UI") panel.Tag = "wide";   // "Kit/Folder/picture" names are long
             _refreshers.Add(() => combo.Text = (string)p.GetValue(target, null) ?? "");
             combo.TextChanged += (s, e) => Set(p, combo.Text);
             return panel;
