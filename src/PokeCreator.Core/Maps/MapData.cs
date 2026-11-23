@@ -110,8 +110,27 @@ namespace PokeCreator.Maps
 
     public static class Triggers
     {
-        public const int Action = 0, PlayerTouch = 1, EventTouch = 2, Autorun = 3, Parallel = 4;
-        public static readonly string[] Names = { "Action button", "Player touch", "Event touch", "Autorun", "Parallel process" };
+        public const int Action = 0, PlayerTouch = 1, EventTouch = 2, Autorun = 3, Parallel = 4, LineOfSight = 5;
+        public static readonly string[] Names = { "Action button", "Player touch", "Event touch", "Autorun", "Parallel process", "Line of sight (trainer vision)" };
+
+        /// <summary>Starts by touching (or talking to) it: Player touch, Event touch and Line of sight pages.</summary>
+        public static bool IsTouch(int t) { return t == PlayerTouch || t == EventTouch || t == LineOfSight; }
+
+        static readonly System.Text.RegularExpressions.Regex TrainerName = new System.Text.RegularExpressions.Regex(@"trainer\((\d+)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// How many tiles this page can see the player from (0 = it doesn't watch): a Line of sight page's range,
+        /// or Essentials' way — an Event touch page on an event named "Trainer(n)".
+        /// </summary>
+        public static int SightRange(string eventName, EventPage pg)
+        {
+            if (pg == null) return 0;
+            if (pg.Trigger == LineOfSight) return pg.SightRange > 0 ? pg.SightRange : 3;
+            if (pg.Trigger != EventTouch) return 0;
+            var m = TrainerName.Match(eventName ?? "");
+            int n;
+            return m.Success && int.TryParse(m.Groups[1].Value, out n) ? n : 0;
+        }
     }
 
     public class EventPage
@@ -129,6 +148,8 @@ namespace PokeCreator.Maps
         public bool AlwaysOnTop { get; set; }
         /// <summary>Looks around: turns to a random direction every few seconds (trainers can spot the player when they turn to face them).</summary>
         public bool RandomFacing { get; set; }
+        /// <summary>Line of sight pages: how many tiles ahead it spots the player.</summary>
+        public int SightRange { get; set; }
         public int Trigger { get; set; }
         public List<EventCommand> List { get; set; }
         public EventPage()

@@ -338,7 +338,23 @@ namespace PokeCreator.Studio.Editors
             y += 104;
 
             left.Controls.Add(Head("Behaviour", ref y));
-            var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => { pg.Trigger = i; _updateHint(); }, ref y);
+            var sightLabel = new Label { Text = "Sees (tiles)", Left = 8, Width = 90 };
+            var sight = new NumericUpDown { Left = 100, Width = 60, Minimum = 1, Maximum = 30 };
+            var sightNote = new Label { Left = 166, Width = 160, ForeColor = Theme.SubText, Text = "in the way it faces" };
+            Action showSight = () =>
+            {
+                bool los = pg.Trigger == Triggers.LineOfSight;
+                sightLabel.Visible = sight.Visible = sightNote.Visible = los;
+                if (los && pg.SightRange <= 0) pg.SightRange = 3;
+                if (los) sight.Value = Math.Max(1, Math.Min(30, pg.SightRange));
+            };
+            var trig = Combo(left, "Starts when", Triggers.Names, pg.Trigger, i => { pg.Trigger = i; _updateHint(); showSight(); }, ref y);
+            new ToolTip().SetToolTip(trig, "Line of sight: starts when the player walks into view — the tiles in the direction it faces, up to the distance below, with nothing in between (talking to it or bumping into it starts it too).");
+            sightLabel.Top = y + 3; sight.Top = y; sightNote.Top = y + 3;
+            sight.ValueChanged += (s, e) => { if (pg.Trigger == Triggers.LineOfSight) pg.SightRange = (int)sight.Value; };
+            left.Controls.Add(sightLabel); left.Controls.Add(sight); left.Controls.Add(sightNote);
+            showSight();
+            y += 28;
             var routeButton = new Button { Text = "Edit Custom Route…", Left = 100, Width = 180, Height = 24, Enabled = pg.MoveType == 3 };
             Combo(left, "Movement", new[] { "Stays still", "Walks randomly", "Approaches player", "Custom route" }, pg.MoveType, i => { pg.MoveType = i; routeButton.Enabled = i == 3; }, ref y);
             routeButton.Click += (s, e) =>

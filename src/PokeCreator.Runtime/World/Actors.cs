@@ -145,7 +145,7 @@ namespace PokeCreator.Runtime.World
         protected override void OnBump(int x, int y)
         {
             // Event touch: this event walked into the player
-            if (Trigger == Triggers.EventTouch && Game.Player.X == x && Game.Player.Y == y && !Game.InterpreterRunning) Start();
+            if ((Trigger == Triggers.EventTouch || Trigger == Triggers.LineOfSight) && Game.Player.X == x && Game.Player.Y == y && !Game.InterpreterRunning) Start();
         }
 
         public override void Update()
@@ -381,7 +381,7 @@ namespace PokeCreator.Runtime.World
             if (Game.Map.TerrainTag(X, Y) == GameMap.TagIce && !Surfing && !RouteForced) _sliding = true;
             // Player touch / event touch on the tile we stepped onto
             foreach (var e in Game.Map.EventsAt(X, Y).ToList())
-                if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
+                if (Triggers.IsTouch(e.Trigger) && e.OverTrigger && !Game.InterpreterRunning) { e.Start(); return; }
             if (!Game.InterpreterRunning && Game.CheckTrainerSight()) return;
             if (PokeRadar.OnStep(Game)) return;
             Game.Encounters.OnStep(X, Y);
@@ -391,7 +391,7 @@ namespace PokeCreator.Runtime.World
         {
             if (Game.InterpreterRunning) return;
             foreach (var e in Game.Map.EventsAt(x, y))
-                if ((e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && !e.OverTrigger) { e.Start(); return; }
+                if (Triggers.IsTouch(e.Trigger) && !e.OverTrigger) { e.Start(); return; }
         }
 
         void CheckActionTrigger()
@@ -403,7 +403,7 @@ namespace PokeCreator.Runtime.World
             int fx = X + Dx(Direction), fy = Y + Dy(Direction);
             // As RPG Maker XP: talking to an event in front also starts Player Touch / Event Touch pages (trainers)
             foreach (var e in map.EventsAt(fx, fy))
-                if ((e.Trigger == Triggers.Action || e.Trigger == Triggers.PlayerTouch || e.Trigger == Triggers.EventTouch) && !e.OverTrigger) { e.Start(); return; }
+                if ((e.Trigger == Triggers.Action || Triggers.IsTouch(e.Trigger)) && !e.OverTrigger) { e.Start(); return; }
             foreach (var e in map.EventsAt(fx, fy))
                 if (FieldMoves.IsBoulder(e) && e.CharacterName.Length > 0) { FieldMoves.Strength(Game, null); return; }
             if (map.IsCounter(fx, fy))

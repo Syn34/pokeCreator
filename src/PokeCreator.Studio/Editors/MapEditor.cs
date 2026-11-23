@@ -760,11 +760,9 @@ namespace PokeCreator.Studio.Editors
         {
             var ev = _selectedEvent;
             if (ev == null) return;
-            var m = TrainerName.Match(ev.Name ?? "");
-            if (!m.Success) return;
-            int range = int.Parse(m.Groups[1].Value);
-            var pg = ev.Pages.FirstOrDefault(p => p.Trigger == Triggers.EventTouch) ?? ev.Pages.FirstOrDefault();
-            if (pg == null || range <= 0) return;
+            var pg = ev.Pages.FirstOrDefault(p => Triggers.SightRange(ev.Name, p) > 0);
+            if (pg == null) return;
+            int range = Triggers.SightRange(ev.Name, pg);
             int[] dirs = pg.RandomFacing ? new[] { 2, 4, 6, 8 } : new[] { pg.Graphic.Direction == 0 ? 2 : pg.Graphic.Direction };
             using (var seen = new SolidBrush(Color.FromArgb(130, 255, 190, 30)))
             using (var edge = new Pen(Color.FromArgb(220, 255, 200, 40), 1))
@@ -1242,13 +1240,14 @@ namespace PokeCreator.Studio.Editors
             string after = Prompt.Ask(FindForm(), "New trainer", "What do they say after you beat them?", "You're strong!");
             if (after == null) return;
             string battle = "TrainerBattle.start(:" + tr.TrainerType + ", \"" + tr.Name.Replace("\"", "\\\"") + "\"" + (tr.Version > 0 ? ", " + tr.Version : "") + ")";
-            var ev = NewEvent(cell); ev.Name = range > 0 ? "Trainer(" + range + ")" : "Trainer";
+            var ev = NewEvent(cell); ev.Name = "Trainer " + tr.Name;
             var p1 = ev.Pages[0];
             // Overworld sprites follow the trainer_<TYPE> naming
             string sprite = "trainer_" + tr.TrainerType;
             p1.Graphic.CharacterName = TemplateSprite(sprite);
             p1.Graphic.Direction = facing;
-            p1.Trigger = range > 0 ? Triggers.EventTouch : Triggers.Action;
+            p1.Trigger = range > 0 ? Triggers.LineOfSight : Triggers.Action;
+            p1.SightRange = range;
             p1.List = new List<EventCommand>
             {
                 new EventCommand(355, 0, "pbTrainerIntro(:" + tr.TrainerType + ")"),

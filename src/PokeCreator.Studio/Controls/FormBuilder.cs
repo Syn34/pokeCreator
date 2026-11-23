@@ -72,7 +72,7 @@ namespace PokeCreator.Studio.Controls
                     var editor = CreateEditor(target, p, meta);
                     if (meta.Help != null) { var tt = new ToolTip(); tt.SetToolTip(label, meta.Help); tt.SetToolTip(editor, meta.Help); label.Text += " ⓘ"; }
                     editor.Margin = new Padding(0, 3, 0, 3);
-                    editor.Dock = DockStyle.Fill;
+                    SizeEditor(editor);
                     table.Controls.Add(label);
                     table.Controls.Add(editor);
                 }
@@ -82,6 +82,26 @@ namespace PokeCreator.Studio.Controls
             foreach (var r in _refreshers) r();
             _loading = false;
             return outer;
+        }
+
+        /// <summary>Width of a one-line field (text, dropdown, picker): fixed, so fields don't stretch across wide screens.</summary>
+        public const int FieldWidth = 340;
+
+        /// <summary>
+        /// One-line fields get a fixed width (numbers a short one); only grids, lists and sub-forms that need the room
+        /// stretch with the window.
+        /// </summary>
+        static void SizeEditor(Control editor)
+        {
+            bool wide = editor is ObjectGrid || editor is TrainerPartyGrid || editor is ObjectListEditor
+                     || (editor is Panel && editor.Height > 60);   // sub-forms
+            if (wide) { editor.Dock = DockStyle.Fill; return; }
+            editor.Dock = DockStyle.None;
+            editor.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            if (editor is CheckBox) { editor.Width = 24; return; }
+            bool number = editor.Controls.Count == 1 && editor.Controls[0] is NumericUpDown;
+            var tb = editor as TextBox;
+            editor.Width = number ? 130 : tb != null && tb.Multiline ? FieldWidth + 180 : FieldWidth;
         }
 
         void Set(PropertyInfo p, object v)

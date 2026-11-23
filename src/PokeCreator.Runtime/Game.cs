@@ -849,10 +849,9 @@ namespace PokeCreator.Runtime
             var seen = new List<GameEvent>();
             foreach (var e in Map.Events)
             {
-                if (e.Erased || e.Starting || e.Trigger != Triggers.EventTouch || !e.HasCommands) continue;
-                var m = TrainerName.Match(e.Name ?? "");
-                if (!m.Success) continue;
-                if (InSight(e, int.Parse(m.Groups[1].Value))) seen.Add(e);
+                if (e.Erased || e.Starting || !e.HasCommands) continue;
+                int range = Triggers.SightRange(e.Name, e.Page);   // Line of sight pages, or Essentials' "Trainer(n)" + Event touch
+                if (range > 0 && InSight(e, range)) seen.Add(e);
             }
             if (seen.Count == 0) return false;
             // Two trainers spotting the player at once team up for a double battle (as Essentials), if the player
@@ -1006,7 +1005,7 @@ namespace PokeCreator.Runtime
                 if (starter != null)
                 {
                     starter.Starting = false;
-                    if (starter.Trigger <= Triggers.EventTouch) starter.Lock();
+                    if (starter.Trigger <= Triggers.EventTouch || starter.Trigger == Triggers.LineOfSight) starter.Lock();
                     Interpreter.Setup(starter.List, starter.Id);
                 }
                 else
