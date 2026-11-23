@@ -101,7 +101,8 @@ namespace PokeCreator.Studio.Controls
             if (editor is CheckBox) { editor.Width = 24; return; }
             bool number = editor.Controls.Count == 1 && editor.Controls[0] is NumericUpDown;
             var tb = editor as TextBox;
-            editor.Width = number ? 130 : tb != null && tb.Multiline ? FieldWidth + 180 : FieldWidth;
+            bool list = editor is Panel && editor.Controls.OfType<Button>().Any(b => b.Text == "Pick…");   // lists of types, abilities...
+            editor.Width = number ? 130 : (tb != null && tb.Multiline) || list ? FieldWidth + 180 : FieldWidth;
         }
 
         void Set(PropertyInfo p, object v)

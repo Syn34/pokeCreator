@@ -64,9 +64,9 @@ namespace PokeCreator.Data
         [Field("Icon position", Help = "Row of this type's icon in Graphics/UI/types.png")] public int IconPosition { get; set; }
         [Field("Special type", Help = "Gen 1-3: moves of this type are special.")] public bool IsSpecialType { get; set; }
         [Field("Pseudo type", Help = "Not a real type (e.g. ???).")] public bool IsPseudoType { get; set; }
-        [Field("Weak to", Ref = "types", Group = "Matchups")] public List<string> Weaknesses { get; set; }
-        [Field("Resists", Ref = "types", Group = "Matchups")] public List<string> Resistances { get; set; }
-        [Field("Immune to", Ref = "types", Group = "Matchups")] public List<string> Immunities { get; set; }
+        [Field("Weak to (×2)", Ref = "types", Group = "Matchups", Help = "Attacks of these types are super effective against this type (double damage).")] public List<string> Weaknesses { get; set; }
+        [Field("Resists (×½)", Ref = "types", Group = "Matchups", Help = "Attacks of these types are not very effective against this type (half damage).")] public List<string> Resistances { get; set; }
+        [Field("Immune to (×0)", Ref = "types", Group = "Matchups", Help = "Attacks of these types have no effect on this type. Every type not listed in these three does normal damage.")] public List<string> Immunities { get; set; }
         [Field("Flags")] public List<string> Flags { get; set; }
 
         public TypeData() { Weaknesses = new List<string>(); Resistances = new List<string>(); Immunities = new List<string>(); Flags = new List<string>(); }
@@ -359,6 +359,10 @@ namespace PokeCreator.Data
         [Field("Bicycle BGM", Asset = "Audio/BGM", Group = "Music")] public string BicycleBGM { get; set; }
         [Field("Title music", Asset = "Audio/BGM", Group = "Music")] public string TitleBGM { get; set; }
         [Field("Credits music", Asset = "Audio/BGM", Group = "Music")] public string CreditsBGM { get; set; }
+        [Field("Normal hit", Asset = "Audio/SE", Group = "Battle sound effects", Help = "Plays when a move does normal damage (empty = Battle damage normal).")] public string HitNormalSE { get; set; }
+        [Field("Super effective hit", Asset = "Audio/SE", Group = "Battle sound effects", Help = "Plays when a move is super effective (empty = Battle damage super).")] public string HitSuperSE { get; set; }
+        [Field("Not very effective hit", Asset = "Audio/SE", Group = "Battle sound effects", Help = "Plays when a move is not very effective (empty = Battle damage weak).")] public string HitWeakSE { get; set; }
+        [Field("No effect", Asset = "Audio/SE", Group = "Battle sound effects", Help = "Plays when a move has no effect on its target (empty = no sound, as in Essentials).")] public string NoEffectSE { get; set; }
         [Field("Safari steps", Group = "Safari Zone", Help = "Steps allowed in a Safari game (0 = no limit).")] public int SafariSteps { get; set; }
         [Field("Using animated sprites", Group = "Graphics", Help = "Battles, the summary and the Pokédex use animated sprites (Gen 5 style) from Graphics/Pokemon/Animated when a Pokémon has one, and Studio lists Pokémon missing them.")] public bool UseAnimatedSprites { get; set; }
         [Field("Animated sprite speed", Group = "Graphics", Help = "Game frames each picture of an animated sprite stays on screen (0 = 3; 60 frames a second).")] public int AnimatedSpriteSpeed { get; set; }

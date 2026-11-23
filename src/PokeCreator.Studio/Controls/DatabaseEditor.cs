@@ -188,9 +188,50 @@ namespace PokeCreator.Studio.Controls
                     if (i >= 0 && _list.Items[i].ToString() != r.DisplayName) { _renaming = true; try { ListUtil.Rename(_list, i, r.DisplayName); } finally { _renaming = false; } }
                     _heading.Text = r.DisplayName;
                 };
-                _formHost.Controls.Add(fb.Build(r));
+                var form = fb.Build(r);
+                _formHost.Controls.Add(form);
+                if (r is TypeData) AddTypeSummary(form, (TypeData)r, fb);
             }
             _formHost.ResumeLayout();
+        }
+
+        /// <summary>
+        /// Under a type's matchups: every type sorted into super effective / not very effective / no effect / normal,
+        /// both when this type is attacked and when its moves hit others (worked out from the other types' lists).
+        /// </summary>
+        void AddTypeSummary(Control form, TypeData t, FormBuilder fb)
+        {
+            var box = new Label { Dock = DockStyle.Top, AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(14, 6, 14, 16), ForeColor = Theme.Text, Font = new Font("Segoe UI", 9f) };
+            Action refresh = () =>
+            {
+                var all = _project.Types.Where(x => !x.IsPseudoType).ToList();
+                Func<string, string> name = id => { var x = _project.Types.FirstOrDefault(y => y.Id == id); return x != null ? x.DisplayName : id; };
+                Func<IEnumerable<string>, string> join = ids => { var l = ids.Select(name).ToList(); return l.Count == 0 ? "—" : string.Join(", ", l); };
+                Func<List<string>, List<string>> norm = l => l ?? new List<string>();
+                var weak = norm(t.Weaknesses); var res = norm(t.Resistances); var imm = norm(t.Immunities);
+                var normalFrom = all.Select(x => x.Id).Where(id => !weak.Contains(id) && !res.Contains(id) && !imm.Contains(id));
+                // Attacking: look at how each other type takes this type's moves
+                var superOn = all.Where(x => norm(x.Weaknesses).Contains(t.Id)).Select(x => x.Id);
+                var weakOn = all.Where(x => norm(x.Resistances).Contains(t.Id)).Select(x => x.Id);
+                var noneOn = all.Where(x => norm(x.Immunities).Contains(t.Id)).Select(x => x.Id);
+                var normalOn = all.Where(x => !norm(x.Weaknesses).Contains(t.Id) && !norm(x.Resistances).Contains(t.Id) && !norm(x.Immunities).Contains(t.Id)).Select(x => x.Id);
+                box.Text =
+                    "When " + t.DisplayName + " is attacked\n" +
+                    "   Super effective (×2) from:   " + join(weak) + "\n" +
+                    "   Not very effective (×½) from:   " + join(res) + "\n" +
+                    "   No effect (×0) from:   " + join(imm) + "\n" +
+                    "   Normal damage (×1) from:   " + join(normalFrom) + "\n\n" +
+                    "When " + t.DisplayName + " moves hit other types\n" +
+                    "   Super effective (×2) against:   " + join(superOn) + "\n" +
+                    "   Not very effective (×½) against:   " + join(weakOn) + "\n" +
+                    "   No effect (×0) on:   " + join(noneOn) + "\n" +
+                    "   Normal damage (×1) against:   " + join(normalOn) + "\n\n" +
+                    "(The attacking side comes from the other types' lists, so change it there.)";
+            };
+            refresh();
+            fb.Changed += refresh;
+            form.Controls.Add(box);
+            form.Controls.SetChildIndex(box, 0);   // below the form's fields
         }
 
         /// <summary>"Missing: Front 1381 · Back 1387 · Icon 1383 ..." for the whole list.</summary>

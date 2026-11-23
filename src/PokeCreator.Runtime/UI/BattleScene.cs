@@ -106,6 +106,8 @@ namespace PokeCreator.Runtime.UI
             g.Audio.PlayBgm(bgm);
         }
 
+        static string Or(string a, string b) { return string.IsNullOrEmpty(a) ? b : a; }
+
         static int Key(int side, int slot) { return side * 3 + Math.Max(0, Math.Min(2, slot)); }
         /// <summary>The field slot showing this party member (or 0).</summary>
         int SlotOf(int side, int party) { for (int s = 0; s < 3; s++) if (_shownParty[Key(side, s)] == party) return s; return 0; }
@@ -204,6 +206,7 @@ namespace PokeCreator.Runtime.UI
             switch (e.Kind)
             {
                 case BattleEventKind.Message:
+                    if (e.Text != null && e.Text.StartsWith("It doesn't affect") && !string.IsNullOrEmpty(Game.Project.Settings.NoEffectSE)) Game.Audio.PlaySe(Game.Project.Settings.NoEffectSE);
                     // "X used Y!" closes by itself and stays in the box while the move's animation plays (as in Essentials)
                     if (AnimsOn && _queue.Count > 0 && _queue.Peek().Kind == BattleEventKind.MoveUsed) { _briefText = e.Text; Game.Message.Show(e.Text + "\\wtnp[6]"); }
                     else { _briefText = null; Game.Message.Show(e.Text); }
@@ -223,7 +226,12 @@ namespace PokeCreator.Runtime.UI
                 case BattleEventKind.Withdraw: _visible[Key(e.Side, e.Slot)] = false; Game.Audio.PlaySe("Battle recall"); return true;
                 case BattleEventKind.Hp: return true;
                 case BattleEventKind.Hit:
-                    Game.Audio.PlaySe(e.Value > 100 ? "Battle damage super" : e.Value < 100 ? "Battle damage weak" : "Battle damage normal");
+                    {
+                        // Game Settings → Battle sound effects (empty = Essentials' files)
+                        var st = Game.Project.Settings;
+                        string se = e.Value > 100 ? Or(st.HitSuperSE, "Battle damage super") : e.Value < 100 ? Or(st.HitWeakSE, "Battle damage weak") : Or(st.HitNormalSE, "Battle damage normal");
+                        Game.Audio.PlaySe(se);
+                    }
                     _blink[Key(e.Side, SlotOf(e.Side, e.Party))] = 16;
                     if (!_animThisMove) { _burstKey = Key(e.Side, SlotOf(e.Side, e.Party)); _burstFrames = 18; }
                     return true;
