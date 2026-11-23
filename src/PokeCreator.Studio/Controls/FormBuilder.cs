@@ -258,7 +258,20 @@ namespace PokeCreator.Studio.Controls
             if (Project != null)
             {
                 string dir = Path.Combine(Project.Root, folder.Replace('/', Path.DirectorySeparatorChar));
-                if (Directory.Exists(dir))
+                var meta = Meta(p);
+                if (Directory.Exists(dir) && meta.AssetFolder)
+                {
+                    // Folders under it, as "Sub/Folder"
+                    combo.Items.AddRange(Directory.GetDirectories(dir, "*", SearchOption.AllDirectories).Select(d => d.Substring(dir.Length).TrimStart('/', '\\').Replace('\\', '/')).OrderBy(x => x).Cast<object>().ToArray());
+                }
+                else if (Directory.Exists(dir) && folder == "Graphics/UI")
+                {
+                    // UI pictures can be in sub-folders: "Folder/name"
+                    combo.Items.AddRange(Directory.GetFiles(dir, "*.png", SearchOption.AllDirectories)
+                        .Select(f => f.Substring(dir.Length).TrimStart('/', '\\').Replace('\\', '/'))
+                        .Select(f => f.Substring(0, f.Length - 4)).Distinct().OrderBy(x => x).Cast<object>().ToArray());
+                }
+                else if (Directory.Exists(dir))
                     combo.Items.AddRange(Directory.GetFiles(dir).Select(f => Path.GetFileNameWithoutExtension(f)).Distinct().OrderBy(x => x).Cast<object>().ToArray());
                 // Fonts can also come from the shared defaults (BaseData/Fonts)
                 if (folder == "Fonts")

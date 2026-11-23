@@ -50,12 +50,14 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.22";
+        public const string EngineVersion = "0.3.23";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
         public ProjectInfo Info = new ProjectInfo();
         public GameSettings Settings = new GameSettings();
+        /// <summary>Custom battle and menu pictures (Data/ui.json).</summary>
+        public UiSkin Ui = new UiSkin();
         public SystemData System = new SystemData();
         public List<PlayerCharacter> Players = new List<PlayerCharacter>();
 
@@ -225,6 +227,7 @@ namespace PokeCreator.Projects
             var p = new Project { Root = Path.GetFullPath(root) };
             p.Info = Json.Json.FromFile<ProjectInfo>(Path.Combine(p.Root, ProjectFileName));
             p.Settings = LoadOr(p.DataFile("settings.json"), new GameSettings());
+            p.Ui = LoadOr(p.DataFile("ui.json"), new UiSkin());
             p.System = LoadOr(p.DataFile("system.json"), new SystemData());
             p.Players = LoadOr(p.DataFile("players.json"), new List<PlayerCharacter>());
             p.Types = LoadOr(p.DataFile("types.json"), p.Types);
@@ -284,6 +287,7 @@ namespace PokeCreator.Projects
             Directory.CreateDirectory(DataDir);
             Json.Json.ToFile(Path.Combine(Root, ProjectFileName), Info);
             Json.Json.ToFile(DataFile("settings.json"), Settings);
+            Json.Json.ToFile(DataFile("ui.json"), Ui);
             Json.Json.ToFile(DataFile("system.json"), System);
             Json.Json.ToFile(DataFile("players.json"), Players);
             foreach (var t in Tables) Json.Json.ToFile(DataFile(t.FileName), t.Items);

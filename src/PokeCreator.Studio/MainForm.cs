@@ -401,6 +401,7 @@ namespace PokeCreator.Studio
             Node(settings.Nodes, "Switches & Variables", "switches", "sys:switches");
             Node(settings.Nodes, "Tilesets", "tilesets", "sys:tilesets");
             Node(settings.Nodes, "Map Connections (list)", "connections", "sys:connections");
+            Node(settings.Nodes, "Appearance (Game UI)", "appearance", "sys:gameui");
             Node(settings.Nodes, "Appearance (Studio)", "appearance", "sys:appearance");
 
             var db = Node(_tree.Nodes, "Database", "database", null);
@@ -632,6 +633,7 @@ namespace PokeCreator.Studio
             if (s == null || !(s.StartsWith("sys:") || s.StartsWith("assets:") || s.StartsWith("file:"))) return false;
             if (s == "sys:settings") OpenSettings();
             else if (s == "sys:appearance") OpenAppearance();
+            else if (s == "sys:gameui") { if (Project != null) OpenDocument("sys:gameui", () => new Editors.GameUiEditor(Project)); }
             else if (s == "sys:players") OpenPlayers();
             else if (s == "sys:switches") OpenDocument(s, () => new SwitchesEditor(this, Project));
             else if (s == "sys:townmaps") OpenDocument(s, () => new TownMapEditor(Project));
@@ -792,6 +794,7 @@ namespace PokeCreator.Studio
             else if (t == "settings") OpenSettings();
             else if (t == "testbattle") TestBattle();
             else if (t == "players") OpenPlayers();
+            else if (t == "gameui") { if (Project != null) OpenDocument("sys:gameui", () => new Editors.GameUiEditor(Project)); }
             else if (t == "connections") OpenWorld();
             else if (t.StartsWith("file:"))
             {

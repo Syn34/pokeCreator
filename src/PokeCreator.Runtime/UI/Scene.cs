@@ -56,6 +56,7 @@ namespace PokeCreator.Runtime.UI
         /// <summary>Selection arrow (▶) pointing right at (x, y).</summary>
         public static void Arrow(Gfx g, int x, int y, Color? c = null)
         {
+            if (Skin.Arrow(g, x, y)) return;
             var col = c ?? Dark;
             for (int r = 0; r < 8; r++) g.FillRect(x + r, y + r, 1, 16 - r * 2, col);
         }
@@ -81,6 +82,7 @@ namespace PokeCreator.Runtime.UI
 
         public static void HpBar(Gfx g, int x, int y, int w, int hp, int max)
         {
+            if (Skin.HpBar(g, x, y - 1, w, hp, max)) return;
             g.FillRect(x - 2, y - 2, w + 4, 10, new Color(72, 72, 80));
             g.FillRect(x, y, w, 6, new Color(40, 40, 48));
             double f = max <= 0 ? 0 : Math.Max(0, Math.Min(1, (double)hp / max));
@@ -91,6 +93,7 @@ namespace PokeCreator.Runtime.UI
 
         public static void ExpBar(Gfx g, int x, int y, int w, double f)
         {
+            if (Skin.ExpBar(g, x, y, w, f)) return;
             g.FillRect(x - 1, y - 1, w + 2, 6, new Color(72, 72, 80));
             g.FillRect(x, y, w, 4, new Color(40, 40, 48));
             g.FillRect(x, y, (int)(w * Math.Max(0, Math.Min(1, f))), 4, new Color(64, 200, 248));
@@ -129,6 +132,7 @@ namespace PokeCreator.Runtime.UI
 
         public static void GenderSymbol(Gfx g, int x, int y, string gender)
         {
+            if (Skin.Gender(g, x, y + 8, gender)) return;
             if (gender == "M") g.DrawText(x, y, "♂", Male, DarkShadow);
             else if (gender == "F") g.DrawText(x, y, "♀", Female, DarkShadow);
         }
@@ -208,6 +212,15 @@ namespace PokeCreator.Runtime.UI
         {
             long s = frames / 60;
             return (s / 3600) + ":" + ((s / 60) % 60).ToString("00");
+        }
+
+        /// <summary>Status (or FNT) as the custom icon, else as red text.</summary>
+        public static void StatusMark(Gfx g, int x, int y, string status, bool fainted = false)
+        {
+            string code = Skin.StatusCode(status, fainted);
+            if (code == "") return;
+            if (Skin.Status(g, x, y + 6, code)) return;
+            g.DrawText(x, y, code == "TOX" ? "PSN" : code, new Color(232, 64, 48), DarkShadow);
         }
 
         public static string StatusAbbrev(string status)

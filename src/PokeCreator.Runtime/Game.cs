@@ -115,6 +115,7 @@ namespace PokeCreator.Runtime
             var s = Project.Settings;
             int scale = _opt.Scale > 0 ? _opt.Scale : Math.Max(1, s.WindowScale);
             Gfx = new Gfx(s.Title ?? Project.Info.Name, s.ScreenWidth > 0 ? s.ScreenWidth : 512, s.ScreenHeight > 0 ? s.ScreenHeight : 384, scale);
+            UI.Skin.Init(this);
             int fontSize = s.FontSize > 0 ? s.FontSize : 26;
             if (!Gfx.LoadFont(Project.MessageFontFile(), fontSize))
             {
@@ -395,6 +396,8 @@ namespace PokeCreator.Runtime
 
         // ------------------------------------------------------------------ scenes (menus, title)
         readonly List<Scene> _scenes = new List<Scene>();
+        /// <summary>A battle is on screen (battle message box picture).</summary>
+        public bool InBattle { get { return _scenes.Any(sc => sc is UI.BattleScene); } }
         public void PushScene(Scene s) { _scenes.Add(s); }
         public bool SceneOpen { get { return _scenes.Count > 0; } }
         public T FindScene<T>() where T : Scene { return _scenes.OfType<T>().LastOrDefault(); }

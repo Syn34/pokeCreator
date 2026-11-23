@@ -98,6 +98,7 @@ namespace PokeCreator.Projects
                 Add(ProblemSeverity.Info, "Game Settings", "settings", "This project's Fonts folder has " + _p.ProjectFonts.Length + " font(s), but 'Use my own font' is off, so the game uses the default " + Path.GetFileName(font) + ".");
             if (_p.Players.Count == 0) Add(ProblemSeverity.Error, "Player Characters", "players", "There are no player characters.");
             for (int i = 0; i < _p.Players.Count; i++) CheckFields(_p.Players[i], "Player character " + (i + 1), "players");
+            if (_p.Ui != null) CheckFields(_p.Ui, "Appearance (Game UI)", "gameui");
         }
 
         /// <summary>Checks every property marked [Field(Ref=...)] or [Field(Asset=...)] on an object.</summary>
@@ -106,7 +107,14 @@ namespace PokeCreator.Projects
             foreach (var prop in o.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 var f = (FieldAttribute)Attribute.GetCustomAttribute(prop, typeof(FieldAttribute));
-                if (f == null || (f.Ref == null && f.Asset == null)) continue;
+                if (f == null || (f.Ref == null && f.Asset == null) || f.Computed) continue;
+                if (f.AssetFolder)
+                {
+                    var folderName = prop.GetValue(o, null) as string;
+                    if (!string.IsNullOrEmpty(folderName) && !Directory.Exists(Path.Combine(_p.Root, f.Asset.Replace('/', Path.DirectorySeparatorChar), folderName)))
+                        Add(ProblemSeverity.Warning, where, target, f.Label + ": folder '" + folderName + "' is missing from " + f.Asset + ".");
+                    continue;
+                }
                 if (o is GameSettings && prop.Name == "Font") continue; // checked in CheckSettings, with the fallbacks
                 object v = prop.GetValue(o, null);
                 var values = v is string ? new[] { (string)v } : v is IEnumerable ? ((IEnumerable)v).OfType<string>().ToArray() : new string[0];

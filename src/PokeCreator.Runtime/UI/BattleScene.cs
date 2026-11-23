@@ -959,7 +959,7 @@ namespace PokeCreator.Runtime.UI
                 else if (_mode == Mode.Target) DrawTarget(g);
                 else
                 {
-                    MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
+                    if (!Skin.Bottom(g, Skin.U.BattleMessage)) MessageWindow.DrawBox(g, 4, g.Height - 100, g.Width - 8, 96);
                     if (_briefText != null && _mode == Mode.Events) g.DrawText(26, g.Height - 86, _briefText, Color.TextBase, Color.TextShadow);
                 }
             }
@@ -974,14 +974,18 @@ namespace PokeCreator.Runtime.UI
             {
                 if (_lineupGone[side]) continue;
                 var party = _b.Parties[side];
-                int n = 6, bw = 22, w = n * bw + 24;
+                var okBall = Skin.Tex(Skin.U.BallOk);
+                int n = 6, bw = okBall != null ? Math.Max(22, okBall.Width * Skin.S + 4) : 22, w = n * bw + 24;
                 int slide = Math.Max(0, _introSlide) * 2;
                 int x = side == 1 ? -slide : g.Width - w + slide, y = side == 1 ? 96 : 200;
-                Ui.Panel(g, x, y, w, 28, new Color(48, 48, 56, 200), new Color(220, 220, 228));
+                int ph = okBall != null ? Math.Max(28, okBall.Height * Skin.S + 8) : 28;
+                Ui.Panel(g, x, y, w, ph, new Color(48, 48, 56, 200), new Color(220, 220, 228));
                 for (int i = 0; i < n; i++)
                 {
-                    int bx = x + 12 + i * bw + bw / 2, by = y + 14;
+                    int bx = x + 12 + i * bw + bw / 2, by = y + ph / 2;
                     var pk = i < party.Count ? party[i] : null;
+                    var ballPic = Skin.Tex(pk == null || pk.IsEgg ? Skin.U.BallEmpty : pk.Fainted ? Skin.U.BallFainted : !string.IsNullOrEmpty(pk.Status) ? Skin.U.BallStatus : Skin.U.BallOk) ?? Skin.Tex(pk != null && !pk.IsEgg ? Skin.U.BallOk : null);
+                    if (ballPic != null) { Skin.Pic(g, ballPic, bx - ballPic.Width * Skin.S / 2, by - ballPic.Height * Skin.S / 2); continue; }
                     Color c = pk == null || pk.IsEgg ? new Color(0, 0, 0, 0) : pk.Fainted ? new Color(120, 120, 128) : !string.IsNullOrEmpty(pk.Status) ? new Color(232, 176, 56) : new Color(232, 64, 56);
                     // A small Poké Ball: coloured top, white bottom (outline only for an empty slot)
                     g.FillRect(bx - 7, by - 7, 14, 14, new Color(32, 32, 40));
@@ -1199,8 +1203,70 @@ namespace PokeCreator.Runtime.UI
             g.FillRect(x - 2, y - 2, 4, 4, new Color(248, 248, 248));
         }
 
+        /// <summary>
+        /// A data box from the project's custom UI pictures (Game Settings → Appearance (Game UI)). False when the
+        /// project has no box picture, so the built-in box is drawn.
+        /// </summary>
+        bool DrawCustomBox(Gfx g, Pokemon pk, int k, int slot, bool foe)
+        {
+            var u = Skin.U; int s = Skin.S;
+            bool multi = _b.IsDouble || _b.IsTriple;
+            var tex = (multi ? Skin.Tex(foe ? u.FoeBoxSmall : u.PlayerBoxSmall) : null) ?? Skin.Tex(foe ? u.FoeBox : u.PlayerBox);
+            if (tex == null) return false;
+            // Stacked boxes leave room for a name drawn above the box
+            int above = Math.Max(0, -UiSkin.Pos(foe ? u.FoeName : u.PlayerName, 4, 0)[1]) * s;
+            int bw = tex.Width * s, bh = tex.Height * s + above, n = _b.IsTriple ? 3 : multi ? 2 : 1;
+            int[] p = foe ? UiSkin.Pos(u.FoeBoxPos, 16, 30) : UiSkin.Pos(u.PlayerBoxPos, g.Width - bw - 8, g.Height - 104 - n * (bh + 4));
+            int x = p[0], y = p[1] + slot * (bh + 4);
+            Skin.Pic(g, tex, x, y);
+            var hpFrame = Skin.Tex(u.HpFrame) ?? Skin.Tex(u.HpGreen);
+            int hfw = hpFrame != null ? hpFrame.Width : 48, hfh = hpFrame != null ? hpFrame.Height : 4;
+            Func<List<int>, int, int, int[]> at = (v, dx, dy) => { var q = UiSkin.Pos(v, dx, dy); return new[] { x + q[0] * s, y + q[1] * s }; };
+            // Name and gender
+            var np = at(foe ? u.FoeName : u.PlayerName, 4, 0);
+            string name = pk.Name(Game.Project);
+            g.DrawText(np[0], np[1], name, Skin.TextColor, Skin.TextShadow);
+            Ui.GenderSymbol(g, np[0] + g.TextWidth(name) + 4, np[1], pk.Gender);
+            // Level: "Lv" picture (if any) then the number (pictures or font)
+            var lp = at(foe ? u.FoeLevel : u.PlayerLevel, tex.Width - 26, 0);
+            int lx = lp[0];
+            var lv = Skin.Tex(u.LvIcon);
+            if (lv != null) { Skin.Pic(g, lv, lx, lp[1]); lx += lv.Width * s + s; }
+            Skin.Number(g, lx, lp[1], (lv == null && string.IsNullOrEmpty(u.DigitsFolder) ? "Lv" : "") + pk.Level, false);
+            // HP bar
+            var hp = at(foe ? u.FoeHpBar : u.PlayerHpBar, tex.Width - hfw - 4, tex.Height / 2 - hfh / 2);
+            int max = pk.TotalHP(Game.Project), cur = (int)Math.Round(_shownHp[k]);
+            if (!Skin.HpBar(g, hp[0], hp[1], 0, cur, max)) Ui.HpBar(g, hp[0], hp[1] + 2, 96, cur, max);
+            // Status
+            var sp = at(foe ? u.FoeStatus : u.PlayerStatus, 4, tex.Height / 2);
+            string code = Skin.StatusCode(pk.Status, false);
+            if (code != "" && !Skin.Status(g, sp[0], sp[1], code)) g.DrawText(sp[0], sp[1] - 6, code == "TOX" ? "PSN" : code, new Color(232, 64, 48), Ui.DarkShadow);
+            if (foe)
+            {
+                if (_setup.Wild && Game.State.Caught.Contains(pk.Species))
+                {
+                    var cp = at(u.FoeCaught, tex.Width - 12, tex.Height / 2);
+                    if (!Skin.Pic(g, u.Caught, cp[0], cp[1])) { g.FillRect(cp[0], cp[1], 10, 10, new Color(232, 56, 48)); g.FillRect(cp[0], cp[1] + 4, 10, 2, new Color(40, 40, 48)); }
+                }
+                return true;
+            }
+            // Player: HP numbers (single battles) and EXP bar
+            if (!multi || u.PlayerBoxSmall == null)
+            {
+                var hn = at(u.PlayerHpNumbers, tex.Width - 4, (hp[1] - y) / s + hfh + 1);
+                Skin.Number(g, hn[0], hn[1], cur + "/" + max, true);
+            }
+            if (multi && u.PlayerBoxSmall != null) return true;   // the small box has no EXP bar
+            var expShape = Skin.Tex(u.ExpFrame) ?? Skin.Tex(u.ExpFill);
+            int efw = expShape != null ? expShape.Width : 64, efh = expShape != null ? expShape.Height : 2;
+            var ep = at(u.PlayerExpBar, tex.Width - efw - 4, tex.Height - efh - 2);
+            if (!Skin.ExpBar(g, ep[0], ep[1], 0, _shownExp[Math.Min(2, slot)])) Ui.ExpBar(g, ep[0], ep[1], efw * s, _shownExp[Math.Min(2, slot)]);
+            return true;
+        }
+
         void DrawFoeBox(Gfx g, Pokemon pk, int k, int slot)
         {
+            if (DrawCustomBox(g, pk, k, slot, true)) return;
             bool dbl = _b.IsDouble;
             if (_b.IsTriple)
             {
@@ -1209,8 +1275,7 @@ namespace PokeCreator.Runtime.UI
                 Ui.Panel(g, tx2, ty2, tw, th, new Color(248, 248, 232), new Color(64, 80, 72));
                 Ui.Text(g, tx2 + 10, ty2 - 5, pk.Name(Game.Project));
                 Ui.TextRight(g, tx2 + tw - 10, ty2 - 5, "Lv" + pk.Level);
-                string st3 = Ui.StatusAbbrev(pk.Status);
-                if (st3 != "") g.DrawText(tx2 + 10, ty2 + 22, st3, new Color(232, 64, 48), Ui.DarkShadow);
+                Ui.StatusMark(g, tx2 + 10, ty2 + 22, pk.Status);
                 Ui.HpBar(g, tx2 + 70, ty2 + 34, 130, (int)Math.Round(_shownHp[k]), pk.TotalHP(Game.Project));
                 return;
             }
@@ -1221,14 +1286,14 @@ namespace PokeCreator.Runtime.UI
             Ui.TextRight(g, x + w - 12, y + 2, "Lv" + pk.Level);
             int row = dbl ? 24 : 30;
             if (_setup.Wild && Game.State.Caught.Contains(pk.Species)) { g.FillRect(x + w - 26, y + row + 8, 10, 10, new Color(232, 56, 48)); g.FillRect(x + w - 26, y + row + 12, 10, 2, new Color(40, 40, 48)); }
-            string st = Ui.StatusAbbrev(pk.Status);
-            if (st != "") g.DrawText(x + 12, y + row, st, new Color(232, 64, 48), Ui.DarkShadow);
+            Ui.StatusMark(g, x + 12, y + row, pk.Status);
             g.DrawText(x + 72, y + row, "HP", new Color(248, 176, 0), Ui.DarkShadow);
             Ui.HpBar(g, x + 104, y + row + 12, 100, (int)Math.Round(_shownHp[k]), pk.TotalHP(Game.Project));
         }
 
         void DrawPlayerBox(Gfx g, Pokemon pk, int k, int slot)
         {
+            if (DrawCustomBox(g, pk, k, slot, false)) return;
             bool dbl = _b.IsDouble;
             if (_b.IsTriple)
             {
@@ -1246,16 +1311,15 @@ namespace PokeCreator.Runtime.UI
             Ui.GenderSymbol(g, x + 16 + g.TextWidth(pk.Name(Game.Project)) + 4, y + 2, pk.Gender);
             Ui.TextRight(g, x + w - 12, y + 2, "Lv" + pk.Level);
             int max = pk.TotalHP(Game.Project);
-            string st = Ui.StatusAbbrev(pk.Status);
             if (dbl)
             {
                 // Compact box: no HP numbers (the bar shows how much is left)
-                if (st != "") g.DrawText(x + w - 60, y + 22, st, new Color(232, 64, 48), Ui.DarkShadow);
+                Ui.StatusMark(g, x + w - 60, y + 22, pk.Status);
                 Ui.HpBar(g, x + 40, y + 30, 150, (int)Math.Round(_shownHp[k]), max);
                 Ui.ExpBar(g, x + 40, y + h - 5, 150, _shownExp[Math.Min(2, slot)]);
                 return;
             }
-            if (st != "") g.DrawText(x + 16, y + 28, st, new Color(232, 64, 48), Ui.DarkShadow);
+            Ui.StatusMark(g, x + 16, y + 28, pk.Status);
             g.DrawText(x + 76, y + 28, "HP", new Color(248, 176, 0), Ui.DarkShadow);
             Ui.HpBar(g, x + 108, y + 40, 112, (int)Math.Round(_shownHp[k]), max);
             Ui.TextRight(g, x + w - 16, y + 46, (int)Math.Round(_shownHp[k]) + "/" + max);
@@ -1279,10 +1343,11 @@ namespace PokeCreator.Runtime.UI
         void DrawCommands(Gfx g)
         {
             int by = g.Height - 100;
-            MessageWindow.DrawBox(g, 4, by, 260, 96);
+            bool custom = Skin.Bottom(g, Skin.U.CommandMenu);
+            if (!custom) MessageWindow.DrawBox(g, 4, by, 260, 96);
             Ui.Text(g, 24, by + 14, "What will");
             Ui.Text(g, 24, by + 46, (_b.Safari ? Game.State.PlayerName : Me.Pk.Name(Game.Project)) + " do?");
-            Ui.Panel(g, 268, by, g.Width - 272, 96, new Color(248, 248, 248), new Color(96, 88, 120));
+            if (!custom) Ui.Panel(g, 268, by, g.Width - 272, 96, new Color(248, 248, 248), new Color(96, 88, 120));
             for (int i = 0; i < 4; i++)
             {
                 int cx = 296 + (i % 2) * 110, cy = by + 14 + (i / 2) * 36;
@@ -1301,7 +1366,8 @@ namespace PokeCreator.Runtime.UI
         void DrawFight(Gfx g)
         {
             int by = g.Height - 100;
-            Ui.Panel(g, 4, by, 340, 96, new Color(248, 248, 248), new Color(96, 88, 120));
+            bool custom = Skin.Bottom(g, Skin.U.FightMenu);
+            if (!custom) Ui.Panel(g, 4, by, 340, 96, new Color(248, 248, 248), new Color(96, 88, 120));
             var moves = Me.Pk.Moves;
             for (int i = 0; i < 4; i++)
             {
@@ -1309,7 +1375,7 @@ namespace PokeCreator.Runtime.UI
                 if (i == _move) Ui.Arrow(g, cx - 18, cy + 6);
                 Ui.Text(g, cx, cy, i < moves.Count ? ItemEffects.MoveName(Game.Project, moves[i].Id) : "-");
             }
-            Ui.Panel(g, 348, by, g.Width - 352, 96, new Color(248, 248, 248), new Color(96, 88, 120));
+            if (!custom) Ui.Panel(g, 348, by, g.Width - 352, 96, new Color(248, 248, 248), new Color(96, 88, 120));
             if (_b.CanMegaEvolve(Me) && !_pending.Any(x => x.Mega))
             {
                 string mega = _megaOn ? "MEGA EVOLVE: ON" : "Shift: Mega Evolve";

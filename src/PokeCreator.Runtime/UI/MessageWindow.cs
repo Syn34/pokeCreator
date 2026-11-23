@@ -421,7 +421,9 @@ namespace PokeCreator.Runtime.UI
             {
                 if (!string.IsNullOrEmpty(_skin) && _skinLoaded != _skin) { _skinLoaded = _skin; _skinObj = WindowSkin.Load(g, _game.Project.FindAsset("Graphics/Windowskins", _skin)); }
                 var skin = !string.IsNullOrEmpty(_skin) ? _skinObj : null;
-                if (skin != null) skin.Draw(g, bx, by, bw, bh); else DrawSpeechBox(g, bx, by, bw, bh);
+                // In battle, the custom battle message box picture (if the project has one)
+                if (_position == 2 && _game.InBattle && Skin.Bottom(g, Skin.U.BattleMessage)) { }
+                else if (skin != null) skin.Draw(g, bx, by, bw, bh); else DrawSpeechBox(g, bx, by, bw, bh);
             }
             // \f[face]: a picture beside the message (Graphics/Pictures or Graphics/Faces), above the box
             if (!string.IsNullOrEmpty(_face))

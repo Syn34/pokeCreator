@@ -298,7 +298,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(56, 120, 104), new Color(24, 72, 64));
+            if (!Skin.Background(g, Skin.U.PartyBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(56, 120, 104), new Color(24, 72, 64));
             for (int i = 0; i < 6; i++)
             {
                 int x = i % 2 == 0 ? 6 : g.Width / 2 + 2, y = 14 + (i / 2) * 96 + (i % 2) * 16;
@@ -318,9 +318,7 @@ namespace PokeCreator.Runtime.UI
                 Ui.Text(g, x + 20, y + 46, "Lv." + pk.Level);
                 string lbl = _label != null ? _label(pk) : null;
                 if (lbl != null) { Ui.TextRight(g, x + w - 16, y + 46, lbl); continue; }
-                string st = Ui.StatusAbbrev(pk.Status);
-                if (pk.Fainted) st = "FNT";
-                if (st != "") g.DrawText(x + 20, y + 46, st, new Color(248, 64, 48), Ui.DarkShadow);
+                Ui.StatusMark(g, x + 20, y + 46, pk.Status, pk.Fainted);
                 Ui.HpBar(g, x + 104, y + 44, w - 124, pk.HP, max);
                 Ui.TextRight(g, x + w - 16, y + 52, pk.HP + "/" + max);
             }
@@ -363,7 +361,7 @@ namespace PokeCreator.Runtime.UI
             var p = Game.Project;
             var pk = Party[Math.Min(_index, Party.Count - 1)];
             var d = pk.Data(p);
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 248, 240), new Color(216, 224, 232));
+            if (!Skin.Background(g, Skin.U.SummaryBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 248, 240), new Color(216, 224, 232));
             // Header with page tabs
             g.FillRect(0, 0, g.Width, 40, new Color(232, 88, 64));
             Ui.Panel(g, 236, 6, 160, 30, new Color(248, 248, 248), new Color(160, 48, 32));
@@ -716,7 +714,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 200, 120), new Color(216, 136, 64));
+            if (!Skin.Background(g, Skin.U.BagBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(248, 200, 120), new Color(216, 136, 64));
             // Bag panel on the left
             Ui.Panel(g, 8, 8, 176, 268, new Color(248, 232, 200), new Color(160, 96, 48));
             string pname = PocketNames[_pocket];
@@ -786,7 +784,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 160, 232), new Color(40, 88, 176));
+            if (!Skin.Background(g, Skin.U.TrainerCardBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 160, 232), new Color(40, 88, 176));
             Ui.Panel(g, 24, 24, g.Width - 48, g.Height - 48, new Color(248, 240, 216), new Color(176, 136, 72));
             var s = Game.State;
             if (_back) { DrawBack(g); return; }

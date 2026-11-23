@@ -22,6 +22,8 @@ namespace PokeCreator.Data
         /// <summary>Asset folder for file pickers, e.g. "Graphics/Characters".</summary>
         public string Asset;
         public bool Multiline;
+        /// <summary>With Asset: picks a folder (under the asset folder) rather than a file.</summary>
+        public bool AssetFolder;
         /// <summary>Worked out from other fields, not stored (the property is [JsonIgnore]); editing it changes those fields.</summary>
         public bool Computed;
         public string Group = "General";

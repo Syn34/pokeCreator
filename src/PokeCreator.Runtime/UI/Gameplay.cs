@@ -590,7 +590,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
+            if (!Skin.Background(g, Skin.U.DexBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
             Ui.Panel(g, 8, 8, g.Width - 16, 40, new Color(248, 248, 248), new Color(120, 24, 24));
             Ui.Text(g, 22, 12, _title);
             Ui.TextRight(g, g.Width - 24, 12, "Seen " + _list.Count(s => Game.State.Seen.Contains(s.Id)) + "   Owned " + _list.Count(s => Game.State.Caught.Contains(s.Id)));
@@ -738,7 +738,7 @@ namespace PokeCreator.Runtime.UI
             bool caught = Game.State.Caught.Contains(s.Id);
             if (_page > 0)
             {
-                Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
+                if (!Skin.Background(g, Skin.U.DexBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
                 Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 240), new Color(120, 24, 24));
                 Ui.Text(g, 20, 14, Num(s).ToString("000") + "  " + (s.Name ?? s.Id));
                 Ui.TextRight(g, g.Width - 20, 14, "< " + PageNames[_page] + " >");
@@ -746,7 +746,7 @@ namespace PokeCreator.Runtime.UI
                 return;
             }
             Ui.TextRight(g, g.Width - 24, g.Height - 40, "INFO >");
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
+            if (!Skin.Background(g, Skin.U.DexBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(232, 72, 64), new Color(168, 32, 32));
             Ui.Panel(g, 8, 8, g.Width - 16, g.Height - 16, new Color(248, 248, 240), new Color(120, 24, 24));
             Ui.Panel(g, 20, 20, 200, 200, new Color(232, 232, 224), new Color(160, 160, 152));
             Ui.PokemonFront(g, Game, new Pokemon { Species = s.Id }, 120, 210, 176);
@@ -863,7 +863,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
+            if (!Skin.Background(g, Skin.U.MenuBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Options");
             Ui.Panel(g, 8, 60, g.Width - 16, 262, new Color(248, 248, 248), new Color(32, 48, 96));
@@ -971,7 +971,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(120, 184, 232), new Color(56, 112, 184));
+            if (!Skin.Background(g, Skin.U.MenuBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(120, 184, 232), new Color(56, 112, 184));
             Ui.Panel(g, 8, 8, g.Width - 16, 88, new Color(248, 248, 248), new Color(40, 72, 128));
             Ui.Text(g, 24, 14, _prompt);
             int cw = 24, x0 = 24;
@@ -1126,7 +1126,7 @@ namespace PokeCreator.Runtime.UI
 
         public override void Draw(Gfx g)
         {
-            Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
+            if (!Skin.Background(g, Skin.U.MenuBg)) Ui.Gradient(g, 0, 0, g.Width, g.Height, new Color(96, 136, 200), new Color(40, 64, 128));
             Ui.Panel(g, 8, 8, g.Width - 16, 44, new Color(248, 248, 248), new Color(32, 48, 96));
             Ui.Text(g, 22, 14, "Controls");
             Ui.Panel(g, 8, 60, g.Width - 16, 270, new Color(248, 248, 248), new Color(32, 48, 96));
