@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.17";
+        public const string EngineVersion = "0.3.18";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }

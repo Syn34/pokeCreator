@@ -167,6 +167,7 @@ namespace PokeCreator.Runtime.World
             {
                 Turn(d);
                 X += Dx(d); Y += Dy(d);
+                StopCount = 0;   // (RMXP increase_steps) — without this a character with Direction Fix never walk-animates
                 OnMoved();
                 return true;
             }

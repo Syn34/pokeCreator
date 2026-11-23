@@ -289,7 +289,7 @@ namespace PokeCreator.Runtime.World
             int nx = X + Dx(d), ny = Y + Dy(d);
             var map = Game.Map;
 
-            if (Through) { Followers.PlayerMoved(Game, X, Y); X = nx; Y = ny; return true; }
+            if (Through) { Followers.PlayerMoved(Game, X, Y); X = nx; Y = ny; StopCount = 0; return true; }
 
             int lx, ly;
             var target = TargetMap(nx, ny, out lx, out ly);
@@ -335,6 +335,7 @@ namespace PokeCreator.Runtime.World
             }
             Followers.PlayerMoved(Game, X, Y);
             X = nx; Y = ny;
+            StopCount = 0;
             if (target != map)
             {
                 var n = map.Neighbors.First(nb => nb.Map == target);
