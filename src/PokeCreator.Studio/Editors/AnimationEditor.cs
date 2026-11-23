@@ -78,8 +78,10 @@ namespace PokeCreator.Studio.Editors
             left.Controls.Add(Lbl("Search (Move:, OppMove:, Common:)"));
             left.Controls.Add(_filter);
             left.Controls.Add(leftButtons);
-            // Top-docked filter goes above its label
+            // Docking runs from the back of the z-order to the front: buttons (bottom), label, then the search box under
+            // it (top), and the list last so it fills only what's left instead of sliding under the search box
             left.Controls.SetChildIndex(_filter, 0);
+            _list.BringToFront();
 
             // ---- centre: preview, transport, sheet
             var centre = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) };
@@ -304,7 +306,7 @@ namespace PokeCreator.Studio.Editors
                 msg.Add(r.Added + " animation" + (r.Added == 1 ? "" : "s") + " added" + (r.Replaced > 0 ? ", " + r.Replaced + " replaced" : "") + (r.Skipped > 0 ? ", " + r.Skipped + " skipped (you already had them)" : "") + ".");
                 msg.Add(r.Copied + " sheet and sound file" + (r.Copied == 1 ? "" : "s") + " copied" + (r.Same > 0 ? ", " + r.Same + " already in your project" : "") + (r.Renamed > 0 ? " (" + r.Renamed + " renamed with \" (2)\" because a different file had the name)" : "") + ".");
                 if (r.Missing.Count > 0) msg.Add("Not in the package or your project, so add them yourself:\n  " + string.Join("\n  ", r.Missing.Take(12)) + (r.Missing.Count > 12 ? "\n  …and " + (r.Missing.Count - 12) + " more" : ""));
-                msg.Add("Save to keep them.");
+                msg.Add("The sheets and sounds are already in your project's Graphics\\Animations and Audio\\SE\\Anim folders. The animations themselves are written to Data\\animations.json when you save (Save All or Ctrl+S).");
                 MessageBox.Show(this, string.Join("\n\n", msg), "Import", MessageBoxButtons.OK, r.Missing.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             }
         }
