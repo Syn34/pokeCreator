@@ -46,6 +46,9 @@ namespace PokeCreator.Runtime.UI
             if (!string.IsNullOrEmpty(a.Graphic)) _sheet = game.Gfx.LoadHued(game.Project.FindAsset("Graphics/Animations", a.Graphic), a.Hue);
         }
 
+        /// <summary>Moves the cels drawn from the sheet (not the Pokémon's own sprites); used to set send-out effects down where the Pokémon stands.</summary>
+        public double EffectShiftX, EffectShiftY;
+
         public string Name { get { return _a.Id; } }
         public int Frame { get { return _tick / TicksPerFrame; } }
         public bool Done { get { return Frame >= _a.Frames.Count && _flashTicks <= 0; } }
@@ -174,6 +177,7 @@ namespace PokeCreator.Runtime.UI
                 else
                 {
                     tex = _sheet; sw = sh = BattleAnimation.CelSize;
+                    x += EffectShiftX; y += EffectShiftY;
                     sx = pattern % BattleAnimation.SheetColumns * sw; sy = pattern / BattleAnimation.SheetColumns * sh;
                     if (tex == null || sy >= tex.Height) continue;
                 }

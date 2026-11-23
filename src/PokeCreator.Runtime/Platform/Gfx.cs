@@ -165,6 +165,36 @@ namespace PokeCreator.Runtime.Platform
 
         static int Clamp(double v) { return v < 0 ? 0 : v > 255 ? 255 : (int)v; }
 
+        /// <summary>An all-white copy of a texture with the same transparency (for colour tints), cached; null if its file can't be read.</summary>
+        public Texture Silhouette(Texture t)
+        {
+            if (t == null || string.IsNullOrEmpty(t.Path)) return null;
+            string file = t.Path.Contains("#") ? t.Path.Substring(0, t.Path.IndexOf('#')) : t.Path;
+            string key = file + "#white";
+            Texture s;
+            if (_textures.TryGetValue(key, out s)) return s;
+            s = null;
+            var px = ReadPixels(file);
+            if (px != null && px.GetLength(0) == t.Height && px.GetLength(1) == t.Width)
+            {
+                int h = px.GetLength(0), w = px.GetLength(1);
+                var data = new int[w * h];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++) data[y * w + x] = (int)((px[y, x] & 0xFF000000u) | 0x00FFFFFFu);
+                IntPtr tex = SDL.SDL_CreateTexture(Renderer, SDL.PIXELFORMAT_ARGB8888, 0, w, h);
+                if (tex != IntPtr.Zero)
+                {
+                    var handle = System.Runtime.InteropServices.GCHandle.Alloc(data, System.Runtime.InteropServices.GCHandleType.Pinned);
+                    try { SDL.SDL_UpdateTexture(tex, IntPtr.Zero, handle.AddrOfPinnedObject(), w * 4); }
+                    finally { handle.Free(); }
+                    SDL.SDL_SetTextureBlendMode(tex, SDL.BLENDMODE_BLEND);
+                    s = new Texture { Handle = tex, Width = w, Height = h, Path = key };
+                }
+            }
+            _textures[key] = s;
+            return s;
+        }
+
         readonly Dictionary<string, int> _bottomPad = new Dictionary<string, int>();
         /// <summary>How many fully transparent rows are at the bottom of an image (of its first frameW columns).</summary>
         public int BottomPadding(Texture t, int frameW)
@@ -242,8 +272,27 @@ namespace PokeCreator.Runtime.Platform
                 if (_subtractMode == -1) { try { _subtractMode = SDL.SDL_ComposeCustomBlendMode(5, 2, 3, 1, 2, 1); } catch { _subtractMode = 0; } }
                 mode = _subtractMode != 0 ? _subtractMode : 2;
             }
-            // A colour tint darkens channels toward the colour, then an additive pass brightens toward it
             double a = color.A / 255.0;
+            // RGSS Sprite#color: each pixel becomes pixel × (1 − a) + colour × a. Drawn as the sprite darkened by (1 − a),
+            // then a white silhouette of it tinted colour × a added on top (same shape and opacity)
+            var white = a > 0 ? Silhouette(t) : null;
+            if (white != null)
+            {
+                byte k = (byte)Math.Round(255 * (1 - a));
+                SDL.SDL_SetTextureBlendMode(t.Handle, mode);
+                SDL.SDL_SetTextureAlphaMod(t.Handle, (byte)Math.Max(0, Math.Min(255, opacity)));
+                SDL.SDL_SetTextureColorMod(t.Handle, k, k, k);
+                SDL.SDL_RenderCopyEx(Renderer, t.Handle, ref src, ref dst, -angle, ref center, flip);
+                SDL.SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
+                SDL.SDL_SetTextureAlphaMod(t.Handle, 255);
+                SDL.SDL_SetTextureBlendMode(t.Handle, 1);
+                SDL.SDL_SetTextureBlendMode(white.Handle, mode == 1 ? 2 : mode);
+                SDL.SDL_SetTextureAlphaMod(white.Handle, (byte)Math.Max(0, Math.Min(255, opacity)));
+                SDL.SDL_SetTextureColorMod(white.Handle, (byte)Math.Round(color.R * a), (byte)Math.Round(color.G * a), (byte)Math.Round(color.B * a));
+                SDL.SDL_RenderCopyEx(Renderer, white.Handle, ref src, ref dst, -angle, ref center, flip);
+                return;
+            }
+            // (No silhouette: a colour tint darkens channels toward the colour, then an additive pass brightens toward it)
             byte mr = 255, mg = 255, mb = 255;
             SDL.SDL_SetTextureBlendMode(t.Handle, mode);
             SDL.SDL_SetTextureAlphaMod(t.Handle, (byte)Math.Max(0, Math.Min(255, opacity)));

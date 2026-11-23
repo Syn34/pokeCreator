@@ -431,11 +431,14 @@ namespace PokeCreator.Runtime.UI
         void PokemonOut(BattleEvent e)
         {
             var u = Skin.U;
-            Game.Audio.PlaySe(string.IsNullOrEmpty(u.SendOutSE) ? "Battle recall" : u.SendOutSE);
+            // A send-out animation brings its own sounds, so the default sound only plays with the other styles
+            if (!string.IsNullOrEmpty(u.SendOutSE)) Game.Audio.PlaySe(u.SendOutSE);
+            else if (_sendStyle != "Battle animation" || _sendAnimFailed) Game.Audio.PlaySe("Battle recall");
             Game.Audio.PlaySe("Cries/" + _b.Parties[e.Side][e.Party].Species);
         }
 
         int _sendT;   // frames into the Pokémon coming out (after its trainer left)
+        bool _sendAnimFailed;   // "Battle animation" chosen but the animation is missing or animations are off
 
         bool StepSendOut(BattleEvent e)
         {
@@ -473,8 +476,19 @@ namespace PokeCreator.Runtime.UI
                     {
                         var anim = Game.Project.Animations.FirstOrDefault(a => a.Id == Skin.U.SendOutAnimation);
                         var at = Battler(e.Side, e.Slot);
-                        if (anim != null && AnimsOn && at != null) { _player = new BattleAnimPlayer(Game, anim, at, at); return false; }
+                        if (anim != null && AnimsOn && at != null)
+                        {
+                            // Send-out animations are drawn for a front sprite (192 tall, ground at its bottom). Set the
+                            // ball and effects down on this Pokémon's ground instead, and on your side keep that ground above
+                            // the message box (back sprites run off the bottom of the battle area)
+                            double ground = at.Y + at.FrameH / 2.0;
+                            if (e.Side == 0) ground = Math.Min(ground, 288 - 18);
+                            _player = new BattleAnimPlayer(Game, anim, at, at) { EffectShiftY = ground - (at.Y + BattleAnimation.CelSize / 2.0) };
+                            return false;
+                        }
+                        _sendAnimFailed = true;
                         _appear[k] = 1; PokemonOut(e);
+                        _sendAnimFailed = false;
                     }
                     done = t >= 4;
                     break;
@@ -1068,13 +1082,14 @@ namespace PokeCreator.Runtime.UI
                     if (_mode == Mode.Target && _targets.Count > _target && _targets[_target].Side == side && _targets[_target].Slot == slot && (Frame / 8) % 2 == 0)
                         Ellipse(g, x, bottom - 2, 30, 6, new Color(248, 232, 80));
                 }
+            // The party lineups sit under balls and effects (the foe's ball lands where your lineup is)
+            DrawLineups(g);
             if (_ballVisible) { int bx, bb; Pos(1, _ballSlot, out bx, out bb); DrawBall(g, bx, bb); }
             DrawSendOut(g);
             DrawEffects(g);
             if (_player != null) { _player.Draw(g, false); _player.DrawScreenFlash(g); }
             if (_formFlash > 0) { g.FillRect(0, 0, g.Width, 288, new Color(255, 255, 255, (byte)Math.Min(255, _formFlash * 10))); _formFlash--; }
             DrawSplash(g);
-            DrawLineups(g);
             if (_introFade > 0) g.FillRect(0, 0, g.Width, g.Height, new Color(0, 0, 0, (byte)Math.Min(255, _introFade * 8)));
             // Databoxes
             for (int slot = 0; slot < _b.SlotsPerSide; slot++)
