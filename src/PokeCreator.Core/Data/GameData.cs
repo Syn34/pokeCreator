@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using PokeCreator.Json;
 
 namespace PokeCreator.Data
@@ -21,6 +22,8 @@ namespace PokeCreator.Data
         /// <summary>Asset folder for file pickers, e.g. "Graphics/Characters".</summary>
         public string Asset;
         public bool Multiline;
+        /// <summary>Worked out from other fields, not stored (the property is [JsonIgnore]); editing it changes those fields.</summary>
+        public bool Computed;
         public string Group = "General";
         public FieldAttribute(string label) { Label = label; }
     }
@@ -66,7 +69,33 @@ namespace PokeCreator.Data
         [Field("Pseudo type", Help = "Not a real type (e.g. ???).")] public bool IsPseudoType { get; set; }
         [Field("Weak to (×2)", Ref = "types", Group = "Matchups", Help = "Attacks of these types are super effective against this type (double damage).")] public List<string> Weaknesses { get; set; }
         [Field("Resists (×½)", Ref = "types", Group = "Matchups", Help = "Attacks of these types are not very effective against this type (half damage).")] public List<string> Resistances { get; set; }
-        [Field("Immune to (×0)", Ref = "types", Group = "Matchups", Help = "Attacks of these types have no effect on this type. Every type not listed in these three does normal damage.")] public List<string> Immunities { get; set; }
+        [Field("Immune to (×0)", Ref = "types", Group = "Matchups", Help = "Attacks of these types have no effect on this type.")] public List<string> Immunities { get; set; }
+
+        /// <summary>The types the editor lists every type from (set by Studio for the open project).</summary>
+        public static Func<IEnumerable<TypeData>> AllTypes;
+
+        /// <summary>Every (real) type not in the three lists above: their attacks do normal damage. Picking a type here takes it out of those lists.</summary>
+        [JsonIgnore, Field("Normal damage (×1)", Ref = "types", Group = "Matchups", Computed = true, Help = "Attacks of these types do normal damage to this type: every type not in the three lists above. Tick a type in Pick… to make it normal (it's taken out of the other lists).")]
+        public List<string> NormalDamage
+        {
+            get
+            {
+                var all = AllTypes != null ? AllTypes() : null;
+                if (all == null) return new List<string>();
+                return all.Where(x => !x.IsPseudoType).Select(x => x.Id)
+                          .Where(id => !(Weaknesses ?? new List<string>()).Contains(id) && !(Resistances ?? new List<string>()).Contains(id) && !(Immunities ?? new List<string>()).Contains(id)).ToList();
+            }
+            set
+            {
+                if (value == null) return;
+                foreach (var id in value)
+                {
+                    if (Weaknesses != null) Weaknesses.Remove(id);
+                    if (Resistances != null) Resistances.Remove(id);
+                    if (Immunities != null) Immunities.Remove(id);
+                }
+            }
+        }
         [Field("Flags")] public List<string> Flags { get; set; }
 
         public TypeData() { Weaknesses = new List<string>(); Resistances = new List<string>(); Immunities = new List<string>(); Flags = new List<string>(); }

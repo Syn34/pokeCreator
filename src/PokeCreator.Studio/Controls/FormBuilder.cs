@@ -50,6 +50,8 @@ namespace PokeCreator.Studio.Controls
         {
             _target = target;
             _refreshers.Clear();
+            _refreshOf.Clear();
+            if (Project != null) { var pr = Project; TypeData.AllTypes = () => pr.Types; }
             var outer = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Panel };
             var table = new TableLayoutPanel
             {
@@ -60,6 +62,13 @@ namespace PokeCreator.Studio.Controls
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
             var props = Json.Json.GetSerializableProperties(target.GetType()).Where(p => Array.IndexOf(hide, p.Name) < 0).ToList();
+            // Computed fields (not stored) go in among the others, in declaration order
+            var computed = target.GetType().GetProperties().Where(p => { var f = p.GetCustomAttributes(typeof(FieldAttribute), true).FirstOrDefault() as FieldAttribute; return f != null && f.Computed; }).ToList();
+            if (computed.Count > 0)
+            {
+                var chain = new List<Type>(); for (var c = target.GetType(); c != null && c != typeof(object); c = c.BaseType) chain.Insert(0, c);
+                props = props.Concat(computed).Distinct().OrderBy(p => chain.IndexOf(p.DeclaringType)).ThenBy(p => p.MetadataToken).ToList();
+            }
             var groups = props.GroupBy(p => Meta(p).Group).ToList();
             foreach (var g in groups)
             {
@@ -105,10 +114,17 @@ namespace PokeCreator.Studio.Controls
             editor.Width = number ? 130 : (tb != null && tb.Multiline) || list ? FieldWidth + 180 : FieldWidth;
         }
 
+        readonly Dictionary<PropertyInfo, Action> _refreshOf = new Dictionary<PropertyInfo, Action>();
+
         void Set(PropertyInfo p, object v)
         {
             if (_loading) return;
             p.SetValue(_target, v, null);
+            // A computed field changed others (show them); any other change may change the computed ones
+            bool isComputed = Meta(p).Computed;
+            _loading = true;
+            try { foreach (var kv in _refreshOf) if (kv.Key != p && (isComputed || Meta(kv.Key).Computed)) kv.Value(); }
+            finally { _loading = false; }
             if (Changed != null) Changed();
         }
 
@@ -167,7 +183,10 @@ namespace PokeCreator.Studio.Controls
                     };
                     panel.Controls.Add(btn);
                 }
-                _refreshers.Add(() => { var v = (List<string>)p.GetValue(target, null); tb.Text = v == null ? "" : string.Join(", ", v); });
+                Action show = () => { var v = (List<string>)p.GetValue(target, null); tb.Text = v == null ? "" : string.Join(", ", v); };
+                _refreshers.Add(show);
+                _refreshOf[p] = show;
+                if (meta.Computed) tb.ReadOnly = true;   // edited with Pick…
                 tb.TextChanged += (s, e) => Set(p, tb.Text.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList());
                 return panel;
             }
