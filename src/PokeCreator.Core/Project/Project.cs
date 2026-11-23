@@ -50,7 +50,7 @@ namespace PokeCreator.Projects
     /// </summary>
     public class Project
     {
-        public const string EngineVersion = "0.3.15";
+        public const string EngineVersion = "0.3.16";
         public const string ProjectFileName = "project.json";
 
         public string Root { get; private set; }
@@ -139,7 +139,7 @@ namespace PokeCreator.Projects
         {
             string basePath = Path.Combine(root, folder.Replace('/', Path.DirectorySeparatorChar), name);
             if (File.Exists(basePath)) return basePath;
-            foreach (var ext in new[] { ".png", ".gif", ".bmp", ".jpg", ".ogg", ".wav", ".mp3", ".mid", ".midi", ".ttf", ".otf" })
+            foreach (var ext in new[] { ".png", ".gif", ".bmp", ".jpg", ".ogg", ".wav", ".mp3", ".mid", ".midi", ".m4a", ".mp4", ".flac", ".opus", ".ttf", ".otf" })
                 if (File.Exists(basePath + ext)) return basePath + ext;
             // Case-insensitive fallback (projects copied from Windows to Linux)
             var dir = Path.GetDirectoryName(basePath);

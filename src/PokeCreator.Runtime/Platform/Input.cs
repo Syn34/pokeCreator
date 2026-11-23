@@ -176,6 +176,8 @@ namespace PokeCreator.Runtime.Platform
             StopBgm();
             string path = _project.FindAsset("Audio/BGM", name);
             if (path == null) { Console.WriteLine("BGM not found: " + name); return; }
+            path = MediaDecoder.Playable(path);   // MP4 / M4A: decoded once to a cached WAV
+            if (path == null) return;
             _music = SDL.Mix_LoadMUS(SDL.U8(path));
             if (_music == IntPtr.Zero) { Console.WriteLine("Could not play " + path + ": " + SDL.GetError()); return; }
             _bgmBase = volume;
@@ -245,7 +247,7 @@ namespace PokeCreator.Runtime.Platform
             IntPtr c;
             if (!_chunks.TryGetValue(key, out c))
             {
-                string path = _project.FindAsset(folder, name);
+                string path = MediaDecoder.Playable(_project.FindAsset(folder, name));
                 c = path == null ? IntPtr.Zero : SDL.Mix_LoadWAV_RW(SDL.SDL_RWFromFile(SDL.U8(path), SDL.U8("rb")), 1);
                 _chunks[key] = c;
             }

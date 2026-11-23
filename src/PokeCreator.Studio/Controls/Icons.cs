@@ -338,7 +338,7 @@ namespace PokeCreator.Studio.Controls
                 case ".cs": return "cs";
                 case ".json": return "json";
                 case ".png": case ".gif": case ".bmp": case ".jpg": return "image";
-                case ".ogg": case ".wav": case ".mp3": case ".mid": case ".midi": return "audio";
+                case ".ogg": case ".wav": case ".mp3": case ".mid": case ".midi": case ".mp4": case ".m4a": case ".flac": case ".opus": return "audio";
                 case ".ttf": case ".otf": return "font";
                 default: return "text";
             }

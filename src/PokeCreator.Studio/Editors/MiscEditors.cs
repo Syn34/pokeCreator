@@ -382,6 +382,17 @@ namespace PokeCreator.Studio.Editors
             var right = new Panel { Dock = DockStyle.Right, Width = 320 };
             right.Controls.Add(_preview); right.Controls.Add(_details);
             Controls.Add(_view); Controls.Add(new Splitter { Dock = DockStyle.Right }); Controls.Add(right); Controls.Add(bar);
+            if (IsAudioFolder)
+            {
+                // Which files the game can play, above the Import Files bar
+                var formats = new Label
+                {
+                    Dock = DockStyle.Top, AutoSize = false, Height = 40, Padding = new Padding(8, 4, 8, 2), ForeColor = Theme.SubText,
+                    Text = "Supported audio: OGG (best: small, loops cleanly), WAV, MP3, MP4 / M4A, MIDI, FLAC, Opus.\n" +
+                           "MP4 / M4A are converted the first time they play (a short pause once). MIDI sounds different on every PC, so OGG is safer for music."
+                };
+                Controls.Add(formats);
+            }
             _view.SelectedIndexChanged += (s, e) => ShowSelected();
             _view.DoubleClick += (s, e) => { if (_view.SelectedItems.Count > 0) MainForm.OpenInShell((string)_view.SelectedItems[0].Tag); };
             AllowDrop = true; _view.AllowDrop = true;
@@ -391,6 +402,15 @@ namespace PokeCreator.Studio.Editors
         }
 
         string Relative(string d) { return d.StartsWith(_p.Root) ? d.Substring(_p.Root.Length).TrimStart(Path.DirectorySeparatorChar) : d; }
+
+        bool IsAudioFolder
+        {
+            get
+            {
+                string rel = Relative(_dir).Replace('\\', '/');
+                return rel.Equals("Audio", StringComparison.OrdinalIgnoreCase) || rel.StartsWith("Audio/", StringComparison.OrdinalIgnoreCase);
+            }
+        }
 
         static bool IsImage(string f) { var e = Path.GetExtension(f).ToLowerInvariant(); return e == ".png" || e == ".gif" || e == ".bmp" || e == ".jpg"; }
 
@@ -445,7 +465,10 @@ namespace PokeCreator.Studio.Editors
         void ImportFiles()
         {
             using (var d = new OpenFileDialog { Multiselect = true, Title = "Import into " + Relative(_dir) })
+            {
+                if (IsAudioFolder) d.Filter = "Audio files (OGG, WAV, MP3, MP4, M4A, MIDI, FLAC, Opus)|*.ogg;*.wav;*.mp3;*.mp4;*.m4a;*.mid;*.midi;*.flac;*.opus|All files|*.*";
                 if (d.ShowDialog(this) == DialogResult.OK) CopyIn(d.FileNames);
+            }
         }
 
         void CopyIn(string[] files)
