@@ -44,6 +44,7 @@ namespace PokeCreator.Studio.Editors
         readonly CheckBox _visible = new CheckBox { Text = "Visible", Width = 70 };
 
         BattleAnimation _a;
+        Button _importButton;
         int _frame, _cel = -1;
         bool _loading;
         readonly Dictionary<string, Image> _images = new Dictionary<string, Image>();
@@ -65,7 +66,14 @@ namespace PokeCreator.Studio.Editors
             leftButtons.Controls.Add(Btn("New", NewAnimation));
             leftButtons.Controls.Add(Btn("Duplicate", Duplicate));
             leftButtons.Controls.Add(Btn("Delete", DeleteAnimation));
-            leftButtons.Controls.Add(Btn("Import from Essentials…", ImportFromEssentials, 230));
+            var import = Btn("Import…", ShowImportMenu, 112);
+            leftButtons.Controls.Add(import);
+            leftButtons.Controls.Add(Btn("Export…", ExportPackage, 112));
+            _importButton = import;
+            new ToolTip().SetToolTip(import, "Import battle animations from " + AnimationPackage.SupportedText + ".\nYou can also drop any of these on the list.");
+            _list.AllowDrop = true;
+            _list.DragEnter += (s, e) => e.Effect = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+            _list.DragDrop += (s, e) => { var files = e.Data.GetData(DataFormats.FileDrop) as string[]; if (files != null) foreach (var f in files) ImportFrom(f); };
             left.Controls.Add(_list);
             left.Controls.Add(Lbl("Search (Move:, OppMove:, Common:)"));
             left.Controls.Add(_filter);
@@ -246,53 +254,87 @@ namespace PokeCreator.Studio.Editors
             if (_list.Items.Count > 0) _list.SelectedIndex = 0; else ShowFrame();
         }
 
-        void ImportFromEssentials()
+        void ShowImportMenu()
         {
-            using (var dlg = new FolderBrowserDialog { Description = "Choose your Pokémon Essentials project folder (the one with Data and Graphics)." })
+            var m = new ContextMenuStrip();
+            m.Items.Add("Package or file (.zip, .json, .rxdata, .anm)…", null, (s, e) =>
             {
-                if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                string root = dlg.SelectedPath;
-                string file = Path.Combine(root, "Data", "PkmnAnimations.rxdata");
-                if (!File.Exists(file)) { MessageBox.Show(this, "That folder has no Data/PkmnAnimations.rxdata.", "Import", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-                List<BattleAnimation> found;
-                try { found = PokeCreator.Import.EssentialsImporter.ReadAnimations(file); }
-                catch (Exception ex) { MessageBox.Show(this, "Could not read the animations:\n" + ex.Message, "Import", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
-                bool replace = true;
-                if (_p.Animations.Count > 0)
+                using (var dlg = new OpenFileDialog { Title = "Import battle animations", Filter = AnimationPackage.FileFilter, Multiselect = true })
+                    if (dlg.ShowDialog(this) == DialogResult.OK) foreach (var f in dlg.FileNames) ImportFrom(f);
+            });
+            m.Items.Add("Folder (a package, an Essentials project, or a folder of packages)…", null, (s, e) =>
+            {
+                using (var dlg = new FolderBrowserDialog { Description = "Choose a folder with battle animations in it: a package (animation.json or Data/PkmnAnimations.rxdata, with Graphics/Animations and Audio/SE/Anim), a Pokémon Essentials or PokeCreator project, or a folder holding several packages." })
+                    if (dlg.ShowDialog(this) == DialogResult.OK) ImportFrom(dlg.SelectedPath);
+            });
+            Theme.Apply(m);
+            m.Show(_importButton, new Point(0, _importButton.Height));
+        }
+
+        /// <summary>Imports battle animations from a package folder or zip, a .json, an Essentials .rxdata or .anm, or a project folder.</summary>
+        public void ImportFrom(string path)
+        {
+            AnimationPackage pk;
+            Cursor = Cursors.WaitCursor;
+            try { pk = AnimationPackage.Load(path); }
+            catch (Exception ex) { Cursor = Cursors.Default; MessageBox.Show(this, "Could not read " + Path.GetFileName(path) + ":\n" + ex.Message, "Import", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+            finally { Cursor = Cursors.Default; }
+            using (pk)
+            {
+                if (pk.Animations.Count == 0)
                 {
-                    var r = MessageBox.Show(this, "Found " + found.Count + " animations.\n\nYes = replace animations with the same name\nNo = only add the ones you don't have", "Import", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                    if (r == DialogResult.Cancel) return;
-                    replace = r == DialogResult.Yes;
+                    string why = pk.Notes.Count > 0 ? "\n\n" + string.Join("\n", pk.Notes.Take(8)) : "";
+                    MessageBox.Show(this, "No battle animations were found in " + path + ".\n\nPokeCreator can import " + AnimationPackage.SupportedText + "." + why, "Import", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
-                int added = 0;
-                foreach (var a in found)
+                AnimationPackage.Result r;
+                using (var dlg = new AnimationImportDialog(_p, pk))
                 {
-                    var old = _p.Animations.FirstOrDefault(x => x.Id == a.Id);
-                    if (old != null) { if (!replace) continue; _p.Animations.Remove(old); }
-                    _p.Animations.Add(a); added++;
+                    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                    var chosen = dlg.Chosen.ToList();
+                    if (chosen.Count == 0) return;
+                    try { r = pk.Install(_p, chosen, dlg.Clash); }
+                    catch (Exception ex) { MessageBox.Show(this, "Could not import:\n" + ex.Message, "Import", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
                 }
-                int copied = CopyFolder(Path.Combine(root, "Graphics", "Animations"), Path.Combine(_p.GraphicsDir, "Animations"))
-                           + CopyFolder(Path.Combine(root, "Audio", "SE", "Anim"), Path.Combine(_p.AudioDir, "SE", "Anim"));
                 MarkDirty();
                 _graphic.Items.Clear(); foreach (var f in SheetNames()) _graphic.Items.Add(f);
                 FillList();
-                if (_list.Items.Count > 0 && _a == null) _list.SelectedIndex = 0;
-                MessageBox.Show(this, added + " animations imported, " + copied + " sheet and sound files copied.\nSave to keep them.", "Import", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (r.First != null) { _filter.Text = ""; FillList(); _list.SelectedItem = r.First; if (_list.SelectedItem != r.First) Select(r.First); }
+                var msg = new List<string>();
+                msg.Add(r.Added + " animation" + (r.Added == 1 ? "" : "s") + " added" + (r.Replaced > 0 ? ", " + r.Replaced + " replaced" : "") + (r.Skipped > 0 ? ", " + r.Skipped + " skipped (you already had them)" : "") + ".");
+                msg.Add(r.Copied + " sheet and sound file" + (r.Copied == 1 ? "" : "s") + " copied" + (r.Same > 0 ? ", " + r.Same + " already in your project" : "") + (r.Renamed > 0 ? " (" + r.Renamed + " renamed with \" (2)\" because a different file had the name)" : "") + ".");
+                if (r.Missing.Count > 0) msg.Add("Not in the package or your project, so add them yourself:\n  " + string.Join("\n  ", r.Missing.Take(12)) + (r.Missing.Count > 12 ? "\n  …and " + (r.Missing.Count - 12) + " more" : ""));
+                msg.Add("Save to keep them.");
+                MessageBox.Show(this, string.Join("\n\n", msg), "Import", MessageBoxButtons.OK, r.Missing.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             }
         }
 
-        static int CopyFolder(string from, string to)
+        void ExportPackage()
         {
-            if (!Directory.Exists(from)) return 0;
-            Directory.CreateDirectory(to);
-            int n = 0;
-            foreach (var f in Directory.GetFiles(from))
+            if (_a == null) { MessageBox.Show(this, "Pick an animation to export first.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            var anims = new List<BattleAnimation> { _a };
+            var shown = _list.Items.OfType<BattleAnimation>().ToList();
+            if (shown.Count > 1)
             {
-                string dest = Path.Combine(to, Path.GetFileName(f));
-                if (File.Exists(dest)) continue;
-                File.Copy(f, dest); n++;
+                var r = MessageBox.Show(this, "Export just \"" + _a.Id + "\"?\n\nYes = just this one\nNo = all " + shown.Count + " animations in the list" + (_filter.Text.Trim().Length > 0 ? " (the ones matching your search)" : ""), "Export", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (r == DialogResult.Cancel) return;
+                if (r == DialogResult.No) anims = shown;
             }
-            return n;
+            string name = anims.Count == 1 ? _a.Id : "Battle animations";
+            foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, ' ');
+            using (var dlg = new SaveFileDialog { Title = "Export battle animation package", Filter = "Animation package (*.zip)|*.zip", FileName = name.Trim() + ".zip" })
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    List<string> missing;
+                    int files = AnimationPackage.Export(_p, anims, dlg.FileName, out missing);
+                    MessageBox.Show(this, anims.Count + " animation" + (anims.Count == 1 ? "" : "s") + " exported with " + files + " sheet and sound file" + (files == 1 ? "" : "s") + " to\n" + dlg.FileName
+                        + (missing.Count > 0 ? "\n\nNot found in your project, so not included:\n  " + string.Join("\n  ", missing.Take(12)) : "")
+                        + "\n\nAny PokeCreator project can import it with Import… in Battle Animations.", "Export", MessageBoxButtons.OK, missing.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+                }
+                catch (Exception ex) { MessageBox.Show(this, "Could not export:\n" + ex.Message, "Export", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
         }
 
         // ------------------------------------------------------------------ frames

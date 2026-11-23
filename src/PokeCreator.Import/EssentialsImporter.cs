@@ -673,13 +673,18 @@ namespace PokeCreator.Import
             catch (Exception ex) { Warn("PkmnAnimations.rxdata: " + ex.Message); }
         }
 
-        /// <summary>Reads Essentials' PkmnAnimations.rxdata (PBAnimations of PBAnimation) into battle animations.</summary>
+        /// <summary>
+        /// Reads Essentials' PkmnAnimations.rxdata (PBAnimations of PBAnimation) into battle animations. Also reads a single
+        /// PBAnimation, as Essentials' animation editor exports one (a .anm file).
+        /// </summary>
         public static List<BattleAnimation> ReadAnimations(string file)
         {
             var result = new List<BattleAnimation>();
             var root = MarshalReader.Load(file);
             var ua = root as RUserArray;
-            var list = ua != null ? (ua.Get("array") as List<object> ?? ua) : root as List<object>;
+            List<object> list;
+            if (ua != null && !string.IsNullOrEmpty(ua.Str("name"))) list = new List<object> { ua }; // one exported animation
+            else list = ua != null ? (ua.Get("array") as List<object> ?? ua) : root as List<object>;
             if (list == null) return result;
             // Essentials finds a move's extra-hit and charging animations by position (the move's index + hit number):
             // "Fury Attack hit 2" right after "Move:FURYATTACK" becomes "Move:FURYATTACK:1"
